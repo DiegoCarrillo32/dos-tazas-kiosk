@@ -561,3 +561,78 @@ export async function inviteStaffMember(
 
   if (profileError) throw profileError;
 }
+
+// ─── Analytics ─────────────────────────────────────────────────────
+
+export type AnalyticsData = {
+  totalRevenue: number;
+  totalOrders: number;
+  averageOrderValue: number;
+  revenueByDay: { date: string; revenue: number }[];
+  ordersByHour: { hour: string; orders: number }[];
+  topItems: { name: string; quantity: number; revenue: number }[];
+};
+
+export async function fetchAnalyticsData(
+  startDate?: string,
+  endDate?: string
+): Promise<AnalyticsData> {
+  const orders = await fetchCompletedOrders(startDate, endDate);
+
+  let totalRevenue = 0;
+  const totalOrders = orders.length;
+
+  const revenueByDayMap: Record<string, number> = {};
+  const ordersByHourMap: Record<string, number> = {};
+  const itemMap: Record<string, { quantity: number; revenue: number }> = {};
+
+  // Initialize hours
+  for (let i = 0; i < 24; i++) {
+    const hour = i.toString().padStart(2, "0") + ":00";
+    ordersByHourMap[hour] = 0;
+  }
+
+  orders.forEach((order) => {
+    totalRevenue += Number(order.total_amount);
+
+    const date = new Date(order.created_at);
+    const dayString = date.toISOString().split("T")[0]; // YYYY-MM-DD
+    const hourString = date.getHours().toString().padStart(2, "0") + ":00";
+
+    revenueByDayMap[dayString] = (revenueByDayMap[dayString] || 0) + Number(order.total_amount);
+    ordersByHourMap[hourString] += 1;
+
+    (order.order_items || []).forEach((item) => {
+      const itemName = item.menu_item?.name || "Unknown Item";
+      if (!itemMap[itemName]) {
+        itemMap[itemName] = { quantity: 0, revenue: 0 };
+      }
+      itemMap[itemName].quantity += item.quantity;
+      itemMap[itemName].revenue += Number(item.total_price);
+    });
+  });
+
+  const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+
+  const revenueByDay = Object.entries(revenueByDayMap)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, revenue]) => ({ date, revenue }));
+
+  const ordersByHour = Object.entries(ordersByHourMap)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([hour, orders]) => ({ hour, orders }));
+
+  const topItems = Object.entries(itemMap)
+    .sort(([, a], [, b]) => b.quantity - a.quantity)
+    .slice(0, 10)
+    .map(([name, stats]) => ({ name, ...stats }));
+
+  return {
+    totalRevenue,
+    totalOrders,
+    averageOrderValue,
+    revenueByDay,
+    ordersByHour,
+    topItems,
+  };
+}

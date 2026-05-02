@@ -8,6 +8,7 @@ import {
   fetchParkedOrders,
   fetchTodayAnalytics,
   fetchCompletedOrders,
+  fetchAnalyticsData,
   createOrder,
   completeOrder,
   cancelOrder,
@@ -47,6 +48,8 @@ export const queryKeys = {
   todayAnalytics: ["todayAnalytics"] as const,
   completedOrders: (start?: string, end?: string) =>
     ["completedOrders", start, end] as const,
+  analytics: (start?: string, end?: string) =>
+    ["analytics", start, end] as const,
   staffProfiles: ["staffProfiles"] as const,
   currentProfile: ["currentProfile"] as const,
 };
@@ -169,6 +172,14 @@ export function useCompletedOrders(startDate?: string, endDate?: string) {
   return useQuery({
     queryKey: queryKeys.completedOrders(startDate, endDate),
     queryFn: () => fetchCompletedOrders(startDate, endDate),
+    staleTime: SHORT_CACHE,
+  });
+}
+
+export function useAnalytics(startDate?: string, endDate?: string) {
+  return useQuery({
+    queryKey: queryKeys.analytics(startDate, endDate),
+    queryFn: () => fetchAnalyticsData(startDate, endDate),
     staleTime: SHORT_CACHE,
   });
 }

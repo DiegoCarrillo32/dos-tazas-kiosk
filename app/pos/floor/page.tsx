@@ -130,6 +130,7 @@ export default function FloorView() {
 
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [orderItems, setOrderItems] = useState<CartItem[]>([]);
+  const [isOrderExpanded, setIsOrderExpanded] = useState(false);
 
   // Modifier drawer
   const [drawerItem, setDrawerItem] = useState<MenuItem | null>(null);
@@ -216,7 +217,7 @@ export default function FloorView() {
   }
 
   return (
-    <div className="flex flex-col lg:flex-row h-full">
+    <div className="flex flex-col lg:flex-row h-full pb-[76px] lg:pb-0 relative overflow-hidden">
       {drawerItem && (
         <ModifierDrawer
           menuItem={drawerItem}
@@ -233,7 +234,7 @@ export default function FloorView() {
       )}
 
       {/* Left: Categories & Products */}
-      <div className="flex-1 flex flex-col h-[60vh] lg:h-full border-b lg:border-b-0 lg:border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950">
+      <div className="flex-1 flex flex-col h-full border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 overflow-hidden">
         <div className="flex overflow-x-auto p-4 gap-2 border-b border-zinc-200 dark:border-zinc-800 hide-scrollbar shrink-0">
           {categories.map((cat) => (
             <button
@@ -281,10 +282,22 @@ export default function FloorView() {
         </div>
       </div>
 
+      {/* Mobile Bottom Bar */}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-800 p-4 flex justify-between items-center z-30 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
+        <div>
+          <span className="font-semibold text-zinc-900 dark:text-zinc-50">{orderItems.length} items</span>
+          <span className="text-zinc-500 text-sm ml-2">${total.toFixed(2)}</span>
+        </div>
+        <Button onClick={() => setIsOrderExpanded(true)}>View Order</Button>
+      </div>
+
       {/* Right: Current Order */}
-      <div className="w-full lg:w-[400px] flex flex-col bg-white dark:bg-zinc-900 h-[40vh] lg:h-full shrink-0">
-        <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 shrink-0">
+      <div className={`fixed inset-0 z-50 lg:static lg:z-auto w-full lg:w-[400px] flex flex-col bg-white dark:bg-zinc-900 h-full shrink-0 transition-transform duration-300 ${isOrderExpanded ? "translate-y-0" : "translate-y-full lg:translate-y-0"}`}>
+        <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 shrink-0 flex justify-between items-center bg-white dark:bg-zinc-900">
           <h2 className="font-bold text-lg text-zinc-900 dark:text-zinc-50">Current Order</h2>
+          <button className="lg:hidden p-2 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-50" onClick={() => setIsOrderExpanded(false)}>
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-zinc-50/50 dark:bg-zinc-950/50">
@@ -340,7 +353,10 @@ export default function FloorView() {
           </div>
           <Button
             size="lg"
-            onClick={handleSendToCounter}
+            onClick={() => {
+              handleSendToCounter();
+              setIsOrderExpanded(false);
+            }}
             disabled={orderItems.length === 0}
             isLoading={createOrderMut.isPending}
             leftIcon={!createOrderMut.isPending && <Send className="w-5 h-5" />}

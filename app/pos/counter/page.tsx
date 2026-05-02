@@ -159,15 +159,16 @@ export default function CounterView() {
       </div>
 
       {/* Right: Checkout */}
-      <div className="flex-1 flex flex-col bg-zinc-50 dark:bg-zinc-950 h-[60vh] lg:h-full">
+      <div className="flex-1 flex flex-col bg-zinc-50 dark:bg-zinc-950 h-[60vh] lg:h-full overflow-hidden">
         {!currentSelected ? (
           <div className="flex-1 flex flex-col items-center justify-center text-zinc-400">
             <Receipt className="w-16 h-16 mb-4 opacity-20" />
             <h3 className="text-lg font-medium text-zinc-600 dark:text-zinc-400">Select an order to checkout</h3>
           </div>
         ) : (
-          <div className="flex-1 flex flex-col max-w-2xl mx-auto w-full p-6 lg:p-8 space-y-8 overflow-y-auto">
-            {/* Order Summary */}
+          <div className="flex-1 flex flex-col h-full overflow-hidden">
+            <div className="flex-1 overflow-y-auto p-6 lg:p-8 space-y-8">
+              {/* Order Summary */}
             <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
               <div className="flex justify-between items-center mb-4">
                 <div>
@@ -255,8 +256,10 @@ export default function CounterView() {
               )}
             </div>
 
+            </div>
+
             {/* Complete */}
-            <div className="pt-4 mt-auto">
+            <div className="p-6 lg:p-8 pt-4 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 shrink-0">
               <Button
                 size="lg"
                 onClick={handleCompleteOrder}

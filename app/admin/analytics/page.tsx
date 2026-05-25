@@ -115,7 +115,10 @@ export default function AnalyticsPage() {
                     <Tooltip 
                       contentStyle={{ backgroundColor: '#18181b', borderColor: '#27272a', borderRadius: '8px' }}
                       itemStyle={{ color: '#f4f4f5' }}
-                      formatter={(value: any) => [`$${Number(value).toFixed(2)}`, 'Revenue']}
+                      formatter={(value: number | string | readonly (number | string)[] | null | undefined) => {
+                        if (value === null || value === undefined) return ["$0.00", "Revenue"];
+                        return [`$${Number(value).toFixed(2)}`, "Revenue"];
+                      }}
                     />
                     <Line 
                       type="monotone" 

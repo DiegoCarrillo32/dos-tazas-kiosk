@@ -8,29 +8,20 @@ import { useCurrentProfile, useUpdateOwnProfile } from "@/lib/hooks";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Label } from "@/components/ui/Label";
+import type { UserProfile } from "@/lib/types";
 
-export default function SettingsPage() {
-  const router = useRouter();
-  const supabase = createClient();
-  const { data: profile, isLoading } = useCurrentProfile();
+function SettingsForm({
+  profile,
+  initialEmail,
+  onLogout,
+}: {
+  profile: UserProfile;
+  initialEmail: string;
+  onLogout: () => void;
+}) {
   const updateProfileMut = useUpdateOwnProfile();
-
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [email, setEmail] = useState("");
-
-  useEffect(() => {
-    if (profile) {
-      setFirstName(profile.first_name ?? "");
-      setLastName(profile.last_name ?? "");
-    }
-  }, [profile]);
-
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) setEmail(user.email ?? "");
-    });
-  }, [supabase.auth]);
+  const [firstName, setFirstName] = useState(profile.first_name ?? "");
+  const [lastName, setLastName] = useState(profile.last_name ?? "");
 
   const handleSave = () => {
     updateProfileMut.mutate(
@@ -38,19 +29,6 @@ export default function SettingsPage() {
       { onSuccess: () => alert("Profile updated!") }
     );
   };
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.push("/login");
-  };
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-zinc-400" />
-      </div>
-    );
-  }
 
   return (
     <div className="p-6 lg:p-8 space-y-8 max-w-2xl">
@@ -67,15 +45,15 @@ export default function SettingsPage() {
           </div>
           <div>
             <p className="font-semibold text-zinc-900 dark:text-zinc-100">
-              {profile?.first_name} {profile?.last_name}
+              {firstName} {lastName}
             </p>
-            <p className="text-sm text-zinc-500">{email}</p>
+            <p className="text-sm text-zinc-500">{initialEmail}</p>
             <span className={`inline-flex items-center mt-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${
-              profile?.role === "admin"
+              profile.role === "admin"
                 ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
                 : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
             }`}>
-              {profile?.role === "admin" ? "Admin" : "Staff"}
+              {profile.role === "admin" ? "Admin" : "Staff"}
             </span>
           </div>
         </div>
@@ -103,7 +81,7 @@ export default function SettingsPage() {
             <Label className="mb-1 block">Email</Label>
             <Input
               type="email"
-              value={email}
+              value={initialEmail}
               disabled
             />
             <p className="text-xs text-zinc-400 mt-1">Contact an administrator to change your email.</p>
@@ -125,12 +103,50 @@ export default function SettingsPage() {
         <p className="text-sm text-zinc-500 mb-4">Sign out of your account on this device.</p>
         <Button
           variant="danger"
-          onClick={handleLogout}
+          onClick={onLogout}
           leftIcon={<LogOut className="w-4 h-4" />}
         >
           Sign Out
         </Button>
       </div>
     </div>
+  );
+}
+
+export default function SettingsPage() {
+  const router = useRouter();
+  const supabase = createClient();
+  const { data: profile, isLoading } = useCurrentProfile();
+  const [email, setEmail] = useState("");
+  const [authLoading, setAuthLoading] = useState(true);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        setEmail(user.email ?? "");
+      }
+      setAuthLoading(false);
+    });
+  }, [supabase.auth]);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push("/login");
+  };
+
+  if (isLoading || authLoading || !profile) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-zinc-400" />
+      </div>
+    );
+  }
+
+  return (
+    <SettingsForm
+      profile={profile}
+      initialEmail={email}
+      onLogout={handleLogout}
+    />
   );
 }

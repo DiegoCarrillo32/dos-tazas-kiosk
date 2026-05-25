@@ -7,6 +7,8 @@ import { fetchModifiersForItem } from "@/lib/queries";
 import { useCategories, useMenuItems, useCreateOrder } from "@/lib/hooks";
 import { Button } from "@/components/ui/Button";
 
+const generateCartId = () => Math.random().toString(36).substring(2, 11);
+
 // ─── Modifier Drawer ──────────────────────────────────────────────
 
 function ModifierDrawer({
@@ -52,7 +54,7 @@ function ModifierDrawer({
       }
     }
     onConfirm({
-      cartId: Math.random().toString(36).substr(2, 9),
+      cartId: generateCartId(),
       menuItem,
       quantity: 1,
       selectedModifiers: selected,
@@ -121,6 +123,14 @@ function ModifierDrawer({
   );
 }
 
+// ─── Helpers ───────────────────────────────────────────────────────
+
+const areModifiersEqual = (a: SelectedModifier[], b: SelectedModifier[]) => {
+  if (a.length !== b.length) return false;
+  const aOptionIds = new Set(a.map((m) => m.option.id));
+  return b.every((m) => aOptionIds.has(m.option.id));
+};
+
 // ─── Floor View ────────────────────────────────────────────────────
 
 export default function FloorView() {
@@ -162,7 +172,7 @@ export default function FloorView() {
         setDrawerModifiers(mods);
       } else {
         addToOrder({
-          cartId: Math.random().toString(36).substr(2, 9),
+          cartId: generateCartId(),
           menuItem: product,
           quantity: 1,
           selectedModifiers: [],
@@ -170,7 +180,7 @@ export default function FloorView() {
       }
     } catch {
       addToOrder({
-        cartId: Math.random().toString(36).substr(2, 9),
+        cartId: generateCartId(),
         menuItem: product,
         quantity: 1,
         selectedModifiers: [],
@@ -180,8 +190,25 @@ export default function FloorView() {
     }
   };
 
-  const addToOrder = (item: CartItem) => {
-    setOrderItems((prev) => [...prev, item]);
+  const addToOrder = (newItem: CartItem) => {
+    setOrderItems((prev) => {
+      const existingIndex = prev.findIndex(
+        (item) =>
+          item.menuItem.id === newItem.menuItem.id &&
+          areModifiersEqual(item.selectedModifiers, newItem.selectedModifiers)
+      );
+
+      if (existingIndex > -1) {
+        const updated = [...prev];
+        updated[existingIndex] = {
+          ...updated[existingIndex],
+          quantity: updated[existingIndex].quantity + newItem.quantity,
+        };
+        return updated;
+      }
+
+      return [...prev, newItem];
+    });
     setDrawerItem(null);
     setDrawerModifiers([]);
   };

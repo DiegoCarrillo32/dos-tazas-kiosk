@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Shield, ShieldAlert, Trash2, X, Loader2, UserPlus, Users } from "lucide-react";
+import { Shield, ShieldAlert, Trash2, X, Loader2, UserPlus, Users } from "lucide-react";
 import type { UserProfile } from "@/lib/types";
 import {
   useStaffProfiles,

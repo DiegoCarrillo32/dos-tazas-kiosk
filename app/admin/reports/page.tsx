@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { format } from "date-fns";
-import { Download, Loader2 } from "lucide-react";
+import { Download } from "lucide-react";
 import { exportOrdersCSV } from "@/lib/queries";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { Button } from "@/components/ui/Button";

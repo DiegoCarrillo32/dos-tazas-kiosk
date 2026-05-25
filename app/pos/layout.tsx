@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Coffee, MonitorPlay, LogOut, UserCircle } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 
 export default function POSLayout({
   children,
@@ -63,6 +64,7 @@ export default function POSLayout({
             Admin
           </Link>
           <div className="h-8 w-px bg-zinc-200 dark:bg-zinc-800 hidden sm:block"></div>
+          <ThemeToggle />
           <button
             onClick={handleLogout}
             className="flex items-center gap-2 text-zinc-500 hover:text-red-600 dark:text-zinc-400 dark:hover:text-red-400 transition-colors"

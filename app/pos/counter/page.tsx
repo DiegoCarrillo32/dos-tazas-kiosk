@@ -184,11 +184,11 @@ export default function CounterView() {
                   <div key={item.id} className="flex justify-between items-start text-sm">
                     <div>
                       <span className="text-zinc-900 dark:text-zinc-100 font-medium">
-                        {item.quantity}× {(item as any).menu_item?.name ?? "Item"}
+                        {item.quantity}× {item.menu_item?.name ?? "Item"}
                       </span>
                       {(item.modifiers ?? []).length > 0 && (
                         <p className="text-xs text-zinc-400 mt-0.5">
-                          {(item.modifiers ?? []).map((m: any) => m.name).join(", ")}
+                          {(item.modifiers ?? []).map((m) => m.name).join(", ")}
                         </p>
                       )}
                     </div>

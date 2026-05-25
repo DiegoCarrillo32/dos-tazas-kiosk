@@ -67,7 +67,7 @@ export default function TransactionHistory() {
                 <div className="space-y-2">
                   {(selectedOrder.order_items ?? []).map((item: OrderItem) => (
                     <div key={item.id} className="flex justify-between">
-                      <span>{item.quantity}× {(item as any).menu_item?.name ?? "Item"}</span>
+                      <span>{item.quantity}× {item.menu_item?.name ?? "Item"}</span>
                       <span>${Number(item.total_price).toFixed(2)}</span>
                     </div>
                   ))}

@@ -18,16 +18,19 @@ import {
   useCompleteOrder,
   useCancelOrder,
   useLocationSettings,
+  useOrdersRealtime,
 } from "@/lib/hooks";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Label } from "@/components/ui/Label";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { Receipt as ReceiptView } from "@/components/Receipt";
+import { formatMoney } from "@/lib/utils";
 
 export default function CounterView() {
   const { data: orders = [], isLoading, refetch, isRefetching } = useParkedOrders();
   const { data: settings } = useLocationSettings();
+  const live = useOrdersRealtime();
   const completeOrderMut = useCompleteOrder();
   const cancelOrderMut = useCancelOrder();
 
@@ -63,6 +66,7 @@ export default function CounterView() {
   const taxRatePct = Math.round(
     Number(currentSelected?.tax_rate ?? settings?.tax_rate ?? 0.13) * 100
   );
+  const currency = settings?.currency ?? "CRC";
   const tipEnabled = settings?.tip_enabled ?? false;
   const tipAmount = Math.max(0, parseFloat(tip) || 0);
   const totalDue = subtotal + taxAmount + tipAmount;
@@ -160,13 +164,21 @@ export default function CounterView() {
       {/* Left: Order Queue */}
       <div className="w-full lg:w-1/3 border-b lg:border-b-0 lg:border-r border-warm-roast/10 bg-card flex flex-col h-[40vh] lg:h-full shrink-0">
         <div className="p-4 border-b border-warm-roast/10 flex items-center justify-between shrink-0">
-          <h2 className="font-bold text-lg text-expresso">
+          <h2 className="font-bold text-lg text-expresso flex items-center gap-2">
             Parked Orders
-            {orders.length > 0 && <span className="ml-2 text-sm font-normal text-expresso/60">({orders.length})</span>}
+            {orders.length > 0 && <span className="text-sm font-normal text-expresso/60">({orders.length})</span>}
+            <span
+              title={live ? "Live — updates automatically" : "Reconnecting…"}
+              className={`inline-flex items-center gap-1 text-[11px] font-medium ${live ? "text-green-600 dark:text-green-400" : "text-expresso/40"}`}
+            >
+              <span className={`w-2 h-2 rounded-full ${live ? "bg-green-500 animate-pulse" : "bg-expresso/30"}`} />
+              {live ? "Live" : "…"}
+            </span>
           </h2>
           <button
             onClick={() => refetch()}
             disabled={isRefetching}
+            title="Refresh"
             className="p-2 text-expresso/60 hover:text-expresso bg-warm-roast/10 hover:bg-warm-roast/20 rounded-md transition-colors"
           >
             <RefreshCw className={`w-4 h-4 ${isRefetching ? "animate-spin" : ""}`} />
@@ -219,11 +231,13 @@ export default function CounterView() {
                       {order.order_number ? `#${order.order_number}` : `${order.id.slice(0, 8)}…`}
                     </span>
                     <span className="text-sm font-bold text-expresso">
-                      ${Number(order.total_amount).toFixed(2)}
+                      {formatMoney(Number(order.total_amount), currency)}
                     </span>
                   </div>
                   <div className="flex justify-between text-xs text-expresso/60">
-                    <span>{itemCount} item{itemCount !== 1 ? "s" : ""}</span>
+                    <span>
+                      {order.table?.name ?? "Takeaway"} · {itemCount} item{itemCount !== 1 ? "s" : ""}
+                    </span>
                     <span>{formatTime(order.created_at)}</span>
                   </div>
                 </button>
@@ -250,10 +264,12 @@ export default function CounterView() {
                   <h2 className="text-xl font-bold text-expresso">
                     Order {currentSelected.order_number ? `#${currentSelected.order_number}` : `#${currentSelected.id.slice(0, 8)}`}
                   </h2>
-                  <p className="text-expresso/60 text-sm">{formatTime(currentSelected.created_at)}</p>
+                  <p className="text-expresso/60 text-sm">
+                    {currentSelected.table?.name ?? "Takeaway"} · {formatTime(currentSelected.created_at)}
+                  </p>
                 </div>
                 <div className="text-3xl font-black text-expresso">
-                  ${totalDue.toFixed(2)}
+                  {formatMoney(totalDue, currency)}
                 </div>
               </div>
               <div className="space-y-2 border-t border-warm-roast/10 pt-4">
@@ -269,7 +285,7 @@ export default function CounterView() {
                         </p>
                       )}
                     </div>
-                    <span className="text-expresso/80">${Number(item.total_price).toFixed(2)}</span>
+                    <span className="text-expresso/80">{formatMoney(Number(item.total_price), currency)}</span>
                   </div>
                 ))}
               </div>
@@ -277,21 +293,21 @@ export default function CounterView() {
               <div className="space-y-1.5 border-t border-warm-roast/10 mt-4 pt-4 text-sm">
                 <div className="flex justify-between text-expresso/70">
                   <span>Subtotal</span>
-                  <span>${subtotal.toFixed(2)}</span>
+                  <span>{formatMoney(subtotal, currency)}</span>
                 </div>
                 <div className="flex justify-between text-expresso/70">
                   <span>IVA ({taxRatePct}%)</span>
-                  <span>${taxAmount.toFixed(2)}</span>
+                  <span>{formatMoney(taxAmount, currency)}</span>
                 </div>
                 {tipAmount > 0 && (
                   <div className="flex justify-between text-expresso/70">
                     <span>Tip</span>
-                    <span>${tipAmount.toFixed(2)}</span>
+                    <span>{formatMoney(tipAmount, currency)}</span>
                   </div>
                 )}
                 <div className="flex justify-between font-bold text-expresso pt-1.5 border-t border-warm-roast/10 mt-1.5">
                   <span>Total</span>
-                  <span>${totalDue.toFixed(2)}</span>
+                  <span>{formatMoney(totalDue, currency)}</span>
                 </div>
               </div>
             </div>
@@ -389,14 +405,14 @@ export default function CounterView() {
                           onClick={() => setTendered(String(amt))}
                           className="px-3 py-1.5 text-sm rounded-lg bg-warm-roast/10 text-expresso/70 hover:bg-warm-roast/20 transition-colors"
                         >
-                          ${amt.toLocaleString()}
+                          {formatMoney(amt, currency)}
                         </button>
                       ))}
                   </div>
                   <div className="flex justify-between items-center pt-1 border-t border-warm-roast/10">
                     <span className="text-sm font-medium text-expresso/60">Change Due</span>
                     <span className={`text-lg font-bold ${changeDue < 0 ? "text-red-500" : "text-expresso"}`}>
-                      ${(changeDue < 0 ? 0 : changeDue).toFixed(2)}
+                      {formatMoney(changeDue < 0 ? 0 : changeDue, currency)}
                     </span>
                   </div>
                 </div>

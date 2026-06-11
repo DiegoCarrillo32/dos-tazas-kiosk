@@ -1,0 +1,127 @@
+"use client";
+
+import { useState } from "react";
+import { Plus, Trash2, Loader2, Armchair, Check, X, Pencil } from "lucide-react";
+import type { Table } from "@/lib/types";
+import { useTables, useCreateTable, useUpdateTable, useDeleteTable } from "@/lib/hooks";
+import { Input } from "@/components/ui/Input";
+import { Button } from "@/components/ui/Button";
+
+export default function TablesManagement() {
+  const { data: tables = [], isLoading } = useTables();
+  const createMut = useCreateTable();
+  const updateMut = useUpdateTable();
+  const deleteMut = useDeleteTable();
+
+  const [newName, setNewName] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+
+  const handleCreate = () => {
+    const name = newName.trim();
+    if (!name) return;
+    createMut.mutate(name, { onSuccess: () => setNewName("") });
+  };
+
+  const startEdit = (t: Table) => {
+    setEditingId(t.id);
+    setEditName(t.name);
+  };
+
+  const saveEdit = () => {
+    if (!editingId) return;
+    const name = editName.trim();
+    if (!name) return;
+    updateMut.mutate(
+      { id: editingId, updates: { name } },
+      { onSuccess: () => setEditingId(null) }
+    );
+  };
+
+  const handleDelete = (t: Table) => {
+    if (!confirm(`Delete "${t.name}"? Any orders on it become takeaway; it won't be selectable for new orders.`)) return;
+    deleteMut.mutate(t.id, { onError: () => alert("Failed to delete table. Please try again.") });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-expresso/40" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6 lg:p-8 space-y-6 max-w-3xl">
+      <div>
+        <h1 className="text-2xl font-bold text-expresso">Tables</h1>
+        <p className="text-expresso/60 mt-1">Name the tables and tabs your staff can assign orders to</p>
+      </div>
+
+      {/* Add */}
+      <div className="bg-card p-4 rounded-xl border border-warm-roast/10 flex gap-3">
+        <Input
+          type="text"
+          value={newName}
+          onChange={(e) => setNewName(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && handleCreate()}
+          placeholder="Table name (e.g. Mesa 5, Barra 2, Patio 1)"
+          className="flex-1"
+        />
+        <Button onClick={handleCreate} disabled={!newName.trim()} isLoading={createMut.isPending} leftIcon={<Plus className="w-4 h-4" />}>
+          Add Table
+        </Button>
+      </div>
+
+      {/* List */}
+      <div className="bg-card rounded-2xl border border-warm-roast/10 overflow-hidden">
+        {tables.length === 0 ? (
+          <div className="px-6 py-12 text-center text-expresso/40 text-sm">
+            No tables yet. Add your first one above.
+          </div>
+        ) : (
+          <ul className="divide-y divide-warm-roast/10">
+            {tables.map((t) => (
+              <li key={t.id} className="flex items-center gap-3 px-5 py-3">
+                <div className="w-9 h-9 rounded-lg bg-warm-roast/10 flex items-center justify-center shrink-0">
+                  <Armchair className="w-5 h-5 text-expresso/40" />
+                </div>
+                {editingId === t.id ? (
+                  <>
+                    <Input
+                      type="text"
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") saveEdit();
+                        if (e.key === "Escape") setEditingId(null);
+                      }}
+                      className="flex-1"
+                      autoFocus
+                    />
+                    <button onClick={saveEdit} className="p-2 text-green-600 hover:text-green-700" title="Save">
+                      <Check className="w-4 h-4" />
+                    </button>
+                    <button onClick={() => setEditingId(null)} className="p-2 text-expresso/40 hover:text-expresso" title="Cancel">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <span className="flex-1 font-medium text-expresso">{t.name}</span>
+                    <button onClick={() => startEdit(t)} className="p-2 text-expresso/40 hover:text-coffee-fruit transition-colors" title="Rename">
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                    <button onClick={() => handleDelete(t)} className="p-2 text-expresso/40 hover:text-destructive transition-colors" title="Delete">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}

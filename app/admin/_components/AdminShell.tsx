@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, Menu as MenuIcon, X, History, FileText, Store, LogOut, ArrowLeft, SlidersHorizontal, UsersRound, Settings, BarChart3 } from "lucide-react";
+import { LayoutDashboard, Menu as MenuIcon, X, History, FileText, Store, LogOut, ArrowLeft, SlidersHorizontal, UsersRound, Settings, BarChart3, Armchair } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 
@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/admin/menu", label: "Menu & Inventory", icon: MenuIcon },
+  { href: "/admin/tables", label: "Tables", icon: Armchair },
   { href: "/admin/modifiers", label: "Modifiers", icon: SlidersHorizontal },
   { href: "/admin/staff", label: "Staff", icon: UsersRound },
   { href: "/admin/history", label: "Transaction History", icon: History },

@@ -63,6 +63,15 @@ export type ModifierOption = {
   created_at: string;
 };
 
+export type Table = {
+  id: string;
+  location_id: string;
+  name: string;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
 export type OrderStatus = "draft" | "parked" | "completed" | "cancelled";
 export type PaymentMethod = "card" | "cash" | "sinpe";
 
@@ -86,6 +95,7 @@ export type Order = {
   location_id: string;
   user_id: string | null;
   status: OrderStatus;
+  table_id: string | null;
   order_number: number | null;
   subtotal: number;
   tax_amount: number;
@@ -104,6 +114,7 @@ export type Order = {
   updated_at: string;
   // Joined data
   order_items?: OrderItem[];
+  table?: { name: string } | null;
 };
 
 export type OrderItem = {

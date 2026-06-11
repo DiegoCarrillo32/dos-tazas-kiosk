@@ -57,6 +57,7 @@ export function Receipt({
             <span>Orden #{order.order_number ?? order.id.slice(0, 8)}</span>
             <span>{dateStr}</span>
           </div>
+          <div>{order.table?.name ? `Mesa: ${order.table.name}` : "Para llevar"}</div>
 
           <div className="border-t border-dashed border-expresso/40 my-2" />
 

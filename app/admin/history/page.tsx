@@ -55,6 +55,7 @@ export default function TransactionHistory() {
             </div>
             <div className="space-y-3 text-sm">
               <div className="flex justify-between"><span className="text-expresso/60">Date</span><span className="font-medium text-expresso">{formatDate(selectedOrder.created_at)}</span></div>
+              <div className="flex justify-between"><span className="text-expresso/60">Table</span><span className="text-expresso">{selectedOrder.table?.name ?? "Takeaway"}</span></div>
               <div className="flex justify-between"><span className="text-expresso/60">Total</span><span className="font-bold text-expresso">${Number(selectedOrder.total_amount).toFixed(2)}</span></div>
               <div className="flex justify-between"><span className="text-expresso/60">Payment</span><span className="text-expresso">{selectedOrder.payment_method?.toUpperCase() ?? "—"}</span></div>
               {selectedOrder.payment_reference && (<div className="flex justify-between"><span className="text-expresso/60">Reference</span><span className="text-expresso">{selectedOrder.payment_reference}</span></div>)}

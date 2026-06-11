@@ -9,6 +9,7 @@ import type {
   CartItem,
   PaymentMethod,
   LocationSettings,
+  Table,
   UserProfile,
 } from "./types";
 
@@ -270,19 +271,38 @@ export async function setMenuItemModifiers(
 
 // ─── Orders ────────────────────────────────────────────────────────
 
-export async function createOrder(cartItems: CartItem[]): Promise<string> {
-  // Pricing, tax and order numbering are computed server-side by the
-  // create_order RPC. The client only sends item/quantity/option IDs —
-  // never prices — so totals cannot be tampered with.
-  const items = cartItems.map((item) => ({
+function cartItemsToRpcItems(cartItems: CartItem[]) {
+  // The client only sends item/quantity/option IDs — never prices — so
+  // server-side pricing cannot be tampered with.
+  return cartItems.map((item) => ({
     menu_item_id: item.menuItem.id,
     quantity: item.quantity,
     modifier_option_ids: item.selectedModifiers.map((m) => m.option.id),
   }));
+}
 
-  const { data, error } = await supabase().rpc("create_order", { items });
+export async function createOrder(
+  cartItems: CartItem[],
+  tableId?: string | null
+): Promise<string> {
+  const { data, error } = await supabase().rpc("create_order", {
+    items: cartItemsToRpcItems(cartItems),
+    p_table_id: tableId ?? null,
+  });
   if (error) throw error;
   return data as string;
+}
+
+// Append items to an existing open tab (parked order on a table).
+export async function appendToOrder(
+  orderId: string,
+  cartItems: CartItem[]
+): Promise<void> {
+  const { error } = await supabase().rpc("append_to_order", {
+    p_order_id: orderId,
+    items: cartItemsToRpcItems(cartItems),
+  });
+  if (error) throw error;
 }
 
 export async function fetchParkedOrders(): Promise<Order[]> {
@@ -290,7 +310,7 @@ export async function fetchParkedOrders(): Promise<Order[]> {
   const { data, error } = await supabase()
     .from("orders")
     .select(
-      "*, order_items(*, menu_item:menu_items(name), modifiers:order_item_modifiers(*))"
+      "*, table:tables(name), order_items(*, menu_item:menu_items(name), modifiers:order_item_modifiers(*))"
     )
     .eq("location_id", locationId)
     .eq("status", "parked")
@@ -377,7 +397,7 @@ export async function fetchCompletedOrders(
   let query = supabase()
     .from("orders")
     .select(
-      "*, order_items(*, menu_item:menu_items(name), modifiers:order_item_modifiers(*))"
+      "*, table:tables(name), order_items(*, menu_item:menu_items(name), modifiers:order_item_modifiers(*))"
     )
     .eq("location_id", locationId)
     .eq("status", "completed")
@@ -446,6 +466,44 @@ export async function exportOrdersCSV(
   });
 
   return [header.map(csvCell).join(","), ...rows].join("\r\n");
+}
+
+// ─── Tables ────────────────────────────────────────────────────────
+
+export async function fetchTables(): Promise<Table[]> {
+  const locationId = await getLocationId();
+  const { data, error } = await supabase()
+    .from("tables")
+    .select("*")
+    .eq("location_id", locationId)
+    .order("sort_order")
+    .order("name");
+  if (error) throw error;
+  return (data ?? []) as Table[];
+}
+
+export async function createTable(name: string): Promise<Table> {
+  const locationId = await getLocationId();
+  const { data, error } = await supabase()
+    .from("tables")
+    .insert({ location_id: locationId, name })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as Table;
+}
+
+export async function updateTable(
+  id: string,
+  updates: { name?: string; sort_order?: number }
+): Promise<void> {
+  const { error } = await supabase().from("tables").update(updates).eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteTable(id: string): Promise<void> {
+  const { error } = await supabase().from("tables").delete().eq("id", id);
+  if (error) throw error;
 }
 
 // ─── Location Settings ─────────────────────────────────────────────

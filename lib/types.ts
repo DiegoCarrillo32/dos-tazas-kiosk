@@ -35,6 +35,9 @@ export type MenuItem = {
   price: number;
   available_quantity: number;
   is_active: boolean;
+  track_inventory: boolean;
+  low_stock_threshold: number;
+  is_available: boolean;
   created_at: string;
   updated_at: string;
   // Joined data

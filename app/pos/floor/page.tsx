@@ -288,21 +288,45 @@ export default function FloorView() {
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {filteredProducts.map((product) => (
-                <button
-                  key={product.id}
-                  onClick={() => handleProductClick(product)}
-                  className="aspect-square bg-card border border-warm-roast/10 rounded-xl p-4 flex flex-col items-center justify-center gap-3 hover:border-warm-roast/40 hover:shadow-md transition-all active:scale-95"
-                >
-                  <div className="bg-warm-roast/10 p-3 rounded-full">
-                    <Coffee className="w-8 h-8 text-expresso/40" />
-                  </div>
-                  <div className="text-center">
-                    <h3 className="font-semibold text-sm text-expresso leading-tight">{product.name}</h3>
-                    <p className="text-xs text-expresso/60 mt-1">${Number(product.price).toFixed(2)}</p>
-                  </div>
-                </button>
-              ))}
+              {filteredProducts.map((product) => {
+                const soldOut =
+                  product.is_available === false ||
+                  (product.track_inventory && product.available_quantity <= 0);
+                const lowStock =
+                  product.track_inventory &&
+                  product.available_quantity > 0 &&
+                  product.available_quantity <= product.low_stock_threshold;
+                return (
+                  <button
+                    key={product.id}
+                    onClick={() => !soldOut && handleProductClick(product)}
+                    disabled={soldOut}
+                    className={`relative aspect-square bg-card border border-warm-roast/10 rounded-xl p-4 flex flex-col items-center justify-center gap-3 transition-all ${
+                      soldOut
+                        ? "opacity-50 cursor-not-allowed"
+                        : "hover:border-warm-roast/40 hover:shadow-md active:scale-95"
+                    }`}
+                  >
+                    {soldOut && (
+                      <span className="absolute top-2 right-2 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-400">
+                        Sold out
+                      </span>
+                    )}
+                    {!soldOut && lowStock && (
+                      <span className="absolute top-2 right-2 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-400">
+                        {product.available_quantity} left
+                      </span>
+                    )}
+                    <div className="bg-warm-roast/10 p-3 rounded-full">
+                      <Coffee className="w-8 h-8 text-expresso/40" />
+                    </div>
+                    <div className="text-center">
+                      <h3 className="font-semibold text-sm text-expresso leading-tight">{product.name}</h3>
+                      <p className="text-xs text-expresso/60 mt-1">${Number(product.price).toFixed(2)}</p>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>

@@ -233,7 +233,9 @@ export default function CounterView() {
                     </span>
                   </div>
                   <div className="flex justify-between text-xs text-expresso/60">
-                    <span>{itemCount} item{itemCount !== 1 ? "s" : ""}</span>
+                    <span>
+                      {order.table?.name ?? "Takeaway"} · {itemCount} item{itemCount !== 1 ? "s" : ""}
+                    </span>
                     <span>{formatTime(order.created_at)}</span>
                   </div>
                 </button>
@@ -260,7 +262,9 @@ export default function CounterView() {
                   <h2 className="text-xl font-bold text-expresso">
                     Order {currentSelected.order_number ? `#${currentSelected.order_number}` : `#${currentSelected.id.slice(0, 8)}`}
                   </h2>
-                  <p className="text-expresso/60 text-sm">{formatTime(currentSelected.created_at)}</p>
+                  <p className="text-expresso/60 text-sm">
+                    {currentSelected.table?.name ?? "Takeaway"} · {formatTime(currentSelected.created_at)}
+                  </p>
                 </div>
                 <div className="text-3xl font-black text-expresso">
                   ${totalDue.toFixed(2)}

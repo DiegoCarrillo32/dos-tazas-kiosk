@@ -1,10 +1,20 @@
 "use client";
 
 import { useState } from "react";
-import { Coffee, Plus, Minus, Trash2, Send, Loader2, X } from "lucide-react";
-import type { MenuItem, ModifierOption, CartItem, SelectedModifier, Modifier } from "@/lib/types";
+import { Coffee, Plus, Minus, Trash2, Send, Loader2, X, ShoppingBag, Armchair } from "lucide-react";
+import type { MenuItem, ModifierOption, CartItem, SelectedModifier, Modifier, OrderItem } from "@/lib/types";
 import { fetchModifiersForItem } from "@/lib/queries";
-import { useCategories, useMenuItems, useCreateOrder } from "@/lib/hooks";
+import {
+  useCategories,
+  useMenuItems,
+  useCreateOrder,
+  useAppendToOrder,
+  useTables,
+  useParkedOrders,
+  useOrdersRealtime,
+  useLocationSettings,
+} from "@/lib/hooks";
+import { formatMoney } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 
 const generateCartId = () => Math.random().toString(36).substring(2, 11);
@@ -134,11 +144,32 @@ const areModifiersEqual = (a: SelectedModifier[], b: SelectedModifier[]) => {
 export default function FloorView() {
   const { data: categories = [], isLoading: catsLoading } = useCategories();
   const { data: menuItems = [], isLoading: itemsLoading } = useMenuItems();
+  const { data: tables = [] } = useTables();
+  const { data: parkedOrders = [] } = useParkedOrders();
+  const { data: settings } = useLocationSettings();
+  const currency = settings?.currency ?? "CRC";
   const createOrderMut = useCreateOrder();
+  const appendOrderMut = useAppendToOrder();
+  useOrdersRealtime();
 
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [orderItems, setOrderItems] = useState<CartItem[]>([]);
   const [isOrderExpanded, setIsOrderExpanded] = useState(false);
+  // null = Takeaway / walk-in (no table)
+  const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
+
+  // Table tabs: which tables already have an open (parked) order, and the
+  // currently-selected table's open tab (if any) so we append to it.
+  const occupiedTableIds = new Set(
+    parkedOrders.map((o) => o.table_id).filter(Boolean) as string[]
+  );
+  const openTab = selectedTableId
+    ? parkedOrders.find((o) => o.table_id === selectedTableId) ?? null
+    : null;
+  const selectedTableName = selectedTableId
+    ? tables.find((t) => t.id === selectedTableId)?.name ?? "Table"
+    : "Takeaway";
+  const tabExistingTotal = openTab ? Number(openTab.total_amount) : 0;
 
   // Modifier drawer
   const [drawerItem, setDrawerItem] = useState<MenuItem | null>(null);
@@ -226,12 +257,35 @@ export default function FloorView() {
     setOrderItems((items) => items.filter((item) => item.cartId !== cartId));
   };
 
-  const handleSendToCounter = () => {
+  const isSending = createOrderMut.isPending || appendOrderMut.isPending;
+
+  const handleSend = () => {
     if (orderItems.length === 0) return;
-    createOrderMut.mutate(orderItems, {
-      onSuccess: () => setOrderItems([]),
-      onError: () => alert("Failed to send order. Please try again."),
-    });
+    if (openTab) {
+      // Add to the table's existing running tab.
+      appendOrderMut.mutate(
+        { orderId: openTab.id, cartItems: orderItems },
+        {
+          onSuccess: () => {
+            setOrderItems([]);
+            setIsOrderExpanded(false);
+          },
+          onError: () => alert("Failed to add to tab. Please try again."),
+        }
+      );
+    } else {
+      // Open a new order/tab (with the chosen table, or takeaway).
+      createOrderMut.mutate(
+        { cartItems: orderItems, tableId: selectedTableId },
+        {
+          onSuccess: () => {
+            setOrderItems([]);
+            setIsOrderExpanded(false);
+          },
+          onError: () => alert("Failed to send order. Please try again."),
+        }
+      );
+    }
   };
 
   if (isLoading) {
@@ -261,6 +315,46 @@ export default function FloorView() {
 
       {/* Left: Categories & Products */}
       <div className="flex-1 flex flex-col h-full border-r border-warm-roast/10 bg-card overflow-hidden">
+        {/* Table selector */}
+        <div className="flex items-center gap-2 overflow-x-auto px-4 py-2.5 border-b border-warm-roast/10 hide-scrollbar shrink-0 bg-muted/30">
+          <span className="text-xs font-semibold text-expresso/50 uppercase tracking-wider shrink-0 pr-1">Table</span>
+          <button
+            onClick={() => setSelectedTableId(null)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
+              selectedTableId === null
+                ? "bg-coffee-fruit text-white shadow-sm"
+                : "bg-warm-roast/10 text-expresso/70 hover:bg-warm-roast/20"
+            }`}
+          >
+            <ShoppingBag className="w-3.5 h-3.5" />
+            Takeaway
+          </button>
+          {tables.map((t) => {
+            const occupied = occupiedTableIds.has(t.id);
+            const active = selectedTableId === t.id;
+            return (
+              <button
+                key={t.id}
+                onClick={() => setSelectedTableId(t.id)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
+                  active
+                    ? "bg-coffee-fruit text-white shadow-sm"
+                    : occupied
+                      ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 hover:bg-amber-200"
+                      : "bg-warm-roast/10 text-expresso/70 hover:bg-warm-roast/20"
+                }`}
+              >
+                <Armchair className="w-3.5 h-3.5" />
+                {t.name}
+                {occupied && <span className={`w-1.5 h-1.5 rounded-full ${active ? "bg-white" : "bg-amber-500"}`} />}
+              </button>
+            );
+          })}
+          {tables.length === 0 && (
+            <span className="text-xs text-expresso/40">No tables yet — add some in Admin → Tables.</span>
+          )}
+        </div>
+
         <div className="flex overflow-x-auto p-4 gap-2 border-b border-warm-roast/10 hide-scrollbar shrink-0">
           {categories.map((cat) => (
             <button
@@ -322,7 +416,7 @@ export default function FloorView() {
                     </div>
                     <div className="text-center">
                       <h3 className="font-semibold text-sm text-expresso leading-tight">{product.name}</h3>
-                      <p className="text-xs text-expresso/60 mt-1">${Number(product.price).toFixed(2)}</p>
+                      <p className="text-xs text-expresso/60 mt-1">{formatMoney(product.price, currency)}</p>
                     </div>
                   </button>
                 );
@@ -339,7 +433,8 @@ export default function FloorView() {
           <span className="font-semibold text-expresso">
             {totalQuantity} item{totalQuantity !== 1 ? "s" : ""}
           </span>
-          <span className="text-expresso/60 text-sm ml-2">${total.toFixed(2)}</span>
+          <span className="text-expresso/60 text-sm ml-2">{formatMoney(total, currency)}</span>
+          <span className="block text-xs text-expresso/50">{selectedTableName}{openTab ? " · open tab" : ""}</span>
         </div>
         <Button onClick={() => setIsOrderExpanded(true)} disabled={orderItems.length === 0}>View Order</Button>
       </div>
@@ -347,17 +442,47 @@ export default function FloorView() {
       {/* Right: Current Order */}
       <div className={`fixed inset-0 z-50 lg:static lg:z-auto w-full lg:w-[400px] flex flex-col bg-card h-full shrink-0 transition-transform duration-300 ${isOrderExpanded ? "translate-y-0" : "translate-y-full lg:translate-y-0"}`}>
         <div className="p-4 border-b border-warm-roast/10 shrink-0 flex justify-between items-center bg-card">
-          <h2 className="font-bold text-lg text-expresso">Current Order</h2>
+          <div className="flex items-center gap-2">
+            {selectedTableId === null ? (
+              <ShoppingBag className="w-4 h-4 text-expresso/50" />
+            ) : (
+              <Armchair className="w-4 h-4 text-expresso/50" />
+            )}
+            <h2 className="font-bold text-lg text-expresso">{selectedTableName}</h2>
+            {openTab && (
+              <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+                Open tab
+              </span>
+            )}
+          </div>
           <button className="lg:hidden p-2 text-expresso/60 hover:text-expresso" onClick={() => setIsOrderExpanded(false)}>
             <X className="w-5 h-5" />
           </button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-muted/40">
+          {/* Existing items already on this table's tab (read-only) */}
+          {openTab && (openTab.order_items ?? []).length > 0 && (
+            <div className="bg-warm-roast/5 border border-warm-roast/10 rounded-lg p-3">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-xs font-semibold text-expresso/50 uppercase tracking-wider">Already on tab</span>
+                <span className="text-xs font-semibold text-expresso/70">{formatMoney(tabExistingTotal, currency)}</span>
+              </div>
+              <div className="space-y-1">
+                {(openTab.order_items ?? []).map((it: OrderItem) => (
+                  <div key={it.id} className="flex justify-between text-sm text-expresso/70">
+                    <span>{it.quantity}× {it.menu_item?.name ?? "Item"}</span>
+                    <span>{formatMoney(it.total_price, currency)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {orderItems.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-expresso/40 space-y-2">
+            <div className="flex flex-col items-center justify-center text-expresso/40 space-y-2 py-10">
               <Coffee className="w-12 h-12 opacity-20" />
-              <p className="text-sm">No items in the order yet.</p>
+              <p className="text-sm">{openTab ? "Add items to this tab." : "No items in the order yet."}</p>
             </div>
           ) : (
             orderItems.map((item) => {
@@ -373,10 +498,10 @@ export default function FloorView() {
                           {item.selectedModifiers.map((m) => m.option.name).join(", ")}
                         </p>
                       )}
-                      <p className="text-sm text-expresso/60">${unitTotal.toFixed(2)} each</p>
+                      <p className="text-sm text-expresso/60">{formatMoney(unitTotal, currency)} each</p>
                     </div>
                     <span className="font-semibold text-expresso">
-                      ${(unitTotal * item.quantity).toFixed(2)}
+                      {formatMoney(unitTotal * item.quantity, currency)}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
@@ -400,22 +525,25 @@ export default function FloorView() {
         </div>
 
         <div className="p-4 border-t border-warm-roast/10 bg-card shrink-0">
+          {openTab && (
+            <div className="flex justify-between items-center mb-1 text-sm text-expresso/60">
+              <span>New items</span>
+              <span>{formatMoney(total, currency)}</span>
+            </div>
+          )}
           <div className="flex justify-between items-center mb-4">
-            <span className="text-expresso/60 font-medium">Total</span>
-            <span className="text-2xl font-bold text-expresso">${total.toFixed(2)}</span>
+            <span className="text-expresso/60 font-medium">{openTab ? "Tab total" : "Total"}</span>
+            <span className="text-2xl font-bold text-expresso">{formatMoney(tabExistingTotal + total, currency)}</span>
           </div>
           <Button
             size="lg"
-            onClick={() => {
-              handleSendToCounter();
-              setIsOrderExpanded(false);
-            }}
+            onClick={handleSend}
             disabled={orderItems.length === 0}
-            isLoading={createOrderMut.isPending}
-            leftIcon={!createOrderMut.isPending && <Send className="w-5 h-5" />}
+            isLoading={isSending}
+            leftIcon={!isSending && <Send className="w-5 h-5" />}
             className="w-full bg-coffee-fruit hover:bg-fruit-light text-white border-transparent"
           >
-            Send to Counter
+            {openTab ? `Add to ${selectedTableName}` : selectedTableId ? `Open ${selectedTableName} Tab` : "Send to Counter"}
           </Button>
         </div>
       </div>

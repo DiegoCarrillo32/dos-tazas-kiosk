@@ -12,8 +12,13 @@ import {
   fetchCompletedOrders,
   fetchAnalyticsData,
   createOrder,
+  appendToOrder,
   completeOrder,
   cancelOrder,
+  fetchTables,
+  createTable,
+  updateTable,
+  deleteTable,
   createMenuItem,
   updateMenuItem,
   deleteMenuItem,
@@ -57,6 +62,7 @@ export const queryKeys = {
   staffProfiles: ["staffProfiles"] as const,
   currentProfile: ["currentProfile"] as const,
   locationSettings: ["locationSettings"] as const,
+  tables: ["tables"] as const,
 };
 
 // ─── Categories ────────────────────────────────────────────────────
@@ -150,7 +156,19 @@ export function useOrdersRealtime(): boolean {
 export function useCreateOrder() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (cartItems: CartItem[]) => createOrder(cartItems),
+    mutationFn: (params: { cartItems: CartItem[]; tableId?: string | null }) =>
+      createOrder(params.cartItems, params.tableId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.parkedOrders });
+    },
+  });
+}
+
+export function useAppendToOrder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (params: { orderId: string; cartItems: CartItem[] }) =>
+      appendToOrder(params.orderId, params.cartItems),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.parkedOrders });
     },
@@ -390,6 +408,41 @@ export function useUpdateLocationSettings() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.locationSettings });
     },
+  });
+}
+
+// ─── Tables ────────────────────────────────────────────────────────
+
+export function useTables() {
+  return useQuery({
+    queryKey: queryKeys.tables,
+    queryFn: fetchTables,
+    staleTime: LONG_CACHE,
+  });
+}
+
+export function useCreateTable() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (name: string) => createTable(name),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.tables }),
+  });
+}
+
+export function useUpdateTable() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, updates }: { id: string; updates: { name?: string; sort_order?: number } }) =>
+      updateTable(id, updates),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.tables }),
+  });
+}
+
+export function useDeleteTable() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: deleteTable,
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.tables }),
   });
 }
 

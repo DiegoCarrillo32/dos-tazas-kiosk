@@ -23,6 +23,7 @@ import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Label } from "@/components/ui/Label";
 import { Checkbox } from "@/components/ui/Checkbox";
+import { Receipt as ReceiptView } from "@/components/Receipt";
 
 export default function CounterView() {
   const { data: orders = [], isLoading, refetch, isRefetching } = useParkedOrders();
@@ -36,6 +37,7 @@ export default function CounterView() {
   const [tip, setTip] = useState("");
   const [tendered, setTendered] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [receiptOrder, setReceiptOrder] = useState<Order | null>(null);
 
   // Invoice form
   const [needsInvoice, setNeedsInvoice] = useState(false);
@@ -94,6 +96,24 @@ export default function CounterView() {
       return;
     }
 
+    // Snapshot the order with the just-entered payment details so the receipt
+    // reflects the completed sale without waiting on a refetch.
+    const completed: Order = {
+      ...currentSelected,
+      status: "completed",
+      payment_method: paymentMethod,
+      payment_reference: paymentMethod === "sinpe" ? sinpeRef : null,
+      subtotal,
+      tax_amount: taxAmount,
+      tip_amount: tipAmount,
+      total_amount: totalDue,
+      amount_tendered: paymentMethod === "cash" ? tenderedAmount : null,
+      change_due: paymentMethod === "cash" ? changeDue : null,
+      customer_name: needsInvoice ? invoiceName : null,
+      customer_id: needsInvoice ? invoiceId : null,
+      customer_email: needsInvoice ? invoiceEmail : null,
+    };
+
     completeOrderMut.mutate(
       {
         orderId: currentSelected.id,
@@ -106,7 +126,10 @@ export default function CounterView() {
         customerEmail: needsInvoice ? invoiceEmail : null,
       },
       {
-        onSuccess: resetCheckout,
+        onSuccess: () => {
+          resetCheckout();
+          setReceiptOrder(completed);
+        },
         onError: () => alert("Failed to complete order. Please try again."),
       }
     );
@@ -126,6 +149,14 @@ export default function CounterView() {
 
   return (
     <div className="flex flex-col lg:flex-row h-full">
+      {receiptOrder && (
+        <ReceiptView
+          order={receiptOrder}
+          settings={settings ?? null}
+          onClose={() => setReceiptOrder(null)}
+        />
+      )}
+
       {/* Left: Order Queue */}
       <div className="w-full lg:w-1/3 border-b lg:border-b-0 lg:border-r border-warm-roast/10 bg-card flex flex-col h-[40vh] lg:h-full shrink-0">
         <div className="p-4 border-b border-warm-roast/10 flex items-center justify-between shrink-0">

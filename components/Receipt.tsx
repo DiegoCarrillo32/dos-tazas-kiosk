@@ -1,0 +1,167 @@
+"use client";
+
+import { Printer, X } from "lucide-react";
+import type { Order, OrderItem, LocationSettings } from "@/lib/types";
+import { formatMoney } from "@/lib/utils";
+import { Button } from "@/components/ui/Button";
+
+/**
+ * Thermal-printer-friendly receipt for a completed (or completing) order.
+ * Renders inside a modal; the `.receipt-print-area` is the only thing that
+ * survives `window.print()` (see the @media print rules in globals.css).
+ */
+export function Receipt({
+  order,
+  settings,
+  onClose,
+}: {
+  order: Order;
+  settings: LocationSettings | null;
+  onClose: () => void;
+}) {
+  const currency = settings?.currency ?? "CRC";
+  const money = (n: number | string | null | undefined) =>
+    formatMoney(Number(n ?? 0), currency);
+  const taxPct = Math.round(Number(order.tax_rate ?? 0.13) * 100);
+  const items = order.order_items ?? [];
+
+  const businessName = settings?.business_legal_name?.trim() || "Dos Tazas";
+  const dateStr = new Date(order.created_at).toLocaleString("es-CR", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  const handlePrint = () => window.print();
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center no-print">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full sm:max-w-sm bg-card rounded-t-2xl sm:rounded-2xl border border-warm-roast/10 shadow-xl max-h-[90vh] flex flex-col">
+        {/* Receipt body — the only part that prints */}
+        <div className="receipt-print-area overflow-y-auto p-6 font-mono text-[13px] leading-snug text-expresso">
+          <div className="text-center space-y-0.5 mb-3">
+            <div className="font-display text-xl tracking-wide" style={{ fontFamily: "'Titan One', cursive" }}>
+              {businessName}
+            </div>
+            {settings?.address && <div className="text-[11px]">{settings.address}</div>}
+            {settings?.phone && <div className="text-[11px]">Tel: {settings.phone}</div>}
+            {settings?.tax_id && <div className="text-[11px]">Céd. Jurídica: {settings.tax_id}</div>}
+          </div>
+
+          <div className="border-t border-dashed border-expresso/40 my-2" />
+
+          <div className="flex justify-between">
+            <span>Orden #{order.order_number ?? order.id.slice(0, 8)}</span>
+            <span>{dateStr}</span>
+          </div>
+
+          <div className="border-t border-dashed border-expresso/40 my-2" />
+
+          {/* Items */}
+          <div className="space-y-1.5">
+            {items.map((item: OrderItem) => (
+              <div key={item.id}>
+                <div className="flex justify-between gap-2">
+                  <span>
+                    {item.quantity}× {item.menu_item?.name ?? "Item"}
+                  </span>
+                  <span className="tabular-nums">{money(item.total_price)}</span>
+                </div>
+                {(item.modifiers ?? []).length > 0 && (
+                  <div className="pl-4 text-[11px] text-expresso/70">
+                    {(item.modifiers ?? []).map((m) => m.name).join(", ")}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div className="border-t border-dashed border-expresso/40 my-2" />
+
+          {/* Totals */}
+          <div className="space-y-0.5">
+            <Row label="Subtotal" value={money(order.subtotal)} />
+            <Row label={`IVA (${taxPct}%)`} value={money(order.tax_amount)} />
+            {Number(order.discount_amount) > 0 && (
+              <Row label="Descuento" value={"-" + money(order.discount_amount)} />
+            )}
+            {Number(order.tip_amount) > 0 && (
+              <Row label="Propina" value={money(order.tip_amount)} />
+            )}
+            <div className="flex justify-between font-bold text-[15px] pt-1 mt-1 border-t border-expresso/40">
+              <span>TOTAL</span>
+              <span className="tabular-nums">{money(order.total_amount)}</span>
+            </div>
+          </div>
+
+          <div className="border-t border-dashed border-expresso/40 my-2" />
+
+          {/* Payment */}
+          <div className="space-y-0.5">
+            <Row
+              label="Pago"
+              value={
+                order.payment_method === "sinpe"
+                  ? "SINPE"
+                  : order.payment_method
+                    ? order.payment_method.charAt(0).toUpperCase() + order.payment_method.slice(1)
+                    : "—"
+              }
+            />
+            {order.payment_reference && <Row label="Ref." value={order.payment_reference} />}
+            {order.payment_method === "cash" && order.amount_tendered != null && (
+              <>
+                <Row label="Efectivo" value={money(order.amount_tendered)} />
+                <Row label="Vuelto" value={money(order.change_due)} />
+              </>
+            )}
+          </div>
+
+          {/* Fiscal customer block */}
+          {order.customer_name && (
+            <>
+              <div className="border-t border-dashed border-expresso/40 my-2" />
+              <div className="space-y-0.5">
+                <div className="text-center text-[11px] font-bold">FACTURA ELECTRÓNICA</div>
+                <Row label="Nombre" value={order.customer_name} />
+                {order.customer_id && <Row label="Cédula" value={order.customer_id} />}
+                {order.customer_email && <Row label="Correo" value={order.customer_email} />}
+              </div>
+            </>
+          )}
+
+          <div className="border-t border-dashed border-expresso/40 my-2" />
+          <div className="text-center text-[11px] whitespace-pre-line">
+            {settings?.receipt_footer?.trim() || "¡Gracias por su visita!"}
+          </div>
+        </div>
+
+        {/* Actions — hidden when printing */}
+        <div className="shrink-0 p-4 border-t border-warm-roast/10 bg-card flex gap-3 no-print">
+          <Button variant="secondary" onClick={onClose} className="flex-1" leftIcon={<X className="w-4 h-4" />}>
+            Close
+          </Button>
+          <Button
+            onClick={handlePrint}
+            className="flex-1 bg-coffee-fruit hover:bg-fruit-light text-white border-transparent"
+            leftIcon={<Printer className="w-4 h-4" />}
+          >
+            Print
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex justify-between gap-2">
+      <span className="text-expresso/70">{label}</span>
+      <span className="tabular-nums">{value}</span>
+    </div>
+  );
+}

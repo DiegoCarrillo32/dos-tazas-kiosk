@@ -35,6 +35,9 @@ export type MenuItem = {
   price: number;
   available_quantity: number;
   is_active: boolean;
+  track_inventory: boolean;
+  low_stock_threshold: number;
+  is_available: boolean;
   created_at: string;
   updated_at: string;
   // Joined data
@@ -63,12 +66,35 @@ export type ModifierOption = {
 export type OrderStatus = "draft" | "parked" | "completed" | "cancelled";
 export type PaymentMethod = "card" | "cash" | "sinpe";
 
+export type LocationSettings = {
+  location_id: string;
+  currency: string;
+  tax_rate: number;
+  prices_include_tax: boolean;
+  tip_enabled: boolean;
+  business_legal_name: string | null;
+  tax_id: string | null;
+  address: string | null;
+  phone: string | null;
+  receipt_footer: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type Order = {
   id: string;
   location_id: string;
   user_id: string | null;
   status: OrderStatus;
+  order_number: number | null;
+  subtotal: number;
+  tax_amount: number;
+  tax_rate: number;
+  discount_amount: number;
+  tip_amount: number;
   total_amount: number;
+  amount_tendered: number | null;
+  change_due: number | null;
   payment_method: PaymentMethod | null;
   payment_reference: string | null;
   customer_name: string | null;
@@ -87,6 +113,7 @@ export type OrderItem = {
   quantity: number;
   unit_price: number;
   total_price: number;
+  tax_amount: number;
   notes: string | null;
   created_at: string;
   // Joined data

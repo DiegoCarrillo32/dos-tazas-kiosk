@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Edit2, Trash2, X, Save, Loader2 } from "lucide-react";
+import { Plus, Edit2, Trash2, X, Save, Loader2, Ban, CheckCircle2 } from "lucide-react";
 import type { MenuItem } from "@/lib/types";
 import {
   useAllMenuItems,
@@ -24,6 +24,9 @@ type MenuItemForm = {
   available_quantity: string;
   category_id: string;
   is_active: boolean;
+  track_inventory: boolean;
+  low_stock_threshold: string;
+  is_available: boolean;
 };
 
 const emptyForm: MenuItemForm = {
@@ -33,6 +36,9 @@ const emptyForm: MenuItemForm = {
   available_quantity: "0",
   category_id: "",
   is_active: true,
+  track_inventory: false,
+  low_stock_threshold: "5",
+  is_available: true,
 };
 
 export default function MenuManagement() {
@@ -76,6 +82,9 @@ export default function MenuManagement() {
       available_quantity: String(item.available_quantity),
       category_id: item.category_id ?? "",
       is_active: item.is_active,
+      track_inventory: item.track_inventory,
+      low_stock_threshold: String(item.low_stock_threshold),
+      is_available: item.is_available,
     });
     setShowForm(true);
   };
@@ -96,6 +105,9 @@ export default function MenuManagement() {
             available_quantity: parseInt(form.available_quantity) || 0,
             category_id: form.category_id || null,
             is_active: form.is_active,
+            track_inventory: form.track_inventory,
+            low_stock_threshold: parseInt(form.low_stock_threshold) || 0,
+            is_available: form.is_available,
           },
         },
         { onSuccess: () => setShowForm(false), onError: () => alert("Failed to save.") }
@@ -111,6 +123,9 @@ export default function MenuManagement() {
           available_quantity: parseInt(form.available_quantity) || 0,
           category_id: form.category_id || null,
           is_active: form.is_active,
+          track_inventory: form.track_inventory,
+          low_stock_threshold: parseInt(form.low_stock_threshold) || 0,
+          is_available: form.is_available,
         },
         { onSuccess: () => setShowForm(false), onError: () => alert("Failed to save.") }
       );
@@ -120,6 +135,10 @@ export default function MenuManagement() {
   const handleDelete = (id: string) => {
     if (!confirm("Delete this item?")) return;
     deleteItemMut.mutate(id);
+  };
+
+  const handleToggleAvailable = (item: MenuItem) => {
+    updateItemMut.mutate({ id: item.id, updates: { is_available: !item.is_available } });
   };
 
   const handleCreateCategory = async () => {
@@ -207,6 +226,21 @@ export default function MenuManagement() {
                 <Checkbox id="is_active" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} />
                 <Label htmlFor="is_active" className="cursor-pointer">Active (visible on Floor)</Label>
               </div>
+              <div className="flex items-center gap-2">
+                <Checkbox id="is_available" checked={form.is_available} onChange={(e) => setForm({ ...form, is_available: e.target.checked })} />
+                <Label htmlFor="is_available" className="cursor-pointer">Available (uncheck to 86 / mark sold out)</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox id="track_inventory" checked={form.track_inventory} onChange={(e) => setForm({ ...form, track_inventory: e.target.checked })} />
+                <Label htmlFor="track_inventory" className="cursor-pointer">Track inventory (deplete stock on each sale)</Label>
+              </div>
+              {form.track_inventory && (
+                <div>
+                  <Label className="mb-1 block">Low-stock alert at</Label>
+                  <Input type="number" min={0} value={form.low_stock_threshold} onChange={(e) => setForm({ ...form, low_stock_threshold: e.target.value })} />
+                  <p className="text-xs text-expresso/40 mt-1">Flag the item as &quot;low&quot; once stock falls to this level.</p>
+                </div>
+              )}
             </div>
             <Button onClick={handleSave} isLoading={isSaving} leftIcon={<Save className="w-4 h-4" />} className="w-full">
               {editingId ? "Update Item" : "Create Item"}
@@ -237,13 +271,38 @@ export default function MenuManagement() {
                     <td className="px-6 py-4 text-sm font-medium text-expresso">{item.name}</td>
                     <td className="px-6 py-4 text-sm text-expresso/60">{item.category?.name ?? "—"}</td>
                     <td className="px-6 py-4 text-sm text-expresso/60">${Number(item.price).toFixed(2)}</td>
-                    <td className="px-6 py-4 text-sm text-expresso/60">{item.available_quantity}</td>
+                    <td className="px-6 py-4 text-sm">
+                      {!item.track_inventory ? (
+                        <span className="text-expresso/40">Untracked</span>
+                      ) : (
+                        <span className="inline-flex items-center gap-2">
+                          <span className={`font-medium ${item.available_quantity <= 0 ? "text-destructive" : item.available_quantity <= item.low_stock_threshold ? "text-amber-600 dark:text-amber-400" : "text-expresso/70"}`}>
+                            {item.available_quantity}
+                          </span>
+                          {item.available_quantity > 0 && item.available_quantity <= item.low_stock_threshold && (
+                            <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">Low</span>
+                          )}
+                        </span>
+                      )}
+                    </td>
                     <td className="px-6 py-4">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${item.is_active ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" : "bg-warm-roast/10 text-expresso/60"}`}>
-                        {item.is_active ? "Active" : "Disabled"}
-                      </span>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${item.is_active ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" : "bg-warm-roast/10 text-expresso/60"}`}>
+                          {item.is_active ? "Active" : "Disabled"}
+                        </span>
+                        {!item.is_available && (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">Sold out</span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-right flex items-center justify-end gap-2">
+                      <button
+                        onClick={() => handleToggleAvailable(item)}
+                        title={item.is_available ? "Mark sold out (86)" : "Mark available"}
+                        className={`p-2 transition-colors ${item.is_available ? "text-expresso/40 hover:text-destructive" : "text-green-600 hover:text-green-700"}`}
+                      >
+                        {item.is_available ? <Ban className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
+                      </button>
                       <button onClick={() => openEditForm(item)} className="p-2 text-expresso/40 hover:text-coffee-fruit transition-colors"><Edit2 className="w-4 h-4" /></button>
                       <button onClick={() => handleDelete(item.id)} className="p-2 text-expresso/40 hover:text-destructive transition-colors"><Trash2 className="w-4 h-4" /></button>
                     </td>

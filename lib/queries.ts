@@ -6,9 +6,9 @@ import type {
   ModifierOption,
   Order,
   OrderItem,
-  OrderItemModifier,
   CartItem,
   PaymentMethod,
+  LocationSettings,
   UserProfile,
 } from "./types";
 
@@ -270,78 +270,19 @@ export async function setMenuItemModifiers(
 
 // ─── Orders ────────────────────────────────────────────────────────
 
-export async function createOrder(
-  cartItems: CartItem[]
-): Promise<Order> {
-  const locationId = await getLocationId();
-  const profile = await getCurrentProfile();
+export async function createOrder(cartItems: CartItem[]): Promise<string> {
+  // Pricing, tax and order numbering are computed server-side by the
+  // create_order RPC. The client only sends item/quantity/option IDs —
+  // never prices — so totals cannot be tampered with.
+  const items = cartItems.map((item) => ({
+    menu_item_id: item.menuItem.id,
+    quantity: item.quantity,
+    modifier_option_ids: item.selectedModifiers.map((m) => m.option.id),
+  }));
 
-  const totalAmount = cartItems.reduce((sum, item) => {
-    const modExtra = item.selectedModifiers.reduce(
-      (s, m) => s + m.option.extra_price,
-      0
-    );
-    return sum + (item.menuItem.price + modExtra) * item.quantity;
-  }, 0);
-
-  // Create the order
-  const { data: order, error: orderError } = await supabase()
-    .from("orders")
-    .insert({
-      location_id: locationId,
-      user_id: profile?.id ?? null,
-      status: "parked",
-      total_amount: totalAmount,
-    })
-    .select()
-    .single();
-
-  if (orderError) throw orderError;
-
-  // Create order items
-  const orderItemsToInsert = cartItems.map((item) => {
-    const modExtra = item.selectedModifiers.reduce(
-      (s, m) => s + m.option.extra_price,
-      0
-    );
-    return {
-      order_id: order.id,
-      menu_item_id: item.menuItem.id,
-      quantity: item.quantity,
-      unit_price: item.menuItem.price + modExtra,
-      total_price: (item.menuItem.price + modExtra) * item.quantity,
-    };
-  });
-
-  const { data: insertedItems, error: itemsError } = await supabase()
-    .from("order_items")
-    .insert(orderItemsToInsert)
-    .select();
-
-  if (itemsError) throw itemsError;
-
-  // Create order item modifiers
-  const modifiersToInsert: Omit<OrderItemModifier, "id" | "created_at">[] = [];
-  cartItems.forEach((cartItem, index) => {
-    const orderItemId = insertedItems[index].id;
-    cartItem.selectedModifiers.forEach((mod) => {
-      modifiersToInsert.push({
-        order_item_id: orderItemId,
-        modifier_option_id: mod.option.id,
-        name: `${mod.modifierName}: ${mod.option.name}`,
-        extra_price: mod.option.extra_price,
-      });
-    });
-  });
-
-  if (modifiersToInsert.length > 0) {
-    const { error: modError } = await supabase()
-      .from("order_item_modifiers")
-      .insert(modifiersToInsert);
-    if (modError) throw modError;
-  }
-
-  return order as Order;
+  const { data, error } = await supabase().rpc("create_order", { items });
+  if (error) throw error;
+  return data as string;
 }
 
 export async function fetchParkedOrders(): Promise<Order[]> {
@@ -359,26 +300,28 @@ export async function fetchParkedOrders(): Promise<Order[]> {
   return (data ?? []) as Order[];
 }
 
-export async function completeOrder(
-  orderId: string,
-  paymentMethod: PaymentMethod,
-  paymentReference: string | null,
-  customerName: string | null,
-  customerId: string | null,
-  customerEmail: string | null
-): Promise<void> {
-  const { error } = await supabase()
-    .from("orders")
-    .update({
-      status: "completed",
-      payment_method: paymentMethod,
-      payment_reference: paymentReference,
-      customer_name: customerName,
-      customer_id: customerId,
-      customer_email: customerEmail,
-    })
-    .eq("id", orderId);
-
+export async function completeOrder(params: {
+  orderId: string;
+  paymentMethod: PaymentMethod;
+  paymentReference: string | null;
+  tipAmount?: number;
+  amountTendered?: number | null;
+  customerName: string | null;
+  customerId: string | null;
+  customerEmail: string | null;
+}): Promise<void> {
+  // complete_order recomputes the total (incl. tip) and validates the
+  // cash tendered server-side before marking the order completed.
+  const { error } = await supabase().rpc("complete_order", {
+    p_order_id: params.orderId,
+    p_payment_method: params.paymentMethod,
+    p_payment_reference: params.paymentReference,
+    p_tip_amount: params.tipAmount ?? 0,
+    p_amount_tendered: params.amountTendered ?? null,
+    p_customer_name: params.customerName,
+    p_customer_id: params.customerId,
+    p_customer_email: params.customerEmail,
+  });
   if (error) throw error;
 }
 
@@ -503,6 +446,33 @@ export async function exportOrdersCSV(
   });
 
   return [header.map(csvCell).join(","), ...rows].join("\r\n");
+}
+
+// ─── Location Settings ─────────────────────────────────────────────
+
+export async function fetchLocationSettings(): Promise<LocationSettings | null> {
+  const locationId = await getLocationId();
+  const { data, error } = await supabase()
+    .from("location_settings")
+    .select("*")
+    .eq("location_id", locationId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data as LocationSettings | null;
+}
+
+export async function updateLocationSettings(
+  updates: Partial<
+    Omit<LocationSettings, "location_id" | "created_at" | "updated_at">
+  >
+): Promise<void> {
+  const locationId = await getLocationId();
+  // Upsert so the row is created on first save if the seed didn't run.
+  const { error } = await supabase()
+    .from("location_settings")
+    .upsert({ location_id: locationId, ...updates });
+  if (error) throw error;
 }
 
 // ─── Staff Management ──────────────────────────────────────────────

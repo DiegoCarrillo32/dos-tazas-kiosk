@@ -27,6 +27,8 @@ import {
   inviteStaffMember,
   updateOwnProfile,
   getCurrentProfile,
+  fetchLocationSettings,
+  updateLocationSettings,
 } from "./queries";
 import type { CartItem, PaymentMethod } from "./types";
 
@@ -52,6 +54,7 @@ export const queryKeys = {
     ["analytics", start, end] as const,
   staffProfiles: ["staffProfiles"] as const,
   currentProfile: ["currentProfile"] as const,
+  locationSettings: ["locationSettings"] as const,
 };
 
 // ─── Categories ────────────────────────────────────────────────────
@@ -128,18 +131,12 @@ export function useCompleteOrder() {
       orderId: string;
       paymentMethod: PaymentMethod;
       paymentReference: string | null;
+      tipAmount?: number;
+      amountTendered?: number | null;
       customerName: string | null;
       customerId: string | null;
       customerEmail: string | null;
-    }) =>
-      completeOrder(
-        params.orderId,
-        params.paymentMethod,
-        params.paymentReference,
-        params.customerName,
-        params.customerId,
-        params.customerEmail
-      ),
+    }) => completeOrder(params),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.parkedOrders });
       qc.invalidateQueries({ queryKey: queryKeys.todayAnalytics });
@@ -339,6 +336,26 @@ export function useInviteStaff() {
       ),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.staffProfiles });
+    },
+  });
+}
+
+// ─── Location Settings ─────────────────────────────────────────────
+
+export function useLocationSettings() {
+  return useQuery({
+    queryKey: queryKeys.locationSettings,
+    queryFn: fetchLocationSettings,
+    staleTime: LONG_CACHE,
+  });
+}
+
+export function useUpdateLocationSettings() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: updateLocationSettings,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.locationSettings });
     },
   });
 }

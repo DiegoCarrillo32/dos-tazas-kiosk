@@ -13,7 +13,12 @@ import {
   Ban,
 } from "lucide-react";
 import type { Order, OrderItem, PaymentMethod } from "@/lib/types";
-import { useParkedOrders, useCompleteOrder, useCancelOrder } from "@/lib/hooks";
+import {
+  useParkedOrders,
+  useCompleteOrder,
+  useCancelOrder,
+  useLocationSettings,
+} from "@/lib/hooks";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Label } from "@/components/ui/Label";
@@ -21,12 +26,15 @@ import { Checkbox } from "@/components/ui/Checkbox";
 
 export default function CounterView() {
   const { data: orders = [], isLoading, refetch, isRefetching } = useParkedOrders();
+  const { data: settings } = useLocationSettings();
   const completeOrderMut = useCompleteOrder();
   const cancelOrderMut = useCancelOrder();
 
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
   const [sinpeRef, setSinpeRef] = useState("");
+  const [tip, setTip] = useState("");
+  const [tendered, setTendered] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
 
   // Invoice form
@@ -44,10 +52,24 @@ export default function CounterView() {
     ? orders.find((o) => o.id === selectedOrder.id) ?? null
     : null;
 
+  // Server already computed subtotal + tax at park time; tip is added here.
+  const subtotal = Number(currentSelected?.subtotal ?? 0);
+  const taxAmount = Number(currentSelected?.tax_amount ?? 0);
+  const taxRatePct = Math.round(
+    Number(currentSelected?.tax_rate ?? settings?.tax_rate ?? 0.13) * 100
+  );
+  const tipEnabled = settings?.tip_enabled ?? false;
+  const tipAmount = Math.max(0, parseFloat(tip) || 0);
+  const totalDue = subtotal + taxAmount + tipAmount;
+  const tenderedAmount = parseFloat(tendered) || 0;
+  const changeDue = tenderedAmount - totalDue;
+
   const resetCheckout = () => {
     setSelectedOrder(null);
     setPaymentMethod(null);
     setSinpeRef("");
+    setTip("");
+    setTendered("");
     setNeedsInvoice(false);
     setInvoiceName("");
     setInvoiceId("");
@@ -60,6 +82,10 @@ export default function CounterView() {
       alert("Please enter the SINPE reference number.");
       return;
     }
+    if (paymentMethod === "cash" && tenderedAmount < totalDue) {
+      alert("Amount tendered is less than the total due.");
+      return;
+    }
     if (needsInvoice && (!invoiceName || !invoiceId || !invoiceEmail)) {
       alert("Please fill in all invoice details.");
       return;
@@ -70,6 +96,8 @@ export default function CounterView() {
         orderId: currentSelected.id,
         paymentMethod,
         paymentReference: paymentMethod === "sinpe" ? sinpeRef : null,
+        tipAmount,
+        amountTendered: paymentMethod === "cash" ? tenderedAmount : null,
         customerName: needsInvoice ? invoiceName : null,
         customerId: needsInvoice ? invoiceId : null,
         customerEmail: needsInvoice ? invoiceEmail : null,
@@ -142,6 +170,8 @@ export default function CounterView() {
                     setSelectedOrder(order);
                     setPaymentMethod(null);
                     setSinpeRef("");
+                    setTip("");
+                    setTendered("");
                     setNeedsInvoice(false);
                   }}
                   className={`w-full text-left p-4 rounded-xl border transition-all ${
@@ -152,7 +182,7 @@ export default function CounterView() {
                 >
                   <div className="flex justify-between items-start mb-2">
                     <span className="font-mono font-semibold text-sm text-expresso">
-                      {order.id.slice(0, 8)}…
+                      {order.order_number ? `#${order.order_number}` : `${order.id.slice(0, 8)}…`}
                     </span>
                     <span className="text-sm font-bold text-expresso">
                       ${Number(order.total_amount).toFixed(2)}
@@ -183,11 +213,13 @@ export default function CounterView() {
             <div className="bg-card p-6 rounded-2xl border border-warm-roast/10 shadow-sm">
               <div className="flex justify-between items-center mb-4">
                 <div>
-                  <h2 className="text-xl font-bold text-expresso">Order #{currentSelected.id.slice(0, 8)}</h2>
+                  <h2 className="text-xl font-bold text-expresso">
+                    Order {currentSelected.order_number ? `#${currentSelected.order_number}` : `#${currentSelected.id.slice(0, 8)}`}
+                  </h2>
                   <p className="text-expresso/60 text-sm">{formatTime(currentSelected.created_at)}</p>
                 </div>
                 <div className="text-3xl font-black text-expresso">
-                  ${Number(currentSelected.total_amount).toFixed(2)}
+                  ${totalDue.toFixed(2)}
                 </div>
               </div>
               <div className="space-y-2 border-t border-warm-roast/10 pt-4">
@@ -207,7 +239,63 @@ export default function CounterView() {
                   </div>
                 ))}
               </div>
+              {/* Money breakdown */}
+              <div className="space-y-1.5 border-t border-warm-roast/10 mt-4 pt-4 text-sm">
+                <div className="flex justify-between text-expresso/70">
+                  <span>Subtotal</span>
+                  <span>${subtotal.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-expresso/70">
+                  <span>IVA ({taxRatePct}%)</span>
+                  <span>${taxAmount.toFixed(2)}</span>
+                </div>
+                {tipAmount > 0 && (
+                  <div className="flex justify-between text-expresso/70">
+                    <span>Tip</span>
+                    <span>${tipAmount.toFixed(2)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between font-bold text-expresso pt-1.5 border-t border-warm-roast/10 mt-1.5">
+                  <span>Total</span>
+                  <span>${totalDue.toFixed(2)}</span>
+                </div>
+              </div>
             </div>
+
+            {/* Tip */}
+            {tipEnabled && (
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-expresso/60 uppercase tracking-wider">Tip</h3>
+                <div className="flex flex-wrap items-center gap-2">
+                  {[10, 15, 20].map((pct) => (
+                    <button
+                      key={pct}
+                      type="button"
+                      onClick={() => setTip((subtotal * (pct / 100)).toFixed(2))}
+                      className="px-4 py-2 text-sm rounded-lg bg-warm-roast/10 text-expresso/70 hover:bg-warm-roast/20 transition-colors"
+                    >
+                      {pct}%
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setTip("")}
+                    className="px-4 py-2 text-sm rounded-lg bg-warm-roast/10 text-expresso/70 hover:bg-warm-roast/20 transition-colors"
+                  >
+                    None
+                  </button>
+                  <Input
+                    type="number"
+                    inputMode="decimal"
+                    min={0}
+                    value={tip}
+                    onChange={(e) => setTip(e.target.value)}
+                    placeholder="Custom"
+                    className="w-32"
+                  />
+                </div>
+              </div>
+            )}
 
             {/* Payment Methods */}
             <div className="space-y-4">
@@ -236,6 +324,47 @@ export default function CounterView() {
                 <div className="mt-4 bg-card p-4 rounded-xl border border-warm-roast/10">
                   <Label className="mb-2 block">Reference Number</Label>
                   <Input type="text" value={sinpeRef} onChange={(e) => setSinpeRef(e.target.value)} placeholder="Enter SINPE reference" />
+                </div>
+              )}
+              {paymentMethod === "cash" && (
+                <div className="mt-4 bg-card p-4 rounded-xl border border-warm-roast/10 space-y-3">
+                  <Label className="block">Amount Tendered</Label>
+                  <Input
+                    type="number"
+                    inputMode="decimal"
+                    min={0}
+                    value={tendered}
+                    onChange={(e) => setTendered(e.target.value)}
+                    placeholder={totalDue.toFixed(2)}
+                  />
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setTendered(totalDue.toFixed(2))}
+                      className="px-3 py-1.5 text-sm rounded-lg bg-warm-roast/10 text-expresso/70 hover:bg-warm-roast/20 transition-colors"
+                    >
+                      Exact
+                    </button>
+                    {[1000, 2000, 5000, 10000]
+                      .filter((amt) => amt >= totalDue)
+                      .slice(0, 3)
+                      .map((amt) => (
+                        <button
+                          key={amt}
+                          type="button"
+                          onClick={() => setTendered(String(amt))}
+                          className="px-3 py-1.5 text-sm rounded-lg bg-warm-roast/10 text-expresso/70 hover:bg-warm-roast/20 transition-colors"
+                        >
+                          ${amt.toLocaleString()}
+                        </button>
+                      ))}
+                  </div>
+                  <div className="flex justify-between items-center pt-1 border-t border-warm-roast/10">
+                    <span className="text-sm font-medium text-expresso/60">Change Due</span>
+                    <span className={`text-lg font-bold ${changeDue < 0 ? "text-red-500" : "text-expresso"}`}>
+                      ${(changeDue < 0 ? 0 : changeDue).toFixed(2)}
+                    </span>
+                  </div>
                 </div>
               )}
             </div>
@@ -285,7 +414,7 @@ export default function CounterView() {
               <Button
                 size="lg"
                 onClick={handleCompleteOrder}
-                disabled={!paymentMethod || cancelOrderMut.isPending}
+                disabled={!paymentMethod || cancelOrderMut.isPending || (paymentMethod === "cash" && tenderedAmount < totalDue)}
                 isLoading={completeOrderMut.isPending}
                 leftIcon={!completeOrderMut.isPending && <CheckCircle2 className="w-5 h-5" />}
                 className="flex-1 bg-coffee-fruit hover:bg-fruit-light text-white border-transparent"

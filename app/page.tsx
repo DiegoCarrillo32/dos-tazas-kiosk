@@ -11,16 +11,7 @@ export default async function Home() {
     redirect("/login");
   }
 
-  // Check role to route admins vs staff
-  const { data: profile } = await supabase
-    .from("user_profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  if (profile?.role === "admin") {
-    redirect("/pos/floor");
-  }
-
+  // Both admins and staff land on the POS floor; admins can open the
+  // Admin portal from the nav. No role lookup needed for this redirect.
   redirect("/pos/floor");
 }

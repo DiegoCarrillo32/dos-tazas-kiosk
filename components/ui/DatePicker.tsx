@@ -27,8 +27,8 @@ export function DatePicker({ date, setDate, className, placeholder = "Pick a dat
         <Button
           variant="secondary"
           className={cn(
-            "w-full justify-start text-left font-normal bg-zinc-50 dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-900",
-            !date && "text-zinc-500",
+            "w-full justify-start text-left font-normal bg-card border border-warm-roast/20 text-expresso hover:bg-warm-roast/5",
+            !date && "text-expresso/50",
             className
           )}
         >

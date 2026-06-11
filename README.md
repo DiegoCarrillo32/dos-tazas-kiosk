@@ -1,74 +1,61 @@
-# React + TypeScript + Vite
+# Dos Tazas POS
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Point-of-sale system for the **Dos Tazas** to-go coffee shop kiosks. Optimized for
+touch use on tablets and phones, with a separate Floor (order taking) and Counter
+(checkout) flow plus an Admin portal for menu, modifiers, staff, and reporting.
 
-Currently, two official plugins are available:
+## Tech stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- **Next.js 16** (App Router) + **React 19**
+- **Supabase** (Postgres, Auth, Row Level Security) via `@supabase/ssr`
+- **TanStack Query** for data fetching/caching
+- **Tailwind CSS** for styling (light/dark themes)
+- **Recharts** for analytics
 
-## React Compiler
+## Getting started
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+npm run dev      # http://localhost:3000
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Create a `.env` (or `.env.local`) with your Supabase project credentials:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
 ```
-# dos-tazas-kiosk
+NEXT_PUBLIC_SUPABASE_URL=https://<project>.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon-key>
+```
+
+### Database
+
+Run the SQL migrations in `supabase/migrations/` in order against your Supabase
+project (SQL editor or CLI). They create the schema, seed data, RLS policies, and
+staff/modifier write policies. Each authenticated user has a `user_profiles` row
+that scopes all data to their `location_id`.
+
+## Scripts
+
+| Command         | Description                       |
+| --------------- | --------------------------------- |
+| `npm run dev`   | Start the dev server              |
+| `npm run build` | Production build                  |
+| `npm run start` | Serve the production build        |
+| `npm run lint`  | Lint (`npx eslint .`)             |
+
+## App structure
+
+- `app/login` — email/password auth.
+- `app/pos/floor` — browse menu by category, build an order (with modifiers), and
+  send it to the counter as a "parked" order.
+- `app/pos/counter` — pick a parked order, take payment (card / cash / SINPE),
+  optionally capture electronic-invoice details, complete or **void** the order.
+- `app/admin` — dashboard, analytics, menu & inventory, modifiers, staff, transaction
+  history, and CSV financial reports (admin role only).
+
+## Roles
+
+- **staff** — Floor + Counter.
+- **admin** — everything above plus the Admin portal.
+
+Access is enforced both in the UI (`app/admin/layout.tsx`) and at the database
+level through Supabase RLS policies.

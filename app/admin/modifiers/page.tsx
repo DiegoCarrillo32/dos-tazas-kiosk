@@ -97,7 +97,7 @@ export default function ModifiersManagement() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-zinc-400" />
+        <Loader2 className="w-8 h-8 animate-spin text-expresso/40" />
       </div>
     );
   }
@@ -106,8 +106,8 @@ export default function ModifiersManagement() {
     <div className="p-6 lg:p-8 space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">Modifiers</h1>
-          <p className="text-zinc-500 mt-1">Manage item customization options (Milk Type, Size, etc.)</p>
+          <h1 className="text-2xl font-bold text-expresso">Modifiers</h1>
+          <p className="text-expresso/60 mt-1">Manage item customization options (Milk Type, Size, etc.)</p>
         </div>
         <Button onClick={openCreateMod} leftIcon={<Plus className="w-4 h-4" />}>
           Add Modifier
@@ -117,10 +117,10 @@ export default function ModifiersManagement() {
       {showModForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowModForm(false)} />
-          <div className="relative w-full max-w-md bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-xl p-6 space-y-5">
+          <div className="relative w-full max-w-md bg-card rounded-2xl border border-warm-roast/10 shadow-xl p-6 space-y-5">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-50">{editingModId ? "Edit Modifier" : "New Modifier"}</h3>
-              <button onClick={() => setShowModForm(false)} className="p-2 text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-50"><X className="w-5 h-5" /></button>
+              <h3 className="text-lg font-bold text-expresso">{editingModId ? "Edit Modifier" : "New Modifier"}</h3>
+              <button onClick={() => setShowModForm(false)} className="p-2 text-expresso/40 hover:text-expresso"><X className="w-5 h-5" /></button>
             </div>
             <div className="space-y-4">
               <div>
@@ -130,11 +130,11 @@ export default function ModifiersManagement() {
               <div className="flex items-center gap-6">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <Checkbox checked={modIsRequired} onChange={(e) => setModIsRequired(e.target.checked)} />
-                  <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Required</span>
+                  <span className="text-sm font-medium text-expresso/80">Required</span>
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer">
                   <Checkbox checked={modIsMultiple} onChange={(e) => setModIsMultiple(e.target.checked)} />
-                  <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Allow multiple</span>
+                  <span className="text-sm font-medium text-expresso/80">Allow multiple</span>
                 </label>
               </div>
             </div>
@@ -147,7 +147,7 @@ export default function ModifiersManagement() {
 
       <div className="space-y-4">
         {modifiers.length === 0 ? (
-          <div className="bg-white dark:bg-zinc-900 p-12 rounded-2xl border border-zinc-200 dark:border-zinc-800 text-center text-zinc-400 text-sm">
+          <div className="bg-card p-12 rounded-2xl border border-warm-roast/10 text-center text-expresso/40 text-sm">
             No modifiers yet. Click &quot;Add Modifier&quot; to create one.
           </div>
         ) : (
@@ -155,33 +155,33 @@ export default function ModifiersManagement() {
             const isExpanded = expandedId === mod.id;
             const options = mod.options ?? [];
             return (
-              <div key={mod.id} className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-sm">
-                <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors" onClick={() => setExpandedId(isExpanded ? null : mod.id)}>
+              <div key={mod.id} className="bg-card rounded-2xl border border-warm-roast/10 overflow-hidden shadow-sm">
+                <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-warm-roast/5 transition-colors" onClick={() => setExpandedId(isExpanded ? null : mod.id)}>
                   <div className="flex items-center gap-3">
-                    {isExpanded ? <ChevronDown className="w-4 h-4 text-zinc-400" /> : <ChevronRight className="w-4 h-4 text-zinc-400" />}
+                    {isExpanded ? <ChevronDown className="w-4 h-4 text-expresso/40" /> : <ChevronRight className="w-4 h-4 text-expresso/40" />}
                     <div>
-                      <h3 className="font-semibold text-zinc-900 dark:text-zinc-100">{mod.name}</h3>
+                      <h3 className="font-semibold text-expresso">{mod.name}</h3>
                       <div className="flex items-center gap-2 mt-0.5">
                         {mod.is_required && <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 font-medium">Required</span>}
                         {mod.is_multiple && <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 font-medium">Multi-select</span>}
-                        <span className="text-xs text-zinc-400">{options.length} option{options.length !== 1 ? "s" : ""}</span>
+                        <span className="text-xs text-expresso/40">{options.length} option{options.length !== 1 ? "s" : ""}</span>
                       </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                    <button onClick={() => openEditMod(mod)} className="p-2 text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"><Edit2 className="w-4 h-4" /></button>
-                    <button onClick={() => handleDeleteMod(mod.id)} className="p-2 text-zinc-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                    <button onClick={() => openEditMod(mod)} className="p-2 text-expresso/40 hover:text-coffee-fruit transition-colors"><Edit2 className="w-4 h-4" /></button>
+                    <button onClick={() => handleDeleteMod(mod.id)} className="p-2 text-expresso/40 hover:text-destructive transition-colors"><Trash2 className="w-4 h-4" /></button>
                   </div>
                 </div>
                 {isExpanded && (
-                  <div className="border-t border-zinc-200 dark:border-zinc-800 p-4 bg-zinc-50/50 dark:bg-zinc-950/50 space-y-3">
+                  <div className="border-t border-warm-roast/10 p-4 bg-muted/40 space-y-3">
                     {options.map((opt: ModifierOption) => (
-                      <div key={opt.id} className="flex items-center justify-between bg-white dark:bg-zinc-900 p-3 rounded-lg border border-zinc-200 dark:border-zinc-800">
+                      <div key={opt.id} className="flex items-center justify-between bg-card p-3 rounded-lg border border-warm-roast/10">
                         <div>
-                          <span className="font-medium text-sm text-zinc-900 dark:text-zinc-100">{opt.name}</span>
-                          {Number(opt.extra_price) > 0 && <span className="ml-2 text-xs text-zinc-500">+${Number(opt.extra_price).toFixed(2)}</span>}
+                          <span className="font-medium text-sm text-expresso">{opt.name}</span>
+                          {Number(opt.extra_price) > 0 && <span className="ml-2 text-xs text-expresso/60">+${Number(opt.extra_price).toFixed(2)}</span>}
                         </div>
-                        <button onClick={() => deleteOptMut.mutate(opt.id)} className="p-1.5 text-zinc-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
+                        <button onClick={() => deleteOptMut.mutate(opt.id)} className="p-1.5 text-expresso/40 hover:text-destructive transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
                       </div>
                     ))}
                     {addingOptionFor === mod.id ? (
@@ -193,10 +193,10 @@ export default function ModifiersManagement() {
                           <Input type="number" step="0.01" value={optPrice} onChange={(e) => setOptPrice(e.target.value)} placeholder="Extra $" />
                         </div>
                         <Button onClick={() => handleAddOption(mod.id)} disabled={!optName.trim()} isLoading={createOptMut.isPending}>Add</Button>
-                        <button onClick={() => { setAddingOptionFor(null); setOptName(""); setOptPrice("0"); }} className="p-2 text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-50"><X className="w-4 h-4" /></button>
+                        <button onClick={() => { setAddingOptionFor(null); setOptName(""); setOptPrice("0"); }} className="p-2 text-expresso/40 hover:text-expresso"><X className="w-4 h-4" /></button>
                       </div>
                     ) : (
-                      <button onClick={() => { setAddingOptionFor(mod.id); setOptName(""); setOptPrice("0"); }} className="flex items-center gap-2 text-sm font-medium text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-50 transition-colors">
+                      <button onClick={() => { setAddingOptionFor(mod.id); setOptName(""); setOptPrice("0"); }} className="flex items-center gap-2 text-sm font-medium text-expresso/60 hover:text-expresso transition-colors">
                         <Plus className="w-4 h-4" /> Add Option
                       </button>
                     )}

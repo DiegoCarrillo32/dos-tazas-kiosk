@@ -26,22 +26,20 @@ function ModifierDrawer({
 
   const toggleOption = (mod: Modifier, option: ModifierOption) => {
     if (!option) return;
-    const existing = selected.find((s) => s.option.id === option.id);
-    if (existing) {
-      setSelected(selected.filter((s) => s.option.id !== option.id));
-    } else {
-      if (!mod.is_multiple) {
-        setSelected([
-          ...selected.filter((s) => s.modifierId !== mod.id),
-          { modifierId: mod.id, modifierName: mod.name, option },
-        ]);
-      } else {
-        setSelected([
-          ...selected,
-          { modifierId: mod.id, modifierName: mod.name, option },
-        ]);
+    // Use a functional updater so rapid successive taps (before a re-render)
+    // each build on the latest selection instead of a stale closure.
+    setSelected((prev) => {
+      if (prev.some((s) => s.option.id === option.id)) {
+        return prev.filter((s) => s.option.id !== option.id);
       }
-    }
+      if (!mod.is_multiple) {
+        return [
+          ...prev.filter((s) => s.modifierId !== mod.id),
+          { modifierId: mod.id, modifierName: mod.name, option },
+        ];
+      }
+      return [...prev, { modifierId: mod.id, modifierName: mod.name, option }];
+    });
   };
 
   const totalExtra = selected.reduce((s, m) => s + m.option.extra_price, 0);
@@ -64,23 +62,23 @@ function ModifierDrawer({
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full sm:max-w-md bg-white dark:bg-zinc-900 rounded-t-2xl sm:rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-xl max-h-[80vh] flex flex-col">
-        <div className="p-5 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between shrink-0">
+      <div className="relative w-full sm:max-w-md bg-card rounded-t-2xl sm:rounded-2xl border border-warm-roast/10 shadow-xl max-h-[80vh] flex flex-col">
+        <div className="p-5 border-b border-warm-roast/10 flex items-center justify-between shrink-0">
           <div>
-            <h3 className="font-bold text-lg text-zinc-900 dark:text-zinc-50">{menuItem.name}</h3>
-            <p className="text-sm text-zinc-500">${Number(menuItem.price).toFixed(2)}</p>
+            <h3 className="font-bold text-lg text-expresso">{menuItem.name}</h3>
+            <p className="text-sm text-expresso/60">${Number(menuItem.price).toFixed(2)}</p>
           </div>
-          <button onClick={onClose} className="p-2 text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-50 rounded-md transition-colors">
+          <button onClick={onClose} className="p-2 text-expresso/40 hover:text-expresso rounded-md transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
         <div className="flex-1 overflow-y-auto p-5 space-y-6">
           {modifiers.length === 0 ? (
-            <p className="text-sm text-zinc-400 text-center py-4">No modifiers available.</p>
+            <p className="text-sm text-expresso/40 text-center py-4">No modifiers available.</p>
           ) : (
             modifiers.map((mod) => (
               <div key={mod.id}>
-                <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-wider mb-3">
+                <h4 className="text-sm font-semibold text-expresso/60 uppercase tracking-wider mb-3">
                   {mod.name}
                   {mod.is_required && <span className="text-red-500 ml-1">*</span>}
                 </h4>
@@ -93,8 +91,8 @@ function ModifierDrawer({
                         onClick={() => toggleOption(mod, opt)}
                         className={`w-full flex items-center justify-between p-3 rounded-lg border transition-all text-left ${
                           isSelected
-                            ? "bg-zinc-900 text-zinc-50 dark:bg-zinc-50 dark:text-zinc-900 border-transparent"
-                            : "bg-zinc-50 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-500"
+                            ? "bg-coffee-fruit text-white border-transparent"
+                            : "bg-warm-roast/5 text-expresso/80 border-warm-roast/15 hover:border-warm-roast/40"
                         }`}
                       >
                         <span className="font-medium text-sm">{opt.name}</span>
@@ -109,11 +107,11 @@ function ModifierDrawer({
             ))
           )}
         </div>
-        <div className="p-5 border-t border-zinc-200 dark:border-zinc-800 shrink-0">
+        <div className="p-5 border-t border-warm-roast/10 shrink-0">
           <Button
             size="lg"
             onClick={handleConfirm}
-            className="w-full bg-green-600 hover:bg-green-700 text-white border-transparent"
+            className="w-full bg-coffee-fruit hover:bg-fruit-light text-white border-transparent"
           >
             Add to Order — ${(Number(menuItem.price) + totalExtra).toFixed(2)}
           </Button>
@@ -149,19 +147,20 @@ export default function FloorView() {
 
   const isLoading = catsLoading || itemsLoading;
 
-  // Auto-select first category
-  if (categories.length > 0 && !activeCategory) {
-    setActiveCategory(categories[0].id);
-  }
+  // Derive the effective category instead of setting state during render.
+  // Falls back to the first category until the user explicitly picks one.
+  const effectiveCategory = activeCategory ?? categories[0]?.id ?? null;
 
-  const filteredProducts = activeCategory
-    ? menuItems.filter((p) => p.category_id === activeCategory)
+  const filteredProducts = effectiveCategory
+    ? menuItems.filter((p) => p.category_id === effectiveCategory)
     : menuItems;
 
   const total = orderItems.reduce((sum, item) => {
     const modExtra = item.selectedModifiers.reduce((s, m) => s + m.option.extra_price, 0);
     return sum + (Number(item.menuItem.price) + modExtra) * item.quantity;
   }, 0);
+
+  const totalQuantity = orderItems.reduce((sum, item) => sum + item.quantity, 0);
 
   const handleProductClick = async (product: MenuItem) => {
     setIsLoadingModifiers(true);
@@ -238,13 +237,13 @@ export default function FloorView() {
   if (isLoading) {
     return (
       <div className="h-full flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-zinc-400" />
+        <Loader2 className="w-8 h-8 animate-spin text-expresso/40" />
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col lg:flex-row h-full pb-[76px] lg:pb-0 relative overflow-hidden">
+    <div className="flex flex-col lg:flex-row h-full pb-[140px] sm:pb-[76px] lg:pb-0 relative overflow-hidden">
       {drawerItem && (
         <ModifierDrawer
           menuItem={drawerItem}
@@ -261,29 +260,29 @@ export default function FloorView() {
       )}
 
       {/* Left: Categories & Products */}
-      <div className="flex-1 flex flex-col h-full border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 overflow-hidden">
-        <div className="flex overflow-x-auto p-4 gap-2 border-b border-zinc-200 dark:border-zinc-800 hide-scrollbar shrink-0">
+      <div className="flex-1 flex flex-col h-full border-r border-warm-roast/10 bg-card overflow-hidden">
+        <div className="flex overflow-x-auto p-4 gap-2 border-b border-warm-roast/10 hide-scrollbar shrink-0">
           {categories.map((cat) => (
             <button
               key={cat.id}
               onClick={() => setActiveCategory(cat.id)}
               className={`px-6 py-3 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
-                activeCategory === cat.id
-                  ? "bg-zinc-900 text-zinc-50 dark:bg-zinc-50 dark:text-zinc-900 shadow-sm"
-                  : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                effectiveCategory === cat.id
+                  ? "bg-coffee-fruit text-white shadow-sm"
+                  : "bg-warm-roast/10 text-expresso/70 hover:bg-warm-roast/20"
               }`}
             >
               {cat.name}
             </button>
           ))}
           {categories.length === 0 && (
-            <p className="text-sm text-zinc-400 p-2">No categories found. Add some in Admin → Menu.</p>
+            <p className="text-sm text-expresso/40 p-2">No categories found. Add some in Admin → Menu.</p>
           )}
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 bg-zinc-50 dark:bg-zinc-950">
+        <div className="flex-1 overflow-y-auto p-4 bg-background">
           {filteredProducts.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-zinc-400 space-y-2">
+            <div className="h-full flex flex-col items-center justify-center text-expresso/40 space-y-2">
               <Coffee className="w-12 h-12 opacity-20" />
               <p className="text-sm">No products in this category.</p>
             </div>
@@ -293,14 +292,14 @@ export default function FloorView() {
                 <button
                   key={product.id}
                   onClick={() => handleProductClick(product)}
-                  className="aspect-square bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 flex flex-col items-center justify-center gap-3 hover:border-zinc-400 dark:hover:border-zinc-600 hover:shadow-md transition-all active:scale-95"
+                  className="aspect-square bg-card border border-warm-roast/10 rounded-xl p-4 flex flex-col items-center justify-center gap-3 hover:border-warm-roast/40 hover:shadow-md transition-all active:scale-95"
                 >
-                  <div className="bg-zinc-100 dark:bg-zinc-800 p-3 rounded-full">
-                    <Coffee className="w-8 h-8 text-zinc-400 dark:text-zinc-500" />
+                  <div className="bg-warm-roast/10 p-3 rounded-full">
+                    <Coffee className="w-8 h-8 text-expresso/40" />
                   </div>
                   <div className="text-center">
-                    <h3 className="font-semibold text-sm text-zinc-900 dark:text-zinc-100 leading-tight">{product.name}</h3>
-                    <p className="text-xs text-zinc-500 mt-1">${Number(product.price).toFixed(2)}</p>
+                    <h3 className="font-semibold text-sm text-expresso leading-tight">{product.name}</h3>
+                    <p className="text-xs text-expresso/60 mt-1">${Number(product.price).toFixed(2)}</p>
                   </div>
                 </button>
               ))}
@@ -309,27 +308,30 @@ export default function FloorView() {
         </div>
       </div>
 
-      {/* Mobile Bottom Bar */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-800 p-4 flex justify-between items-center z-30 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
+      {/* Mobile Bottom Bar — sits above the layout's bottom tab nav on phones
+          (bottom-16) and at the screen edge on tablets where that nav is hidden. */}
+      <div className="lg:hidden fixed bottom-16 sm:bottom-0 left-0 right-0 bg-card border-t border-warm-roast/10 p-4 flex justify-between items-center z-30 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
         <div>
-          <span className="font-semibold text-zinc-900 dark:text-zinc-50">{orderItems.length} items</span>
-          <span className="text-zinc-500 text-sm ml-2">${total.toFixed(2)}</span>
+          <span className="font-semibold text-expresso">
+            {totalQuantity} item{totalQuantity !== 1 ? "s" : ""}
+          </span>
+          <span className="text-expresso/60 text-sm ml-2">${total.toFixed(2)}</span>
         </div>
-        <Button onClick={() => setIsOrderExpanded(true)}>View Order</Button>
+        <Button onClick={() => setIsOrderExpanded(true)} disabled={orderItems.length === 0}>View Order</Button>
       </div>
 
       {/* Right: Current Order */}
-      <div className={`fixed inset-0 z-50 lg:static lg:z-auto w-full lg:w-[400px] flex flex-col bg-white dark:bg-zinc-900 h-full shrink-0 transition-transform duration-300 ${isOrderExpanded ? "translate-y-0" : "translate-y-full lg:translate-y-0"}`}>
-        <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 shrink-0 flex justify-between items-center bg-white dark:bg-zinc-900">
-          <h2 className="font-bold text-lg text-zinc-900 dark:text-zinc-50">Current Order</h2>
-          <button className="lg:hidden p-2 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-50" onClick={() => setIsOrderExpanded(false)}>
+      <div className={`fixed inset-0 z-50 lg:static lg:z-auto w-full lg:w-[400px] flex flex-col bg-card h-full shrink-0 transition-transform duration-300 ${isOrderExpanded ? "translate-y-0" : "translate-y-full lg:translate-y-0"}`}>
+        <div className="p-4 border-b border-warm-roast/10 shrink-0 flex justify-between items-center bg-card">
+          <h2 className="font-bold text-lg text-expresso">Current Order</h2>
+          <button className="lg:hidden p-2 text-expresso/60 hover:text-expresso" onClick={() => setIsOrderExpanded(false)}>
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-zinc-50/50 dark:bg-zinc-950/50">
+        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-muted/40">
           {orderItems.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-zinc-400 space-y-2">
+            <div className="h-full flex flex-col items-center justify-center text-expresso/40 space-y-2">
               <Coffee className="w-12 h-12 opacity-20" />
               <p className="text-sm">No items in the order yet.</p>
             </div>
@@ -338,32 +340,32 @@ export default function FloorView() {
               const modExtra = item.selectedModifiers.reduce((s, m) => s + m.option.extra_price, 0);
               const unitTotal = Number(item.menuItem.price) + modExtra;
               return (
-                <div key={item.cartId} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg p-3 flex flex-col gap-3 shadow-sm">
+                <div key={item.cartId} className="bg-card border border-warm-roast/10 rounded-lg p-3 flex flex-col gap-3 shadow-sm">
                   <div className="flex justify-between items-start">
                     <div>
-                      <h4 className="font-medium text-zinc-900 dark:text-zinc-100">{item.menuItem.name}</h4>
+                      <h4 className="font-medium text-expresso">{item.menuItem.name}</h4>
                       {item.selectedModifiers.length > 0 && (
-                        <p className="text-xs text-zinc-400 mt-0.5">
+                        <p className="text-xs text-expresso/40 mt-0.5">
                           {item.selectedModifiers.map((m) => m.option.name).join(", ")}
                         </p>
                       )}
-                      <p className="text-sm text-zinc-500">${unitTotal.toFixed(2)} each</p>
+                      <p className="text-sm text-expresso/60">${unitTotal.toFixed(2)} each</p>
                     </div>
-                    <span className="font-semibold text-zinc-900 dark:text-zinc-100">
+                    <span className="font-semibold text-expresso">
                       ${(unitTotal * item.quantity).toFixed(2)}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3 bg-zinc-100 dark:bg-zinc-800 rounded-md p-1">
-                      <button onClick={() => updateQuantity(item.cartId, -1)} className="p-1 hover:bg-white dark:hover:bg-zinc-700 rounded text-zinc-600 dark:text-zinc-300 transition-colors">
+                    <div className="flex items-center gap-1 bg-warm-roast/10 rounded-lg p-1">
+                      <button onClick={() => updateQuantity(item.cartId, -1)} aria-label="Decrease quantity" className="h-10 w-10 flex items-center justify-center hover:bg-card rounded-md text-expresso/70 transition-colors active:scale-95">
                         <Minus className="w-4 h-4" />
                       </button>
-                      <span className="w-6 text-center font-medium text-sm">{item.quantity}</span>
-                      <button onClick={() => updateQuantity(item.cartId, 1)} className="p-1 hover:bg-white dark:hover:bg-zinc-700 rounded text-zinc-600 dark:text-zinc-300 transition-colors">
+                      <span className="w-8 text-center font-medium text-sm tabular-nums">{item.quantity}</span>
+                      <button onClick={() => updateQuantity(item.cartId, 1)} aria-label="Increase quantity" className="h-10 w-10 flex items-center justify-center hover:bg-card rounded-md text-expresso/70 transition-colors active:scale-95">
                         <Plus className="w-4 h-4" />
                       </button>
                     </div>
-                    <button onClick={() => removeItem(item.cartId)} className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-950 rounded-md transition-colors">
+                    <button onClick={() => removeItem(item.cartId)} aria-label="Remove item" className="h-10 w-10 flex items-center justify-center text-red-500 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors active:scale-95">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
@@ -373,10 +375,10 @@ export default function FloorView() {
           )}
         </div>
 
-        <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shrink-0">
+        <div className="p-4 border-t border-warm-roast/10 bg-card shrink-0">
           <div className="flex justify-between items-center mb-4">
-            <span className="text-zinc-500 dark:text-zinc-400 font-medium">Total</span>
-            <span className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">${total.toFixed(2)}</span>
+            <span className="text-expresso/60 font-medium">Total</span>
+            <span className="text-2xl font-bold text-expresso">${total.toFixed(2)}</span>
           </div>
           <Button
             size="lg"
@@ -387,7 +389,7 @@ export default function FloorView() {
             disabled={orderItems.length === 0}
             isLoading={createOrderMut.isPending}
             leftIcon={!createOrderMut.isPending && <Send className="w-5 h-5" />}
-            className="w-full bg-green-600 hover:bg-green-700 text-white border-transparent"
+            className="w-full bg-coffee-fruit hover:bg-fruit-light text-white border-transparent"
           >
             Send to Counter
           </Button>

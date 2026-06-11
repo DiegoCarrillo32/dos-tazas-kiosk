@@ -34,7 +34,7 @@ export default function AdminShell({
   };
 
   return (
-    <div className="flex h-screen bg-zinc-50 dark:bg-zinc-950 overflow-hidden">
+    <div className="flex h-screen bg-background overflow-hidden">
       {/* Mobile Sidebar Navigation Drawer */}
       {isMobileMenuOpen && (
         <div className="md:hidden fixed inset-0 z-50 flex">
@@ -44,20 +44,20 @@ export default function AdminShell({
             onClick={() => setIsMobileMenuOpen(false)}
           />
           {/* Side Drawer */}
-          <aside className="relative w-64 max-w-xs bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 flex flex-col z-50 h-full">
-            <div className="p-6 flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800">
+          <aside className="relative w-64 max-w-xs bg-card border-r border-warm-roast/10 flex flex-col z-50 h-full">
+            <div className="p-6 flex items-center justify-between border-b border-warm-roast/10">
               <div className="flex items-center gap-3">
-                <div className="bg-zinc-900 dark:bg-zinc-50 p-2 rounded-md">
-                  <Store className="w-5 h-5 text-zinc-50 dark:text-zinc-900" />
+                <div className="bg-coffee-fruit p-2 rounded-md">
+                  <Store className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <h1 className="font-bold tracking-tight text-zinc-900 dark:text-zinc-50">Dos Tazas</h1>
-                  <p className="text-xs text-zinc-500">Admin Portal</p>
+                  <h1 className="font-bold tracking-tight text-expresso">Dos Tazas</h1>
+                  <p className="text-xs text-expresso/60">Admin Portal</p>
                 </div>
               </div>
               <button
                 onClick={() => setIsMobileMenuOpen(false)}
-                className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-50 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                className="p-1.5 rounded-md text-expresso/40 hover:text-expresso hover:bg-warm-roast/10"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -74,24 +74,24 @@ export default function AdminShell({
                     onClick={() => setIsMobileMenuOpen(false)}
                     className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                       isActive
-                        ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50"
-                        : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 hover:text-zinc-900 dark:hover:text-zinc-50"
+                        ? "bg-warm-roast/10 text-expresso"
+                        : "text-expresso/70 hover:bg-warm-roast/5 hover:text-expresso"
                     }`}
                   >
-                    <Icon className={`w-5 h-5 ${isActive ? "text-zinc-900 dark:text-zinc-50" : "text-zinc-400"}`} />
+                    <Icon className={`w-5 h-5 ${isActive ? "text-expresso" : "text-expresso/40"}`} />
                     {item.label}
                   </Link>
                 );
               })}
             </nav>
 
-            <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 space-y-2">
+            <div className="p-4 border-t border-warm-roast/10 space-y-2">
               <Link
                 href="/pos/floor"
                 onClick={() => setIsMobileMenuOpen(false)}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-50 transition-colors"
+                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-expresso/70 hover:bg-warm-roast/5 hover:text-expresso transition-colors"
               >
-                <ArrowLeft className="w-5 h-5 text-zinc-400" />
+                <ArrowLeft className="w-5 h-5 text-expresso/40" />
                 Back to POS
               </Link>
               <button
@@ -107,15 +107,15 @@ export default function AdminShell({
       )}
 
       {/* Sidebar */}
-      <aside className="w-64 bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 flex flex-col hidden md:flex shrink-0">
-        <div className="p-6 flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800">
+      <aside className="w-64 bg-card border-r border-warm-roast/10 flex flex-col hidden md:flex shrink-0">
+        <div className="p-6 flex items-center justify-between border-b border-warm-roast/10">
           <div className="flex items-center gap-3">
-            <div className="bg-zinc-900 dark:bg-zinc-50 p-2 rounded-md">
-              <Store className="w-5 h-5 text-zinc-50 dark:text-zinc-900" />
+            <div className="bg-coffee-fruit p-2 rounded-md">
+              <Store className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h1 className="font-bold tracking-tight text-zinc-900 dark:text-zinc-50">Dos Tazas</h1>
-              <p className="text-xs text-zinc-500">Admin Portal</p>
+              <h1 className="font-bold tracking-tight text-expresso">Dos Tazas</h1>
+              <p className="text-xs text-expresso/60">Admin Portal</p>
             </div>
           </div>
           <ThemeToggle />
@@ -131,23 +131,23 @@ export default function AdminShell({
                 href={item.href}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                   isActive
-                    ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50"
-                    : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 hover:text-zinc-900 dark:hover:text-zinc-50"
+                    ? "bg-warm-roast/10 text-expresso"
+                    : "text-expresso/70 hover:bg-warm-roast/5 hover:text-expresso"
                 }`}
               >
-                <Icon className={`w-5 h-5 ${isActive ? "text-zinc-900 dark:text-zinc-50" : "text-zinc-400"}`} />
+                <Icon className={`w-5 h-5 ${isActive ? "text-expresso" : "text-expresso/40"}`} />
                 {item.label}
               </Link>
             );
           })}
         </nav>
 
-        <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 space-y-2">
+        <div className="p-4 border-t border-warm-roast/10 space-y-2">
           <Link
             href="/pos/floor"
-            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-50 transition-colors"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-expresso/70 hover:bg-warm-roast/5 hover:text-expresso transition-colors"
           >
-            <ArrowLeft className="w-5 h-5 text-zinc-400" />
+            <ArrowLeft className="w-5 h-5 text-expresso/40" />
             Back to POS
           </Link>
           <button
@@ -162,20 +162,20 @@ export default function AdminShell({
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col overflow-hidden relative">
-        <div className="md:hidden flex items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
+        <div className="md:hidden flex items-center justify-between p-4 border-b border-warm-roast/10 bg-card">
           <div className="flex items-center gap-2">
             <button
               onClick={() => setIsMobileMenuOpen(true)}
-              className="p-2 -ml-2 text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50 focus:outline-none"
+              className="p-2 -ml-2 text-expresso/60 hover:text-expresso dark:text-expresso/40 hover:text-expresso focus:outline-none"
               aria-label="Open menu"
             >
               <MenuIcon className="w-5 h-5" />
             </button>
-            <h1 className="font-bold tracking-tight text-zinc-900 dark:text-zinc-50">Admin Portal</h1>
+            <h1 className="font-bold tracking-tight text-expresso">Admin Portal</h1>
           </div>
           <div className="flex items-center gap-4">
             <ThemeToggle />
-            <Link href="/pos/floor" className="text-sm font-medium text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50">Back to POS</Link>
+            <Link href="/pos/floor" className="text-sm font-medium text-expresso/60 hover:text-expresso dark:text-expresso/40 hover:text-expresso">Back to POS</Link>
           </div>
         </div>
         <div className="flex-1 overflow-y-auto">

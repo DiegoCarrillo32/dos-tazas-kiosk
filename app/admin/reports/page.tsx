@@ -41,20 +41,20 @@ export default function FinancialReports() {
   return (
     <div className="p-6 lg:p-8 space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">Financial Reports</h1>
-        <p className="text-zinc-500 mt-1">Export sales data for accounting</p>
+        <h1 className="text-2xl font-bold text-expresso">Financial Reports</h1>
+        <p className="text-expresso/60 mt-1">Export sales data for accounting</p>
       </div>
 
-      <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm max-w-2xl">
-        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50 mb-4">Export Sales Data</h2>
+      <div className="bg-card p-6 rounded-2xl border border-warm-roast/10 shadow-sm max-w-2xl">
+        <h2 className="text-lg font-semibold text-expresso mb-4">Export Sales Data</h2>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
           <div className="space-y-2">
-            <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Start Date</label>
+            <label className="text-sm font-medium text-expresso/80">Start Date</label>
             <DatePicker date={startDate} setDate={setStartDate} placeholder="Select start date" />
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">End Date</label>
+            <label className="text-sm font-medium text-expresso/80">End Date</label>
             <DatePicker date={endDate} setDate={setEndDate} placeholder="Select end date" />
           </div>
         </div>
@@ -65,7 +65,7 @@ export default function FinancialReports() {
           disabled={!startDate || !endDate}
           isLoading={isDownloading}
           leftIcon={!isDownloading && <Download className="w-5 h-5" />}
-          className="w-full sm:w-auto bg-zinc-900 text-zinc-50 hover:bg-zinc-800 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
+          className="w-full sm:w-auto"
         >
           Download CSV Report
         </Button>

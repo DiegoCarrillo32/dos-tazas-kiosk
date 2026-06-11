@@ -33,25 +33,25 @@ function SettingsForm({
   return (
     <div className="p-6 lg:p-8 space-y-8 max-w-2xl">
       <div>
-        <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">Settings</h1>
-        <p className="text-zinc-500 mt-1">Manage your profile and account</p>
+        <h1 className="text-2xl font-bold text-expresso">Settings</h1>
+        <p className="text-expresso/60 mt-1">Manage your profile and account</p>
       </div>
 
       {/* Profile Card */}
-      <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm p-6 space-y-6">
-        <div className="flex items-center gap-4 pb-4 border-b border-zinc-200 dark:border-zinc-800">
-          <div className="w-14 h-14 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center">
-            <User className="w-7 h-7 text-zinc-400" />
+      <div className="bg-card rounded-2xl border border-warm-roast/10 shadow-sm p-6 space-y-6">
+        <div className="flex items-center gap-4 pb-4 border-b border-warm-roast/10">
+          <div className="w-14 h-14 rounded-full bg-warm-roast/10 flex items-center justify-center">
+            <User className="w-7 h-7 text-expresso/40" />
           </div>
           <div>
-            <p className="font-semibold text-zinc-900 dark:text-zinc-100">
+            <p className="font-semibold text-expresso">
               {firstName} {lastName}
             </p>
-            <p className="text-sm text-zinc-500">{initialEmail}</p>
+            <p className="text-sm text-expresso/60">{initialEmail}</p>
             <span className={`inline-flex items-center mt-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${
               profile.role === "admin"
                 ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
-                : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
+                : "bg-warm-roast/10 text-expresso/70"
             }`}>
               {profile.role === "admin" ? "Admin" : "Staff"}
             </span>
@@ -84,7 +84,7 @@ function SettingsForm({
               value={initialEmail}
               disabled
             />
-            <p className="text-xs text-zinc-400 mt-1">Contact an administrator to change your email.</p>
+            <p className="text-xs text-expresso/40 mt-1">Contact an administrator to change your email.</p>
           </div>
         </div>
 
@@ -98,9 +98,9 @@ function SettingsForm({
       </div>
 
       {/* Danger Zone */}
-      <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-red-200 dark:border-red-900/30 shadow-sm p-6">
+      <div className="bg-card rounded-2xl border border-red-200 dark:border-red-900/30 shadow-sm p-6">
         <h3 className="font-semibold text-red-600 dark:text-red-400 mb-2">Sign Out</h3>
-        <p className="text-sm text-zinc-500 mb-4">Sign out of your account on this device.</p>
+        <p className="text-sm text-expresso/60 mb-4">Sign out of your account on this device.</p>
         <Button
           variant="danger"
           onClick={onLogout}
@@ -137,7 +137,7 @@ export default function SettingsPage() {
   if (isLoading || authLoading || !profile) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-zinc-400" />
+        <Loader2 className="w-8 h-8 animate-spin text-expresso/40" />
       </div>
     );
   }

@@ -29,13 +29,13 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     
     const variants = {
       primary:
-        "bg-zinc-900 text-zinc-50 hover:bg-zinc-800 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200 focus:ring-zinc-900 dark:focus:ring-zinc-50",
+        "bg-coffee-fruit text-white hover:bg-fruit-light focus:ring-coffee-fruit",
       secondary:
-        "bg-white text-zinc-900 border border-zinc-200 hover:bg-zinc-50 dark:bg-zinc-900 dark:text-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-800 focus:ring-zinc-900 dark:focus:ring-zinc-50",
+        "bg-card text-expresso border border-warm-roast/20 hover:bg-warm-roast/5 focus:ring-coffee-fruit",
       danger:
-        "bg-red-600 text-white hover:bg-red-700 focus:ring-red-600",
+        "bg-destructive text-white hover:bg-destructive/90 focus:ring-destructive",
       ghost:
-        "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800/50 hover:text-zinc-900 dark:hover:text-zinc-50 focus:ring-zinc-500",
+        "text-expresso/70 hover:bg-warm-roast/10 hover:text-expresso focus:ring-coffee-fruit",
     };
 
     const sizes = {

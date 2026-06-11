@@ -34,7 +34,7 @@ export function ThemeToggle() {
   return (
     <button
       onClick={toggleTheme}
-      className="p-2 rounded-lg text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-50 transition-all active:scale-95 duration-200"
+      className="p-2 rounded-lg text-expresso/60 hover:bg-warm-roast/10 hover:text-expresso transition-all active:scale-95 duration-200"
       aria-label="Toggle theme"
     >
       {theme === "light" ? (

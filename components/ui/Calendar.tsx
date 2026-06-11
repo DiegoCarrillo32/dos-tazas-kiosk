@@ -16,7 +16,7 @@ function Calendar({
   return (
     <DayPicker
       showOutsideDays={showOutsideDays}
-      className={cn("p-3 bg-white dark:bg-zinc-950 dark:text-zinc-50", className)}
+      className={cn("p-3 bg-popover text-popover-foreground [--rdp-accent-color:rgb(var(--coffee-fruit))] [--rdp-accent-background-color:rgb(var(--coffee-fruit)/0.1)]", className)}
       {...props}
     />
   );

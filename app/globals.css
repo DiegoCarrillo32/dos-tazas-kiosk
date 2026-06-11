@@ -2,59 +2,120 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Dos Tazas brand fonts (self-hosted .ttf for offline kiosk reliability) ── */
+@font-face {
+  font-family: "Titan One";
+  src: url("/assets/fonts/Titan_One/TitanOne-Regular.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Gotham";
+  src: url("/assets/fonts/Gotham-Font/GothamBook.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Gotham";
+  src: url("/assets/fonts/Gotham-Font/GothamBold.ttf") format("truetype");
+  font-weight: bold;
+  font-style: normal;
+  font-display: swap;
+}
+
 @layer base {
+  /*
+   * Dos Tazas brand tokens. Colors are stored as space-separated RGB channels
+   * so Tailwind v3 can apply opacity modifiers (e.g. `text-expresso/70`,
+   * `border-warm-roast/10`). Brand vars flip in `.dark`, so brand utilities are
+   * dark-mode-aware automatically — do NOT add `dark:` overrides for brand
+   * colors. See the `dos-tazas-brand` skill for the full style guide.
+   */
   :root {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-    --primary: 240 5.9% 10%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 240 10% 3.9%;
-    --radius: 0.5rem;
+    /* Brand palette */
+    --expresso: 65 5 5;             /* #410505 */
+    --warm-roast: 122 19 24;        /* #7a1318 */
+    --coffee-fruit: 185 35 35;      /* #b92323 */
+    --white-pergamino: 255 245 225; /* #fff5e1 */
+    --fruit-light: 214 69 69;       /* #d64545 */
+
+    /* shadcn semantic tokens mapped onto the brand */
+    --background: 255 245 225;
+    --foreground: 65 5 5;
+    --card: 255 255 255;
+    --card-foreground: 65 5 5;
+    --popover: 255 255 255;
+    --popover-foreground: 65 5 5;
+    --primary: 185 35 35;
+    --primary-foreground: 255 245 225;
+    --secondary: 122 19 24;
+    --secondary-foreground: 255 245 225;
+    --muted: 251 249 244;
+    --muted-foreground: 122 19 24;
+    --accent: 251 249 244;
+    --accent-foreground: 65 5 5;
+    --destructive: 220 38 38;
+    --border: 122 19 24;
+    --input: 122 19 24;
+    --ring: 185 35 35;
+    --radius: 0.625rem;
   }
 
   .dark {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 240 5.9% 10%;
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 240 4.9% 83.9%;
+    --expresso: 255 245 225;
+    --warm-roast: 194 181 163;
+    --coffee-fruit: 185 35 35;
+    --white-pergamino: 20 13 13;
+    --fruit-light: 214 69 69;
+
+    --background: 20 13 13;
+    --foreground: 255 245 225;
+    --card: 36 22 22;
+    --card-foreground: 255 245 225;
+    --popover: 36 22 22;
+    --popover-foreground: 255 245 225;
+    --primary: 185 35 35;
+    --primary-foreground: 255 245 225;
+    --secondary: 194 181 163;
+    --secondary-foreground: 65 5 5;
+    --muted: 36 22 22;
+    --muted-foreground: 194 181 163;
+    --accent: 36 22 22;
+    --accent-foreground: 255 245 225;
+    --destructive: 248 113 113;
+    --border: 65 5 5;
+    --input: 65 5 5;
+    --ring: 185 35 35;
   }
 }
 
 @layer base {
   * {
-    border-color: hsl(var(--border));
+    /* Default subtle warm border for any unspecified border (brand-aware). */
+    border-color: rgb(var(--border) / 0.12);
   }
   body {
-    background-color: hsl(var(--background));
-    color: hsl(var(--foreground));
+    background-color: rgb(var(--background));
+    color: rgb(var(--foreground));
+    font-family: "Gotham", system-ui, sans-serif;
+  }
+}
+
+@layer utilities {
+  /* Hide the scrollbar on horizontally-scrolling strips (e.g. category chips)
+     while keeping them scrollable via touch/trackpad. */
+  .hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Pad for the device safe area (e.g. iOS home indicator) on the mobile nav. */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
   }
 }

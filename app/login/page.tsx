@@ -44,9 +44,9 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-6 bg-zinc-50 dark:bg-zinc-950">
-      <div className="w-full max-w-md bg-white dark:bg-zinc-900 rounded-xl shadow-lg border border-zinc-200 dark:border-zinc-800 p-8">
-        <h1 className="text-2xl font-bold text-center mb-6 text-zinc-900 dark:text-zinc-50">
+    <main className="flex min-h-screen flex-col items-center justify-center p-6 bg-background">
+      <div className="w-full max-w-md bg-card rounded-xl shadow-lg border border-warm-roast/10 p-8">
+        <h1 className="text-2xl font-bold text-center mb-6 text-expresso">
           Dos Tazas Login
         </h1>
         

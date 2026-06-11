@@ -455,14 +455,33 @@ export async function fetchCompletedOrders(
 
 // ─── CSV Export ────────────────────────────────────────────────────
 
+// Escape a value for safe inclusion in a CSV cell.
+// Wraps in quotes when needed and neutralizes spreadsheet formula injection
+// (values beginning with = + - @ tab or CR are treated as formulas by Excel/Sheets).
+function csvCell(value: unknown): string {
+  let s = value === null || value === undefined ? "" : String(value);
+  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+  if (/[",\n\r]/.test(s)) s = '"' + s.replace(/"/g, '""') + '"';
+  return s;
+}
+
 export async function exportOrdersCSV(
   startDate: string,
   endDate: string
 ): Promise<string> {
   const orders = await fetchCompletedOrders(startDate, endDate);
 
-  const header =
-    "Order ID,Date,Items,Total Amount,Payment Method,Reference,Customer Name,Customer ID,Customer Email";
+  const header = [
+    "Order ID",
+    "Date",
+    "Items",
+    "Total Amount",
+    "Payment Method",
+    "Reference",
+    "Customer Name",
+    "Customer ID",
+    "Customer Email",
+  ];
   const rows = orders.map((o) => {
     const itemCount = (o.order_items ?? []).reduce(
       (s: number, i: OrderItem) => s + i.quantity,
@@ -478,10 +497,12 @@ export async function exportOrdersCSV(
       o.customer_name ?? "",
       o.customer_id ?? "",
       o.customer_email ?? "",
-    ].join(",");
+    ]
+      .map(csvCell)
+      .join(",");
   });
 
-  return [header, ...rows].join("\n");
+  return [header.map(csvCell).join(","), ...rows].join("\r\n");
 }
 
 // ─── Staff Management ──────────────────────────────────────────────

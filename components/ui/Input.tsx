@@ -14,7 +14,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
       <div className="w-full">
         <div className="relative">
           {icon && (
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-expresso/40 pointer-events-none">
               {icon}
             </span>
           )}
@@ -24,18 +24,16 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
             className={cn(
               // Base
               "w-full rounded-lg border px-3 py-2.5 text-sm transition-all",
-              // Colors – high contrast for readability
-              "bg-white text-zinc-900 placeholder:text-zinc-400",
-              "dark:bg-zinc-900 dark:text-zinc-50 dark:placeholder:text-zinc-500",
+              // Colors – brand tokens (dark-mode aware)
+              "bg-card text-expresso placeholder:text-expresso/40",
               // Border
-              "border-zinc-300 dark:border-zinc-700",
+              "border-warm-roast/20",
               // Focus
-              "focus:outline-none focus:ring-2 focus:ring-zinc-900/20 focus:border-zinc-900",
-              "dark:focus:ring-zinc-50/20 dark:focus:border-zinc-50",
+              "focus:outline-none focus:ring-2 focus:ring-coffee-fruit/30 focus:border-coffee-fruit",
               // Disabled
-              "disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-zinc-100 dark:disabled:bg-zinc-950",
+              "disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-muted",
               // Error
-              error && "border-red-500 dark:border-red-500 focus:ring-red-500/20 focus:border-red-500",
+              error && "border-destructive focus:ring-destructive/20 focus:border-destructive",
               // Icon padding
               icon && "pl-10",
               className
@@ -44,7 +42,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
           />
         </div>
         {error && (
-          <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">{error}</p>
+          <p className="mt-1.5 text-xs text-destructive">{error}</p>
         )}
       </div>
     );

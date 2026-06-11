@@ -1,13 +1,23 @@
-import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import type { Metadata, Viewport } from "next";
 import QueryProvider from "@/lib/QueryProvider";
 import "./globals.css";
-
-const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Dos Tazas POS",
   description: "Point of Sale system for Dos Tazas",
+};
+
+// Lock scaling so tablets/phones don't zoom into inputs on focus and the
+// POS behaves like a fixed kiosk surface.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#09090b" },
+  ],
 };
 
 export default function RootLayout({
@@ -32,7 +42,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className={inter.className}>
+      <body>
         <QueryProvider>{children}</QueryProvider>
       </body>
     </html>

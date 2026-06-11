@@ -1,14 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { Search, Eye, Loader2, X } from "lucide-react";
+import { Search, Eye, Loader2, X, Printer } from "lucide-react";
 import type { Order, OrderItem } from "@/lib/types";
-import { useCompletedOrders } from "@/lib/hooks";
+import { useCompletedOrders, useLocationSettings } from "@/lib/hooks";
+import { Button } from "@/components/ui/Button";
+import { Receipt } from "@/components/Receipt";
 
 export default function TransactionHistory() {
   const { data: history = [], isLoading } = useCompletedOrders();
+  const { data: settings } = useLocationSettings();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [receiptOrder, setReceiptOrder] = useState<Order | null>(null);
 
   const filtered = history.filter((o) =>
     o.id.toLowerCase().includes(searchQuery.toLowerCase())
@@ -74,8 +78,25 @@ export default function TransactionHistory() {
                 </div>
               </div>
             </div>
+            <div className="mt-5 pt-4 border-t border-warm-roast/10">
+              <Button
+                onClick={() => setReceiptOrder(selectedOrder)}
+                leftIcon={<Printer className="w-4 h-4" />}
+                className="w-full bg-coffee-fruit hover:bg-fruit-light text-white border-transparent"
+              >
+                Print Receipt
+              </Button>
+            </div>
           </div>
         </div>
+      )}
+
+      {receiptOrder && (
+        <Receipt
+          order={receiptOrder}
+          settings={settings ?? null}
+          onClose={() => setReceiptOrder(null)}
+        />
       )}
 
       <div className="bg-card rounded-2xl border border-warm-roast/10 overflow-hidden shadow-sm">

@@ -119,3 +119,34 @@
     padding-bottom: env(safe-area-inset-bottom);
   }
 }
+
+/* ── Receipt printing ──────────────────────────────────────────────
+   When printing, hide the whole app and show only the receipt body at
+   the top-left, sized for an 80mm thermal roll. */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .receipt-print-area,
+  .receipt-print-area * {
+    visibility: visible;
+  }
+  .receipt-print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 80mm;
+    max-height: none;
+    overflow: visible;
+    padding: 4mm;
+    margin: 0;
+    color: #000 !important;
+    background: #fff !important;
+  }
+  .receipt-print-area * {
+    color: #000 !important;
+  }
+}

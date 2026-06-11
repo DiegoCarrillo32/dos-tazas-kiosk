@@ -39,8 +39,8 @@ export default function TablesManagement() {
   };
 
   const handleDelete = (t: Table) => {
-    if (!confirm(`Delete "${t.name}"? Open tabs on it stay, but it won't be selectable for new orders.`)) return;
-    deleteMut.mutate(t.id);
+    if (!confirm(`Delete "${t.name}"? Any orders on it become takeaway; it won't be selectable for new orders.`)) return;
+    deleteMut.mutate(t.id, { onError: () => alert("Failed to delete table. Please try again.") });
   };
 
   if (isLoading) {

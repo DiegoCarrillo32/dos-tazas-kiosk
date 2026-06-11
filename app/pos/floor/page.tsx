@@ -24,11 +24,13 @@ const generateCartId = () => Math.random().toString(36).substring(2, 11);
 function ModifierDrawer({
   menuItem,
   modifiers,
+  currency,
   onConfirm,
   onClose,
 }: {
   menuItem: MenuItem;
   modifiers: Modifier[];
+  currency: string;
   onConfirm: (item: CartItem) => void;
   onClose: () => void;
 }) {
@@ -76,7 +78,7 @@ function ModifierDrawer({
         <div className="p-5 border-b border-warm-roast/10 flex items-center justify-between shrink-0">
           <div>
             <h3 className="font-bold text-lg text-expresso">{menuItem.name}</h3>
-            <p className="text-sm text-expresso/60">${Number(menuItem.price).toFixed(2)}</p>
+            <p className="text-sm text-expresso/60">{formatMoney(menuItem.price, currency)}</p>
           </div>
           <button onClick={onClose} className="p-2 text-expresso/40 hover:text-expresso rounded-md transition-colors">
             <X className="w-5 h-5" />
@@ -107,7 +109,7 @@ function ModifierDrawer({
                       >
                         <span className="font-medium text-sm">{opt.name}</span>
                         {opt.extra_price > 0 && (
-                          <span className="text-xs opacity-70">+${Number(opt.extra_price).toFixed(2)}</span>
+                          <span className="text-xs opacity-70">+{formatMoney(opt.extra_price, currency)}</span>
                         )}
                       </button>
                     );
@@ -123,7 +125,7 @@ function ModifierDrawer({
             onClick={handleConfirm}
             className="w-full bg-coffee-fruit hover:bg-fruit-light text-white border-transparent"
           >
-            Add to Order — ${(Number(menuItem.price) + totalExtra).toFixed(2)}
+            Add to Order — {formatMoney(Number(menuItem.price) + totalExtra, currency)}
           </Button>
         </div>
       </div>
@@ -302,6 +304,7 @@ export default function FloorView() {
         <ModifierDrawer
           menuItem={drawerItem}
           modifiers={drawerModifiers}
+          currency={currency}
           onConfirm={addToOrder}
           onClose={() => { setDrawerItem(null); setDrawerModifiers([]); }}
         />

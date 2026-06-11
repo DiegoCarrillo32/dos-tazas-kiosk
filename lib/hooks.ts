@@ -1,4 +1,6 @@
+import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { createClient } from "@/utils/supabase/client";
 import {
   fetchCategories,
   fetchMenuItems,
@@ -112,6 +114,37 @@ export function useParkedOrders() {
     queryFn: fetchParkedOrders,
     staleTime: SHORT_CACHE,
   });
+}
+
+/**
+ * Subscribe to live order changes so the parked-orders queue refreshes the
+ * moment the Floor sends, the Counter completes, or an order is voided —
+ * no manual refresh needed. Returns whether the realtime channel is connected.
+ */
+export function useOrdersRealtime(): boolean {
+  const qc = useQueryClient();
+  const [connected, setConnected] = useState(false);
+
+  useEffect(() => {
+    const supabase = createClient();
+    const channel = supabase
+      .channel("orders-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "orders" },
+        () => {
+          qc.invalidateQueries({ queryKey: queryKeys.parkedOrders });
+          qc.invalidateQueries({ queryKey: queryKeys.todayAnalytics });
+        }
+      )
+      .subscribe((status) => setConnected(status === "SUBSCRIBED"));
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [qc]);
+
+  return connected;
 }
 
 export function useCreateOrder() {

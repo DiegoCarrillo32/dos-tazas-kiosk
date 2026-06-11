@@ -18,6 +18,7 @@ import {
   useCompleteOrder,
   useCancelOrder,
   useLocationSettings,
+  useOrdersRealtime,
 } from "@/lib/hooks";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
@@ -28,6 +29,7 @@ import { Receipt as ReceiptView } from "@/components/Receipt";
 export default function CounterView() {
   const { data: orders = [], isLoading, refetch, isRefetching } = useParkedOrders();
   const { data: settings } = useLocationSettings();
+  const live = useOrdersRealtime();
   const completeOrderMut = useCompleteOrder();
   const cancelOrderMut = useCancelOrder();
 
@@ -160,13 +162,21 @@ export default function CounterView() {
       {/* Left: Order Queue */}
       <div className="w-full lg:w-1/3 border-b lg:border-b-0 lg:border-r border-warm-roast/10 bg-card flex flex-col h-[40vh] lg:h-full shrink-0">
         <div className="p-4 border-b border-warm-roast/10 flex items-center justify-between shrink-0">
-          <h2 className="font-bold text-lg text-expresso">
+          <h2 className="font-bold text-lg text-expresso flex items-center gap-2">
             Parked Orders
-            {orders.length > 0 && <span className="ml-2 text-sm font-normal text-expresso/60">({orders.length})</span>}
+            {orders.length > 0 && <span className="text-sm font-normal text-expresso/60">({orders.length})</span>}
+            <span
+              title={live ? "Live — updates automatically" : "Reconnecting…"}
+              className={`inline-flex items-center gap-1 text-[11px] font-medium ${live ? "text-green-600 dark:text-green-400" : "text-expresso/40"}`}
+            >
+              <span className={`w-2 h-2 rounded-full ${live ? "bg-green-500 animate-pulse" : "bg-expresso/30"}`} />
+              {live ? "Live" : "…"}
+            </span>
           </h2>
           <button
             onClick={() => refetch()}
             disabled={isRefetching}
+            title="Refresh"
             className="p-2 text-expresso/60 hover:text-expresso bg-warm-roast/10 hover:bg-warm-roast/20 rounded-md transition-colors"
           >
             <RefreshCw className={`w-4 h-4 ${isRefetching ? "animate-spin" : ""}`} />

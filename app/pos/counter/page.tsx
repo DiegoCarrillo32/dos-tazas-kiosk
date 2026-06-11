@@ -53,7 +53,10 @@ export default function CounterView() {
     : null;
 
   // Server already computed subtotal + tax at park time; tip is added here.
-  const subtotal = Number(currentSelected?.subtotal ?? 0);
+  // Fall back to total_amount for legacy orders that have no breakdown.
+  const subtotal =
+    Number(currentSelected?.subtotal ?? 0) ||
+    Number(currentSelected?.total_amount ?? 0);
   const taxAmount = Number(currentSelected?.tax_amount ?? 0);
   const taxRatePct = Math.round(
     Number(currentSelected?.tax_rate ?? settings?.tax_rate ?? 0.13) * 100

@@ -5,6 +5,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { Coffee, MonitorPlay, LogOut, UserCircle } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
+import { LanguageToggle } from "@/components/ui/LanguageToggle";
+import { useT } from "@/lib/i18n/LanguageContext";
 
 export default function POSNav({
   children,
@@ -13,6 +15,7 @@ export default function POSNav({
   children: React.ReactNode;
   isAdmin: boolean;
 }) {
+  const t = useT();
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
@@ -31,7 +34,7 @@ export default function POSNav({
             <Coffee className="w-5 h-5 text-white" />
           </div>
           <span className="font-bold text-lg hidden sm:block tracking-tight text-expresso">
-            Dos Tazas POS
+            {t("nav.appName")}
           </span>
         </div>
 
@@ -46,7 +49,7 @@ export default function POSNav({
             }`}
           >
             <Coffee className="w-4 h-4" />
-            Floor View
+            {t("nav.floorView")}
           </Link>
           <Link
             href="/pos/counter"
@@ -57,27 +60,28 @@ export default function POSNav({
             }`}
           >
             <MonitorPlay className="w-4 h-4" />
-            Counter View
+            {t("nav.counterView")}
           </Link>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           {isAdmin && (
             <Link
               href="/admin"
               className="text-sm font-medium text-expresso/60 hover:text-expresso dark:text-expresso/40 hover:text-expresso hidden sm:block"
             >
-              Admin
+              {t("nav.admin")}
             </Link>
           )}
           {isAdmin && (
             <div className="h-8 w-px bg-warm-roast/20 hidden sm:block"></div>
           )}
+          <LanguageToggle />
           <ThemeToggle />
           <button
             onClick={handleLogout}
             className="flex items-center gap-2 text-expresso/60 hover:text-red-600 dark:text-expresso/40 dark:hover:text-red-400 transition-colors"
-            title="Log out"
+            title={t("nav.logOut")}
           >
             <LogOut className="w-5 h-5" />
           </button>
@@ -98,7 +102,7 @@ export default function POSNav({
           }`}
         >
           <Coffee className="w-5 h-5" />
-          <span className="text-xs font-medium">Floor</span>
+          <span className="text-xs font-medium">{t("nav.floor")}</span>
         </Link>
         <Link
           href="/pos/counter"
@@ -107,7 +111,7 @@ export default function POSNav({
           }`}
         >
           <MonitorPlay className="w-5 h-5" />
-          <span className="text-xs font-medium">Counter</span>
+          <span className="text-xs font-medium">{t("nav.counter")}</span>
         </Link>
         {isAdmin && (
           <Link
@@ -115,7 +119,7 @@ export default function POSNav({
             className="flex flex-col items-center justify-center w-full h-full gap-1 text-expresso/60 hover:text-expresso transition-colors"
           >
             <UserCircle className="w-5 h-5" />
-            <span className="text-xs font-medium">Admin</span>
+            <span className="text-xs font-medium">{t("nav.admin")}</span>
           </Link>
         )}
       </nav>

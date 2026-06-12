@@ -13,8 +13,10 @@ import {
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Label } from "@/components/ui/Label";
+import { useT } from "@/lib/i18n/LanguageContext";
 
 export default function StaffManagement() {
+  const t = useT();
   const { data: staff = [], isLoading } = useStaffProfiles();
   const { data: currentUser } = useCurrentProfile();
   const updateRoleMut = useUpdateStaffRole();
@@ -30,7 +32,7 @@ export default function StaffManagement() {
 
   const handleInvite = () => {
     if (!inviteEmail || !invitePassword || !inviteFirst) {
-      alert("Email, password, and first name are required.");
+      alert(t("staff.fieldsRequired"));
       return;
     }
     inviteMut.mutate(
@@ -50,23 +52,23 @@ export default function StaffManagement() {
           setInviteLast("");
           setInviteRole("staff");
         },
-        onError: (err) => alert(`Failed to invite: ${err.message}`),
+        onError: (err) => alert(t("staff.failedToInvite", { msg: err.message })),
       }
     );
   };
 
   const handleToggleRole = (member: UserProfile) => {
     const newRole = member.role === "admin" ? "staff" : "admin";
-    if (!confirm(`Change ${member.first_name}'s role to ${newRole}?`)) return;
+    if (!confirm(t("staff.confirmRoleChange", { name: member.first_name ?? "", role: newRole }))) return;
     updateRoleMut.mutate({ userId: member.id, role: newRole });
   };
 
   const handleRemove = (member: UserProfile) => {
     if (member.id === currentUser?.id) {
-      alert("You cannot remove yourself.");
+      alert(t("staff.cannotRemoveSelf"));
       return;
     }
-    if (!confirm(`Remove ${member.first_name} ${member.last_name ?? ""}? This will revoke their access.`)) return;
+    if (!confirm(t("staff.confirmRemove", { name: `${member.first_name} ${member.last_name ?? ""}`.trim() }))) return;
     removeMut.mutate(member.id);
   };
 
@@ -82,14 +84,14 @@ export default function StaffManagement() {
     <div className="p-6 lg:p-8 space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-expresso">Staff Management</h1>
-          <p className="text-expresso/60 mt-1">Manage team members for this location</p>
+          <h1 className="text-2xl font-bold text-expresso">{t("staff.title")}</h1>
+          <p className="text-expresso/60 mt-1">{t("staff.subtitle")}</p>
         </div>
         <Button
           onClick={() => setShowInvite(true)}
           leftIcon={<UserPlus className="w-4 h-4" />}
         >
-          Invite Staff
+          {t("staff.invite")}
         </Button>
       </div>
 
@@ -99,7 +101,7 @@ export default function StaffManagement() {
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowInvite(false)} />
           <div className="relative w-full max-w-md bg-card rounded-2xl border border-warm-roast/10 shadow-xl p-6 space-y-5">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-expresso">Invite Team Member</h3>
+              <h3 className="text-lg font-bold text-expresso">{t("staff.inviteTitle")}</h3>
               <button onClick={() => setShowInvite(false)} className="p-2 text-expresso/40 hover:text-expresso">
                 <X className="w-5 h-5" />
               </button>
@@ -107,27 +109,27 @@ export default function StaffManagement() {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label className="mb-1 block">First Name *</Label>
+                  <Label className="mb-1 block">{t("staff.firstName")}</Label>
                   <Input type="text" value={inviteFirst} onChange={(e) => setInviteFirst(e.target.value)} />
                 </div>
                 <div>
-                  <Label className="mb-1 block">Last Name</Label>
+                  <Label className="mb-1 block">{t("staff.lastName")}</Label>
                   <Input type="text" value={inviteLast} onChange={(e) => setInviteLast(e.target.value)} />
                 </div>
               </div>
               <div>
-                <Label className="mb-1 block">Email *</Label>
+                <Label className="mb-1 block">{t("staff.email")}</Label>
                 <Input type="email" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} placeholder="staff@dostazas.com" />
               </div>
               <div>
-                <Label className="mb-1 block">Password *</Label>
-                <Input type="password" value={invitePassword} onChange={(e) => setInvitePassword(e.target.value)} placeholder="Min 6 characters" />
+                <Label className="mb-1 block">{t("staff.password")}</Label>
+                <Input type="password" value={invitePassword} onChange={(e) => setInvitePassword(e.target.value)} placeholder={t("staff.passwordPlaceholder")} />
               </div>
               <div>
-                <label className="block text-sm font-medium text-expresso/80 mb-1">Role</label>
+                <label className="block text-sm font-medium text-expresso/80 mb-1">{t("staff.role")}</label>
                 <select value={inviteRole} onChange={(e) => setInviteRole(e.target.value as "admin" | "staff")} className="w-full px-3 py-2 bg-background border border-warm-roast/10 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-coffee-fruit">
-                  <option value="staff">Staff</option>
-                  <option value="admin">Admin</option>
+                  <option value="staff">{t("settings.roleStaff")}</option>
+                  <option value="admin">{t("settings.roleAdmin")}</option>
                 </select>
               </div>
             </div>
@@ -138,7 +140,7 @@ export default function StaffManagement() {
               leftIcon={<UserPlus className="w-4 h-4" />}
               className="w-full"
             >
-              Create Account
+              {t("staff.createAccount")}
             </Button>
           </div>
         </div>
@@ -150,10 +152,10 @@ export default function StaffManagement() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-warm-roast/10 bg-muted/40">
-                <th className="px-6 py-4 text-sm font-semibold text-expresso">Name</th>
-                <th className="px-6 py-4 text-sm font-semibold text-expresso">Role</th>
-                <th className="px-6 py-4 text-sm font-semibold text-expresso">Joined</th>
-                <th className="px-6 py-4 text-sm font-semibold text-expresso text-right">Actions</th>
+                <th className="px-6 py-4 text-sm font-semibold text-expresso">{t("staff.colName")}</th>
+                <th className="px-6 py-4 text-sm font-semibold text-expresso">{t("staff.colRole")}</th>
+                <th className="px-6 py-4 text-sm font-semibold text-expresso">{t("staff.colJoined")}</th>
+                <th className="px-6 py-4 text-sm font-semibold text-expresso text-right">{t("staff.colActions")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-warm-roast/10">
@@ -162,7 +164,7 @@ export default function StaffManagement() {
                   <td colSpan={4} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center gap-3 text-expresso/40">
                       <Users className="w-10 h-10 opacity-20" />
-                      <p className="text-sm">No team members yet.</p>
+                      <p className="text-sm">{t("staff.noStaff")}</p>
                     </div>
                   </td>
                 </tr>
@@ -179,7 +181,7 @@ export default function StaffManagement() {
                           <div>
                             <p className="font-medium text-sm text-expresso">
                               {member.first_name} {member.last_name ?? ""}
-                              {isCurrentUser && <span className="ml-2 text-xs text-expresso/40">(you)</span>}
+                              {isCurrentUser && <span className="ml-2 text-xs text-expresso/40">{t("staff.you")}</span>}
                             </p>
                           </div>
                         </div>
@@ -191,7 +193,7 @@ export default function StaffManagement() {
                             : "bg-warm-roast/10 text-expresso/70"
                         }`}>
                           {member.role === "admin" ? <ShieldAlert className="w-3 h-3" /> : <Shield className="w-3 h-3" />}
-                          {member.role.charAt(0).toUpperCase() + member.role.slice(1)}
+                          {member.role === "admin" ? t("settings.roleAdmin") : t("settings.roleStaff")}
                         </span>
                       </td>
                       <td className="px-6 py-4 text-sm text-expresso/60">
@@ -204,7 +206,7 @@ export default function StaffManagement() {
                             disabled={isCurrentUser || updateRoleMut.isPending}
                             className="px-3 py-1.5 text-xs font-medium border border-warm-roast/15 rounded-lg hover:bg-warm-roast/5 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                           >
-                            {member.role === "admin" ? "Demote" : "Promote"}
+                            {member.role === "admin" ? t("staff.demote") : t("staff.promote")}
                           </button>
                           <button
                             onClick={() => handleRemove(member)}

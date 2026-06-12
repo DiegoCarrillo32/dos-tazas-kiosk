@@ -6,8 +6,10 @@ import type { Table } from "@/lib/types";
 import { useTables, useCreateTable, useUpdateTable, useDeleteTable } from "@/lib/hooks";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { useT } from "@/lib/i18n/LanguageContext";
 
 export default function TablesManagement() {
+  const t = useT();
   const { data: tables = [], isLoading } = useTables();
   const createMut = useCreateTable();
   const updateMut = useUpdateTable();
@@ -23,9 +25,9 @@ export default function TablesManagement() {
     createMut.mutate(name, { onSuccess: () => setNewName("") });
   };
 
-  const startEdit = (t: Table) => {
-    setEditingId(t.id);
-    setEditName(t.name);
+  const startEdit = (tbl: Table) => {
+    setEditingId(tbl.id);
+    setEditName(tbl.name);
   };
 
   const saveEdit = () => {
@@ -38,9 +40,9 @@ export default function TablesManagement() {
     );
   };
 
-  const handleDelete = (t: Table) => {
-    if (!confirm(`Delete "${t.name}"? Any orders on it become takeaway; it won't be selectable for new orders.`)) return;
-    deleteMut.mutate(t.id, { onError: () => alert("Failed to delete table. Please try again.") });
+  const handleDelete = (tbl: Table) => {
+    if (!confirm(t("tables.deleteConfirm", { name: tbl.name }))) return;
+    deleteMut.mutate(tbl.id, { onError: () => alert(t("tables.failedToDelete")) });
   };
 
   if (isLoading) {
@@ -54,8 +56,8 @@ export default function TablesManagement() {
   return (
     <div className="p-6 lg:p-8 space-y-6 max-w-3xl">
       <div>
-        <h1 className="text-2xl font-bold text-expresso">Tables</h1>
-        <p className="text-expresso/60 mt-1">Name the tables and tabs your staff can assign orders to</p>
+        <h1 className="text-2xl font-bold text-expresso">{t("tables.title")}</h1>
+        <p className="text-expresso/60 mt-1">{t("tables.subtitle")}</p>
       </div>
 
       {/* Add */}
@@ -65,11 +67,11 @@ export default function TablesManagement() {
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleCreate()}
-          placeholder="Table name (e.g. Mesa 5, Barra 2, Patio 1)"
+          placeholder={t("tables.placeholder")}
           className="flex-1"
         />
         <Button onClick={handleCreate} disabled={!newName.trim()} isLoading={createMut.isPending} leftIcon={<Plus className="w-4 h-4" />}>
-          Add Table
+          {t("tables.addTable")}
         </Button>
       </div>
 
@@ -77,16 +79,16 @@ export default function TablesManagement() {
       <div className="bg-card rounded-2xl border border-warm-roast/10 overflow-hidden">
         {tables.length === 0 ? (
           <div className="px-6 py-12 text-center text-expresso/40 text-sm">
-            No tables yet. Add your first one above.
+            {t("tables.noTables")}
           </div>
         ) : (
           <ul className="divide-y divide-warm-roast/10">
-            {tables.map((t) => (
-              <li key={t.id} className="flex items-center gap-3 px-5 py-3">
+            {tables.map((tbl) => (
+              <li key={tbl.id} className="flex items-center gap-3 px-5 py-3">
                 <div className="w-9 h-9 rounded-lg bg-warm-roast/10 flex items-center justify-center shrink-0">
                   <Armchair className="w-5 h-5 text-expresso/40" />
                 </div>
-                {editingId === t.id ? (
+                {editingId === tbl.id ? (
                   <>
                     <Input
                       type="text"
@@ -99,20 +101,20 @@ export default function TablesManagement() {
                       className="flex-1"
                       autoFocus
                     />
-                    <button onClick={saveEdit} className="p-2 text-green-600 hover:text-green-700" title="Save">
+                    <button onClick={saveEdit} className="p-2 text-green-600 hover:text-green-700" title={t("common.save")}>
                       <Check className="w-4 h-4" />
                     </button>
-                    <button onClick={() => setEditingId(null)} className="p-2 text-expresso/40 hover:text-expresso" title="Cancel">
+                    <button onClick={() => setEditingId(null)} className="p-2 text-expresso/40 hover:text-expresso" title={t("common.cancel")}>
                       <X className="w-4 h-4" />
                     </button>
                   </>
                 ) : (
                   <>
-                    <span className="flex-1 font-medium text-expresso">{t.name}</span>
-                    <button onClick={() => startEdit(t)} className="p-2 text-expresso/40 hover:text-coffee-fruit transition-colors" title="Rename">
+                    <span className="flex-1 font-medium text-expresso">{tbl.name}</span>
+                    <button onClick={() => startEdit(tbl)} className="p-2 text-expresso/40 hover:text-coffee-fruit transition-colors" title={t("tables.rename")}>
                       <Pencil className="w-4 h-4" />
                     </button>
-                    <button onClick={() => handleDelete(t)} className="p-2 text-expresso/40 hover:text-destructive transition-colors" title="Delete">
+                    <button onClick={() => handleDelete(tbl)} className="p-2 text-expresso/40 hover:text-destructive transition-colors" title={t("tables.delete")}>
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </>

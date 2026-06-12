@@ -2,8 +2,10 @@
 
 import { DollarSign, ShoppingBag, Coffee, Loader2 } from "lucide-react";
 import { useTodayAnalytics } from "@/lib/hooks";
+import { useT } from "@/lib/i18n/LanguageContext";
 
 export default function AdminDashboard() {
+  const t = useT();
   const { data: analytics, isLoading } = useTodayAnalytics();
 
   if (isLoading || !analytics) {
@@ -15,17 +17,17 @@ export default function AdminDashboard() {
   }
 
   const metrics = [
-    { label: "Gross Revenue", value: `$${analytics.grossRevenue.toFixed(2)}`, icon: DollarSign },
-    { label: "Total Orders", value: analytics.totalOrders.toString(), icon: ShoppingBag },
-    { label: "Items Sold", value: analytics.totalItemsSold.toString(), icon: Coffee },
-    { label: "Average Order Value", value: `$${analytics.averageOrderValue.toFixed(2)}`, icon: DollarSign },
+    { label: t("dashboard.grossRevenue"), value: `$${analytics.grossRevenue.toFixed(2)}`, icon: DollarSign },
+    { label: t("dashboard.totalOrders"), value: analytics.totalOrders.toString(), icon: ShoppingBag },
+    { label: t("dashboard.itemsSold"), value: analytics.totalItemsSold.toString(), icon: Coffee },
+    { label: t("dashboard.avgOrderValue"), value: `$${analytics.averageOrderValue.toFixed(2)}`, icon: DollarSign },
   ];
 
   return (
     <div className="p-6 lg:p-8 space-y-8">
       <div>
-        <h1 className="text-2xl font-bold text-expresso">Daily Analytics</h1>
-        <p className="text-expresso/60 mt-1">Overview of today&#39;s performance</p>
+        <h1 className="text-2xl font-bold text-expresso">{t("dashboard.title")}</h1>
+        <p className="text-expresso/60 mt-1">{t("dashboard.subtitle")}</p>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {metrics.map((metric) => {

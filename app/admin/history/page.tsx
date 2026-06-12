@@ -6,8 +6,10 @@ import type { Order, OrderItem } from "@/lib/types";
 import { useCompletedOrders, useLocationSettings } from "@/lib/hooks";
 import { Button } from "@/components/ui/Button";
 import { Receipt } from "@/components/Receipt";
+import { useT } from "@/lib/i18n/LanguageContext";
 
 export default function TransactionHistory() {
+  const t = useT();
   const { data: history = [], isLoading } = useCompletedOrders();
   const { data: settings } = useLocationSettings();
   const [searchQuery, setSearchQuery] = useState("");
@@ -34,14 +36,20 @@ export default function TransactionHistory() {
   return (
     <div className="p-6 lg:p-8 space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-expresso">Transaction History</h1>
-        <p className="text-expresso/60 mt-1">View past orders and receipts</p>
+        <h1 className="text-2xl font-bold text-expresso">{t("history.title")}</h1>
+        <p className="text-expresso/60 mt-1">{t("history.subtitle")}</p>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-4 mb-6">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-expresso/40" />
-          <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search by Order ID..." className="w-full pl-9 pr-4 py-2 bg-card border border-warm-roast/10 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-coffee-fruit shadow-sm" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder={t("history.searchPlaceholder")}
+            className="w-full pl-9 pr-4 py-2 bg-card border border-warm-roast/10 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-coffee-fruit shadow-sm"
+          />
         </div>
       </div>
 
@@ -50,25 +58,25 @@ export default function TransactionHistory() {
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setSelectedOrder(null)} />
           <div className="relative w-full max-w-lg bg-card rounded-2xl border border-warm-roast/10 shadow-xl p-6 max-h-[80vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-expresso">Order #{selectedOrder.id.slice(0, 8)}</h3>
+              <h3 className="text-lg font-bold text-expresso">{t("history.orderDetail")}{selectedOrder.id.slice(0, 8)}</h3>
               <button onClick={() => setSelectedOrder(null)} className="p-2 text-expresso/40 hover:text-expresso"><X className="w-5 h-5" /></button>
             </div>
             <div className="space-y-3 text-sm">
-              <div className="flex justify-between"><span className="text-expresso/60">Date</span><span className="font-medium text-expresso">{formatDate(selectedOrder.created_at)}</span></div>
-              <div className="flex justify-between"><span className="text-expresso/60">Table</span><span className="text-expresso">{selectedOrder.table?.name ?? "Takeaway"}</span></div>
-              <div className="flex justify-between"><span className="text-expresso/60">Total</span><span className="font-bold text-expresso">${Number(selectedOrder.total_amount).toFixed(2)}</span></div>
-              <div className="flex justify-between"><span className="text-expresso/60">Payment</span><span className="text-expresso">{selectedOrder.payment_method?.toUpperCase() ?? "—"}</span></div>
-              {selectedOrder.payment_reference && (<div className="flex justify-between"><span className="text-expresso/60">Reference</span><span className="text-expresso">{selectedOrder.payment_reference}</span></div>)}
+              <div className="flex justify-between"><span className="text-expresso/60">{t("history.date")}</span><span className="font-medium text-expresso">{formatDate(selectedOrder.created_at)}</span></div>
+              <div className="flex justify-between"><span className="text-expresso/60">{t("history.table")}</span><span className="text-expresso">{selectedOrder.table?.name ?? t("common.takeaway")}</span></div>
+              <div className="flex justify-between"><span className="text-expresso/60">{t("history.total")}</span><span className="font-bold text-expresso">${Number(selectedOrder.total_amount).toFixed(2)}</span></div>
+              <div className="flex justify-between"><span className="text-expresso/60">{t("history.payment")}</span><span className="text-expresso">{selectedOrder.payment_method?.toUpperCase() ?? "—"}</span></div>
+              {selectedOrder.payment_reference && (<div className="flex justify-between"><span className="text-expresso/60">{t("history.reference")}</span><span className="text-expresso">{selectedOrder.payment_reference}</span></div>)}
               {selectedOrder.customer_name && (
                 <>
-                  <div className="border-t border-warm-roast/10 pt-3 mt-3"><h4 className="font-semibold text-expresso/60 uppercase tracking-wider text-xs mb-2">Invoice Info</h4></div>
-                  <div className="flex justify-between"><span className="text-expresso/60">Name</span><span>{selectedOrder.customer_name}</span></div>
-                  <div className="flex justify-between"><span className="text-expresso/60">Cédula</span><span>{selectedOrder.customer_id}</span></div>
-                  <div className="flex justify-between"><span className="text-expresso/60">Email</span><span>{selectedOrder.customer_email}</span></div>
+                  <div className="border-t border-warm-roast/10 pt-3 mt-3"><h4 className="font-semibold text-expresso/60 uppercase tracking-wider text-xs mb-2">{t("history.invoiceInfo")}</h4></div>
+                  <div className="flex justify-between"><span className="text-expresso/60">{t("history.name")}</span><span>{selectedOrder.customer_name}</span></div>
+                  <div className="flex justify-between"><span className="text-expresso/60">{t("history.cedula")}</span><span>{selectedOrder.customer_id}</span></div>
+                  <div className="flex justify-between"><span className="text-expresso/60">{t("history.email")}</span><span>{selectedOrder.customer_email}</span></div>
                 </>
               )}
               <div className="border-t border-warm-roast/10 pt-3 mt-3">
-                <h4 className="font-semibold text-expresso/60 uppercase tracking-wider text-xs mb-2">Items</h4>
+                <h4 className="font-semibold text-expresso/60 uppercase tracking-wider text-xs mb-2">{t("history.items")}</h4>
                 <div className="space-y-2">
                   {(selectedOrder.order_items ?? []).map((item: OrderItem) => (
                     <div key={item.id} className="flex justify-between">
@@ -85,7 +93,7 @@ export default function TransactionHistory() {
                 leftIcon={<Printer className="w-4 h-4" />}
                 className="w-full bg-coffee-fruit hover:bg-fruit-light text-white border-transparent"
               >
-                Print Receipt
+                {t("history.printReceipt")}
               </Button>
             </div>
           </div>
@@ -105,17 +113,17 @@ export default function TransactionHistory() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-warm-roast/10 bg-muted/40">
-                <th className="px-6 py-4 text-sm font-semibold text-expresso">Order ID</th>
-                <th className="px-6 py-4 text-sm font-semibold text-expresso">Date & Time</th>
-                <th className="px-6 py-4 text-sm font-semibold text-expresso">Items</th>
-                <th className="px-6 py-4 text-sm font-semibold text-expresso">Total</th>
-                <th className="px-6 py-4 text-sm font-semibold text-expresso">Payment</th>
-                <th className="px-6 py-4 text-sm font-semibold text-expresso text-right">Actions</th>
+                <th className="px-6 py-4 text-sm font-semibold text-expresso">{t("history.colOrderId")}</th>
+                <th className="px-6 py-4 text-sm font-semibold text-expresso">{t("history.colDateTime")}</th>
+                <th className="px-6 py-4 text-sm font-semibold text-expresso">{t("history.colItems")}</th>
+                <th className="px-6 py-4 text-sm font-semibold text-expresso">{t("history.colTotal")}</th>
+                <th className="px-6 py-4 text-sm font-semibold text-expresso">{t("history.colPayment")}</th>
+                <th className="px-6 py-4 text-sm font-semibold text-expresso text-right">{t("history.colActions")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-warm-roast/10">
               {filtered.length === 0 ? (
-                <tr><td colSpan={6} className="px-6 py-12 text-center text-expresso/40 text-sm">{searchQuery ? "No matching orders." : "No completed orders yet."}</td></tr>
+                <tr><td colSpan={6} className="px-6 py-12 text-center text-expresso/40 text-sm">{searchQuery ? t("history.noMatching") : t("history.noOrders")}</td></tr>
               ) : (
                 filtered.map((order) => {
                   const itemCount = (order.order_items ?? []).reduce((s: number, i: OrderItem) => s + i.quantity, 0);

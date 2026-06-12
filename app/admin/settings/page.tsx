@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/Button";
 import { Label } from "@/components/ui/Label";
 import { Checkbox } from "@/components/ui/Checkbox";
 import type { UserProfile, LocationSettings } from "@/lib/types";
+import { useT } from "@/lib/i18n/LanguageContext";
 
 function SettingsForm({
   profile,
@@ -25,6 +26,7 @@ function SettingsForm({
   initialEmail: string;
   onLogout: () => void;
 }) {
+  const t = useT();
   const updateProfileMut = useUpdateOwnProfile();
   const { data: bizSettings, isLoading: settingsLoading } = useLocationSettings();
   const [firstName, setFirstName] = useState(profile.first_name ?? "");
@@ -33,15 +35,15 @@ function SettingsForm({
   const handleSave = () => {
     updateProfileMut.mutate(
       { first_name: firstName.trim(), last_name: lastName.trim() },
-      { onSuccess: () => alert("Profile updated!") }
+      { onSuccess: () => alert(t("settings.profileUpdated")) }
     );
   };
 
   return (
     <div className="p-6 lg:p-8 space-y-8 max-w-2xl">
       <div>
-        <h1 className="text-2xl font-bold text-expresso">Settings</h1>
-        <p className="text-expresso/60 mt-1">Manage your profile and account</p>
+        <h1 className="text-2xl font-bold text-expresso">{t("settings.title")}</h1>
+        <p className="text-expresso/60 mt-1">{t("settings.subtitle")}</p>
       </div>
 
       {/* Profile Card */}
@@ -60,7 +62,7 @@ function SettingsForm({
                 ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
                 : "bg-warm-roast/10 text-expresso/70"
             }`}>
-              {profile.role === "admin" ? "Admin" : "Staff"}
+              {profile.role === "admin" ? t("settings.roleAdmin") : t("settings.roleStaff")}
             </span>
           </div>
         </div>
@@ -68,7 +70,7 @@ function SettingsForm({
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label className="mb-1 block">First Name</Label>
+              <Label className="mb-1 block">{t("settings.firstName")}</Label>
               <Input
                 type="text"
                 value={firstName}
@@ -76,7 +78,7 @@ function SettingsForm({
               />
             </div>
             <div>
-              <Label className="mb-1 block">Last Name</Label>
+              <Label className="mb-1 block">{t("settings.lastName")}</Label>
               <Input
                 type="text"
                 value={lastName}
@@ -85,13 +87,13 @@ function SettingsForm({
             </div>
           </div>
           <div>
-            <Label className="mb-1 block">Email</Label>
+            <Label className="mb-1 block">{t("settings.email")}</Label>
             <Input
               type="email"
               value={initialEmail}
               disabled
             />
-            <p className="text-xs text-expresso/40 mt-1">Contact an administrator to change your email.</p>
+            <p className="text-xs text-expresso/40 mt-1">{t("settings.emailNote")}</p>
           </div>
         </div>
 
@@ -100,7 +102,7 @@ function SettingsForm({
           isLoading={updateProfileMut.isPending}
           leftIcon={<Save className="w-4 h-4" />}
         >
-          Save Changes
+          {t("settings.saveChanges")}
         </Button>
       </div>
 
@@ -111,14 +113,14 @@ function SettingsForm({
 
       {/* Danger Zone */}
       <div className="bg-card rounded-2xl border border-red-200 dark:border-red-900/30 shadow-sm p-6">
-        <h3 className="font-semibold text-red-600 dark:text-red-400 mb-2">Sign Out</h3>
-        <p className="text-sm text-expresso/60 mb-4">Sign out of your account on this device.</p>
+        <h3 className="font-semibold text-red-600 dark:text-red-400 mb-2">{t("settings.signOut")}</h3>
+        <p className="text-sm text-expresso/60 mb-4">{t("settings.signOutDesc")}</p>
         <Button
           variant="danger"
           onClick={onLogout}
           leftIcon={<LogOut className="w-4 h-4" />}
         >
-          Sign Out
+          {t("settings.signOut")}
         </Button>
       </div>
     </div>
@@ -126,6 +128,7 @@ function SettingsForm({
 }
 
 function BusinessSettingsForm({ settings }: { settings: LocationSettings | null }) {
+  const t = useT();
   const updateMut = useUpdateLocationSettings();
   const [legalName, setLegalName] = useState(settings?.business_legal_name ?? "");
   const [taxId, setTaxId] = useState(settings?.tax_id ?? "");
@@ -155,7 +158,7 @@ function BusinessSettingsForm({ settings }: { settings: LocationSettings | null 
         tip_enabled: tipEnabled,
         receipt_footer: receiptFooter.trim() || null,
       },
-      { onSuccess: () => alert("Business settings saved!") }
+      { onSuccess: () => alert(t("settings.businessSaved")) }
     );
   };
 
@@ -166,40 +169,38 @@ function BusinessSettingsForm({ settings }: { settings: LocationSettings | null 
           <Store className="w-6 h-6 text-expresso/40" />
         </div>
         <div>
-          <h2 className="font-semibold text-expresso">Business &amp; Tax</h2>
-          <p className="text-sm text-expresso/60">
-            Fiscal details and how prices and tax are handled at checkout
-          </p>
+          <h2 className="font-semibold text-expresso">{t("settings.businessTitle")}</h2>
+          <p className="text-sm text-expresso/60">{t("settings.businessSubtitle")}</p>
         </div>
       </div>
 
       <div className="space-y-4">
         <div>
-          <Label className="mb-1 block">Legal Business Name</Label>
+          <Label className="mb-1 block">{t("settings.legalName")}</Label>
           <Input type="text" value={legalName} onChange={(e) => setLegalName(e.target.value)} placeholder="Dos Tazas S.A." />
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <Label className="mb-1 block">Tax ID (Cédula Jurídica)</Label>
+            <Label className="mb-1 block">{t("settings.taxId")}</Label>
             <Input type="text" value={taxId} onChange={(e) => setTaxId(e.target.value)} />
           </div>
           <div>
-            <Label className="mb-1 block">Phone</Label>
+            <Label className="mb-1 block">{t("settings.phone")}</Label>
             <Input type="text" value={phone} onChange={(e) => setPhone(e.target.value)} />
           </div>
         </div>
         <div>
-          <Label className="mb-1 block">Address</Label>
+          <Label className="mb-1 block">{t("settings.address")}</Label>
           <Input type="text" value={address} onChange={(e) => setAddress(e.target.value)} />
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <Label className="mb-1 block">IVA Rate (%)</Label>
+            <Label className="mb-1 block">{t("settings.ivaRate")}</Label>
             <Input type="number" inputMode="decimal" min={0} value={taxRatePct} onChange={(e) => setTaxRatePct(e.target.value)} />
           </div>
           <div>
-            <Label className="mb-1 block">Currency</Label>
+            <Label className="mb-1 block">{t("settings.currency")}</Label>
             <Input type="text" value={currency} onChange={(e) => setCurrency(e.target.value)} placeholder="CRC" />
           </div>
         </div>
@@ -207,29 +208,29 @@ function BusinessSettingsForm({ settings }: { settings: LocationSettings | null 
         <label className="flex items-start gap-3 cursor-pointer pt-1">
           <Checkbox checked={pricesIncludeTax} onChange={(e) => setPricesIncludeTax(e.target.checked)} />
           <span className="text-sm text-expresso/80">
-            <span className="font-medium text-expresso">Menu prices include IVA</span>
+            <span className="font-medium text-expresso">{t("settings.pricesIncludeTax")}</span>
             <br />
-            The price shown on the menu is what the customer pays; tax is broken out on the receipt.
+            {t("settings.pricesIncludeTaxDesc")}
           </span>
         </label>
 
         <label className="flex items-start gap-3 cursor-pointer">
           <Checkbox checked={tipEnabled} onChange={(e) => setTipEnabled(e.target.checked)} />
           <span className="text-sm text-expresso/80">
-            <span className="font-medium text-expresso">Enable tips at checkout</span>
+            <span className="font-medium text-expresso">{t("settings.enableTips")}</span>
             <br />
-            Show tip options on the Counter when taking payment.
+            {t("settings.enableTipsDesc")}
           </span>
         </label>
 
         <div>
-          <Label className="mb-1 block">Receipt Footer</Label>
+          <Label className="mb-1 block">{t("settings.receiptFooter")}</Label>
           <Input type="text" value={receiptFooter} onChange={(e) => setReceiptFooter(e.target.value)} placeholder="¡Gracias por su visita!" />
         </div>
       </div>
 
       <Button onClick={handleSave} isLoading={updateMut.isPending} leftIcon={<Save className="w-4 h-4" />}>
-        Save Business Settings
+        {t("settings.saveBusinessSettings")}
       </Button>
     </div>
   );

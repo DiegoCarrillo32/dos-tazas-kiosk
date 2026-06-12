@@ -7,6 +7,7 @@ import { createClient } from "@/utils/supabase/client";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Label } from "@/components/ui/Label";
+import { useT } from "@/lib/i18n/LanguageContext";
 
 type LoginForm = {
   email: string;
@@ -14,6 +15,7 @@ type LoginForm = {
 };
 
 export default function LoginPage() {
+  const t = useT();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -47,9 +49,9 @@ export default function LoginPage() {
     <main className="flex min-h-screen flex-col items-center justify-center p-6 bg-background">
       <div className="w-full max-w-md bg-card rounded-xl shadow-lg border border-warm-roast/10 p-8">
         <h1 className="text-2xl font-bold text-center mb-6 text-expresso">
-          Dos Tazas Login
+          {t("login.title")}
         </h1>
-        
+
         {error && (
           <div className="mb-4 p-3 bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 rounded-md text-sm">
             {error}
@@ -58,27 +60,27 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email">{t("login.email")}</Label>
             <Input
               id="email"
               type="email"
-              {...register("email", { required: "Email is required" })}
+              {...register("email", { required: t("login.emailRequired") })}
               error={errors.email?.message}
             />
           </div>
-          
+
           <div className="flex flex-col gap-2">
-            <Label htmlFor="password">Password</Label>
+            <Label htmlFor="password">{t("login.password")}</Label>
             <Input
               id="password"
               type="password"
-              {...register("password", { required: "Password is required" })}
+              {...register("password", { required: t("login.passwordRequired") })}
               error={errors.password?.message}
             />
           </div>
 
           <Button type="submit" isLoading={loading} className="mt-4 w-full">
-            Sign In
+            {t("login.signIn")}
           </Button>
         </form>
       </div>

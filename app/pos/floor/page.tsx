@@ -16,6 +16,7 @@ import {
 } from "@/lib/hooks";
 import { formatMoney } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
+import { useT } from "@/lib/i18n/LanguageContext";
 
 const generateCartId = () => Math.random().toString(36).substring(2, 11);
 
@@ -34,12 +35,11 @@ function ModifierDrawer({
   onConfirm: (item: CartItem) => void;
   onClose: () => void;
 }) {
+  const t = useT();
   const [selected, setSelected] = useState<SelectedModifier[]>([]);
 
   const toggleOption = (mod: Modifier, option: ModifierOption) => {
     if (!option) return;
-    // Use a functional updater so rapid successive taps (before a re-render)
-    // each build on the latest selection instead of a stale closure.
     setSelected((prev) => {
       if (prev.some((s) => s.option.id === option.id)) {
         return prev.filter((s) => s.option.id !== option.id);
@@ -59,7 +59,7 @@ function ModifierDrawer({
   const handleConfirm = () => {
     for (const mod of modifiers) {
       if (mod.is_required && !selected.some((s) => s.modifierId === mod.id)) {
-        alert(`Please select an option for "${mod.name}"`);
+        alert(t("floor.selectOptionAlert", { name: mod.name }));
         return;
       }
     }
@@ -86,7 +86,7 @@ function ModifierDrawer({
         </div>
         <div className="flex-1 overflow-y-auto p-5 space-y-6">
           {modifiers.length === 0 ? (
-            <p className="text-sm text-expresso/40 text-center py-4">No modifiers available.</p>
+            <p className="text-sm text-expresso/40 text-center py-4">{t("floor.noModifiers")}</p>
           ) : (
             modifiers.map((mod) => (
               <div key={mod.id}>
@@ -125,7 +125,7 @@ function ModifierDrawer({
             onClick={handleConfirm}
             className="w-full bg-coffee-fruit hover:bg-fruit-light text-white border-transparent"
           >
-            Add to Order — {formatMoney(Number(menuItem.price) + totalExtra, currency)}
+            {t("floor.addToOrder")} — {formatMoney(Number(menuItem.price) + totalExtra, currency)}
           </Button>
         </div>
       </div>
@@ -144,6 +144,7 @@ const areModifiersEqual = (a: SelectedModifier[], b: SelectedModifier[]) => {
 // ─── Floor View ────────────────────────────────────────────────────
 
 export default function FloorView() {
+  const t = useT();
   const { data: categories = [], isLoading: catsLoading } = useCategories();
   const { data: menuItems = [], isLoading: itemsLoading } = useMenuItems();
   const { data: tables = [] } = useTables();
@@ -157,11 +158,8 @@ export default function FloorView() {
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [orderItems, setOrderItems] = useState<CartItem[]>([]);
   const [isOrderExpanded, setIsOrderExpanded] = useState(false);
-  // null = Takeaway / walk-in (no table)
   const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
 
-  // Table tabs: which tables already have an open (parked) order, and the
-  // currently-selected table's open tab (if any) so we append to it.
   const occupiedTableIds = new Set(
     parkedOrders.map((o) => o.table_id).filter(Boolean) as string[]
   );
@@ -169,19 +167,16 @@ export default function FloorView() {
     ? parkedOrders.find((o) => o.table_id === selectedTableId) ?? null
     : null;
   const selectedTableName = selectedTableId
-    ? tables.find((t) => t.id === selectedTableId)?.name ?? "Table"
-    : "Takeaway";
+    ? tables.find((t) => t.id === selectedTableId)?.name ?? t("floor.table")
+    : t("common.takeaway");
   const tabExistingTotal = openTab ? Number(openTab.total_amount) : 0;
 
-  // Modifier drawer
   const [drawerItem, setDrawerItem] = useState<MenuItem | null>(null);
   const [drawerModifiers, setDrawerModifiers] = useState<Modifier[]>([]);
   const [isLoadingModifiers, setIsLoadingModifiers] = useState(false);
 
   const isLoading = catsLoading || itemsLoading;
 
-  // Derive the effective category instead of setting state during render.
-  // Falls back to the first category until the user explicitly picks one.
   const effectiveCategory = activeCategory ?? categories[0]?.id ?? null;
 
   const filteredProducts = effectiveCategory
@@ -264,7 +259,6 @@ export default function FloorView() {
   const handleSend = () => {
     if (orderItems.length === 0) return;
     if (openTab) {
-      // Add to the table's existing running tab.
       appendOrderMut.mutate(
         { orderId: openTab.id, cartItems: orderItems },
         {
@@ -272,11 +266,10 @@ export default function FloorView() {
             setOrderItems([]);
             setIsOrderExpanded(false);
           },
-          onError: () => alert("Failed to add to tab. Please try again."),
+          onError: () => alert(t("floor.failedToAddToTab")),
         }
       );
     } else {
-      // Open a new order/tab (with the chosen table, or takeaway).
       createOrderMut.mutate(
         { cartItems: orderItems, tableId: selectedTableId },
         {
@@ -284,7 +277,7 @@ export default function FloorView() {
             setOrderItems([]);
             setIsOrderExpanded(false);
           },
-          onError: () => alert("Failed to send order. Please try again."),
+          onError: () => alert(t("floor.failedToSendOrder")),
         }
       );
     }
@@ -297,6 +290,8 @@ export default function FloorView() {
       </div>
     );
   }
+
+  const itemLabel = (count: number) => count === 1 ? t("common.item") : t("common.items");
 
   return (
     <div className="flex flex-col lg:flex-row h-full pb-[140px] sm:pb-[76px] lg:pb-0 relative overflow-hidden">
@@ -320,7 +315,7 @@ export default function FloorView() {
       <div className="flex-1 flex flex-col h-full border-r border-warm-roast/10 bg-card overflow-hidden">
         {/* Table selector */}
         <div className="flex items-center gap-2 overflow-x-auto px-4 py-2.5 border-b border-warm-roast/10 hide-scrollbar shrink-0 bg-muted/30">
-          <span className="text-xs font-semibold text-expresso/50 uppercase tracking-wider shrink-0 pr-1">Table</span>
+          <span className="text-xs font-semibold text-expresso/50 uppercase tracking-wider shrink-0 pr-1">{t("floor.table")}</span>
           <button
             onClick={() => setSelectedTableId(null)}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
@@ -330,15 +325,15 @@ export default function FloorView() {
             }`}
           >
             <ShoppingBag className="w-3.5 h-3.5" />
-            Takeaway
+            {t("common.takeaway")}
           </button>
-          {tables.map((t) => {
-            const occupied = occupiedTableIds.has(t.id);
-            const active = selectedTableId === t.id;
+          {tables.map((tbl) => {
+            const occupied = occupiedTableIds.has(tbl.id);
+            const active = selectedTableId === tbl.id;
             return (
               <button
-                key={t.id}
-                onClick={() => setSelectedTableId(t.id)}
+                key={tbl.id}
+                onClick={() => setSelectedTableId(tbl.id)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
                   active
                     ? "bg-coffee-fruit text-white shadow-sm"
@@ -348,13 +343,13 @@ export default function FloorView() {
                 }`}
               >
                 <Armchair className="w-3.5 h-3.5" />
-                {t.name}
+                {tbl.name}
                 {occupied && <span className={`w-1.5 h-1.5 rounded-full ${active ? "bg-white" : "bg-amber-500"}`} />}
               </button>
             );
           })}
           {tables.length === 0 && (
-            <span className="text-xs text-expresso/40">No tables yet — add some in Admin → Tables.</span>
+            <span className="text-xs text-expresso/40">{t("floor.noTables")}</span>
           )}
         </div>
 
@@ -373,7 +368,7 @@ export default function FloorView() {
             </button>
           ))}
           {categories.length === 0 && (
-            <p className="text-sm text-expresso/40 p-2">No categories found. Add some in Admin → Menu.</p>
+            <p className="text-sm text-expresso/40 p-2">{t("floor.noCategories")}</p>
           )}
         </div>
 
@@ -381,7 +376,7 @@ export default function FloorView() {
           {filteredProducts.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-expresso/40 space-y-2">
               <Coffee className="w-12 h-12 opacity-20" />
-              <p className="text-sm">No products in this category.</p>
+              <p className="text-sm">{t("floor.noProducts")}</p>
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -406,12 +401,12 @@ export default function FloorView() {
                   >
                     {soldOut && (
                       <span className="absolute top-2 right-2 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-400">
-                        Sold out
+                        {t("floor.soldOut")}
                       </span>
                     )}
                     {!soldOut && lowStock && (
                       <span className="absolute top-2 right-2 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-400">
-                        {product.available_quantity} left
+                        {t("floor.stockLeft", { n: product.available_quantity })}
                       </span>
                     )}
                     <div className="bg-warm-roast/10 p-3 rounded-full">
@@ -429,17 +424,16 @@ export default function FloorView() {
         </div>
       </div>
 
-      {/* Mobile Bottom Bar — sits above the layout's bottom tab nav on phones
-          (bottom-16) and at the screen edge on tablets where that nav is hidden. */}
+      {/* Mobile Bottom Bar */}
       <div className="lg:hidden fixed bottom-16 sm:bottom-0 left-0 right-0 bg-card border-t border-warm-roast/10 p-4 flex justify-between items-center z-30 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
         <div>
           <span className="font-semibold text-expresso">
-            {totalQuantity} item{totalQuantity !== 1 ? "s" : ""}
+            {totalQuantity} {itemLabel(totalQuantity)}
           </span>
           <span className="text-expresso/60 text-sm ml-2">{formatMoney(total, currency)}</span>
-          <span className="block text-xs text-expresso/50">{selectedTableName}{openTab ? " · open tab" : ""}</span>
+          <span className="block text-xs text-expresso/50">{selectedTableName}{openTab ? ` · ${t("floor.openTabBadge")}` : ""}</span>
         </div>
-        <Button onClick={() => setIsOrderExpanded(true)} disabled={orderItems.length === 0}>View Order</Button>
+        <Button onClick={() => setIsOrderExpanded(true)} disabled={orderItems.length === 0}>{t("floor.viewOrder")}</Button>
       </div>
 
       {/* Right: Current Order */}
@@ -454,7 +448,7 @@ export default function FloorView() {
             <h2 className="font-bold text-lg text-expresso">{selectedTableName}</h2>
             {openTab && (
               <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
-                Open tab
+                {t("floor.openTabBadge")}
               </span>
             )}
           </div>
@@ -468,7 +462,7 @@ export default function FloorView() {
           {openTab && (openTab.order_items ?? []).length > 0 && (
             <div className="bg-warm-roast/5 border border-warm-roast/10 rounded-lg p-3">
               <div className="flex justify-between items-center mb-2">
-                <span className="text-xs font-semibold text-expresso/50 uppercase tracking-wider">Already on tab</span>
+                <span className="text-xs font-semibold text-expresso/50 uppercase tracking-wider">{t("floor.alreadyOnTab")}</span>
                 <span className="text-xs font-semibold text-expresso/70">{formatMoney(tabExistingTotal, currency)}</span>
               </div>
               <div className="space-y-1">
@@ -485,7 +479,7 @@ export default function FloorView() {
           {orderItems.length === 0 ? (
             <div className="flex flex-col items-center justify-center text-expresso/40 space-y-2 py-10">
               <Coffee className="w-12 h-12 opacity-20" />
-              <p className="text-sm">{openTab ? "Add items to this tab." : "No items in the order yet."}</p>
+              <p className="text-sm">{openTab ? t("floor.addItemsToTab") : t("floor.noItemsYet")}</p>
             </div>
           ) : (
             orderItems.map((item) => {
@@ -501,7 +495,7 @@ export default function FloorView() {
                           {item.selectedModifiers.map((m) => m.option.name).join(", ")}
                         </p>
                       )}
-                      <p className="text-sm text-expresso/60">{formatMoney(unitTotal, currency)} each</p>
+                      <p className="text-sm text-expresso/60">{formatMoney(unitTotal, currency)} {t("floor.each")}</p>
                     </div>
                     <span className="font-semibold text-expresso">
                       {formatMoney(unitTotal * item.quantity, currency)}
@@ -530,12 +524,12 @@ export default function FloorView() {
         <div className="p-4 border-t border-warm-roast/10 bg-card shrink-0">
           {openTab && (
             <div className="flex justify-between items-center mb-1 text-sm text-expresso/60">
-              <span>New items</span>
+              <span>{t("floor.newItems")}</span>
               <span>{formatMoney(total, currency)}</span>
             </div>
           )}
           <div className="flex justify-between items-center mb-4">
-            <span className="text-expresso/60 font-medium">{openTab ? "Tab total" : "Total"}</span>
+            <span className="text-expresso/60 font-medium">{openTab ? t("floor.tabTotal") : t("floor.total")}</span>
             <span className="text-2xl font-bold text-expresso">{formatMoney(tabExistingTotal + total, currency)}</span>
           </div>
           <Button
@@ -546,7 +540,11 @@ export default function FloorView() {
             leftIcon={!isSending && <Send className="w-5 h-5" />}
             className="w-full bg-coffee-fruit hover:bg-fruit-light text-white border-transparent"
           >
-            {openTab ? `Add to ${selectedTableName}` : selectedTableId ? `Open ${selectedTableName} Tab` : "Send to Counter"}
+            {openTab
+              ? t("floor.addToTab", { name: selectedTableName })
+              : selectedTableId
+                ? t("floor.openTab", { name: selectedTableName })
+                : t("floor.sendToCounter")}
           </Button>
         </div>
       </div>

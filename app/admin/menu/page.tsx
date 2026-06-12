@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Label } from "@/components/ui/Label";
 import { Checkbox } from "@/components/ui/Checkbox";
+import { useT } from "@/lib/i18n/LanguageContext";
 
 type MenuItemForm = {
   name: string;
@@ -42,6 +43,7 @@ const emptyForm: MenuItemForm = {
 };
 
 export default function MenuManagement() {
+  const t = useT();
   const { data: items = [], isLoading: itemsLoading } = useAllMenuItems();
   const { data: categories = [], isLoading: catsLoading } = useCategories();
   const createItemMut = useCreateMenuItem();
@@ -53,7 +55,6 @@ export default function MenuManagement() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<MenuItemForm>(emptyForm);
 
-  // New category
   const [showCatForm, setShowCatForm] = useState(false);
   const [newCatName, setNewCatName] = useState("");
 
@@ -91,7 +92,7 @@ export default function MenuManagement() {
 
   const handleSave = async () => {
     if (!form.name || !form.price) {
-      alert("Name and Price are required.");
+      alert(t("menu.nameRequired"));
       return;
     }
     if (editingId) {
@@ -110,7 +111,7 @@ export default function MenuManagement() {
             is_available: form.is_available,
           },
         },
-        { onSuccess: () => setShowForm(false), onError: () => alert("Failed to save.") }
+        { onSuccess: () => setShowForm(false), onError: () => alert(t("menu.failedToSave")) }
       );
     } else {
       const locationId = await getLocationId();
@@ -127,13 +128,13 @@ export default function MenuManagement() {
           low_stock_threshold: parseInt(form.low_stock_threshold) || 0,
           is_available: form.is_available,
         },
-        { onSuccess: () => setShowForm(false), onError: () => alert("Failed to save.") }
+        { onSuccess: () => setShowForm(false), onError: () => alert(t("menu.failedToSave")) }
       );
     }
   };
 
   const handleDelete = (id: string) => {
-    if (!confirm("Delete this item?")) return;
+    if (!confirm(t("menu.deleteConfirm"))) return;
     deleteItemMut.mutate(id);
   };
 
@@ -148,7 +149,7 @@ export default function MenuManagement() {
       { location_id: locationId, name: newCatName.trim(), sort_order: categories.length },
       {
         onSuccess: () => { setNewCatName(""); setShowCatForm(false); },
-        onError: () => alert("Failed to create category."),
+        onError: () => alert(t("menu.failedCategory")),
       }
     );
   };
@@ -167,23 +168,23 @@ export default function MenuManagement() {
     <div className="p-6 lg:p-8 space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-expresso">Menu & Inventory</h1>
-          <p className="text-expresso/60 mt-1">Manage your products and stock</p>
+          <h1 className="text-2xl font-bold text-expresso">{t("menu.title")}</h1>
+          <p className="text-expresso/60 mt-1">{t("menu.subtitle")}</p>
         </div>
         <div className="flex gap-2">
           <Button variant="secondary" onClick={() => setShowCatForm(!showCatForm)} leftIcon={<Plus className="w-4 h-4" />}>
-            Add Category
+            {t("menu.addCategory")}
           </Button>
           <Button onClick={openCreateForm} leftIcon={<Plus className="w-4 h-4" />}>
-            Add Item
+            {t("menu.addItem")}
           </Button>
         </div>
       </div>
 
       {showCatForm && (
         <div className="bg-card p-4 rounded-xl border border-warm-roast/10 flex gap-3">
-          <Input type="text" value={newCatName} onChange={(e) => setNewCatName(e.target.value)} placeholder="Category name" className="flex-1" />
-          <Button onClick={handleCreateCategory} disabled={!newCatName.trim()} isLoading={createCatMut.isPending}>Create</Button>
+          <Input type="text" value={newCatName} onChange={(e) => setNewCatName(e.target.value)} placeholder={t("menu.categoryPlaceholder")} className="flex-1" />
+          <Button onClick={handleCreateCategory} disabled={!newCatName.trim()} isLoading={createCatMut.isPending}>{t("common.create")}</Button>
           <button onClick={() => setShowCatForm(false)} className="p-2 text-expresso/40 hover:text-expresso"><X className="w-4 h-4" /></button>
         </div>
       )}
@@ -193,57 +194,57 @@ export default function MenuManagement() {
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowForm(false)} />
           <div className="relative w-full max-w-lg bg-card rounded-2xl border border-warm-roast/10 shadow-xl p-6 space-y-5">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-expresso">{editingId ? "Edit Item" : "New Menu Item"}</h3>
+              <h3 className="text-lg font-bold text-expresso">{editingId ? t("menu.editItem") : t("menu.newMenuItem")}</h3>
               <button onClick={() => setShowForm(false)} className="p-2 text-expresso/40 hover:text-expresso"><X className="w-5 h-5" /></button>
             </div>
             <div className="space-y-4">
               <div>
-                <Label className="mb-1 block">Name *</Label>
+                <Label className="mb-1 block">{t("menu.name")}</Label>
                 <Input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
               </div>
               <div>
-                <Label className="mb-1 block">Description</Label>
+                <Label className="mb-1 block">{t("menu.description")}</Label>
                 <Input type="text" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label className="mb-1 block">Price *</Label>
+                  <Label className="mb-1 block">{t("menu.price")}</Label>
                   <Input type="number" step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
                 </div>
                 <div>
-                  <Label className="mb-1 block">Stock</Label>
+                  <Label className="mb-1 block">{t("menu.stock")}</Label>
                   <Input type="number" value={form.available_quantity} onChange={(e) => setForm({ ...form, available_quantity: e.target.value })} />
                 </div>
               </div>
               <div>
-                <Label className="mb-1 block">Category</Label>
+                <Label className="mb-1 block">{t("menu.category")}</Label>
                 <select value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })} className="w-full px-3 py-2.5 bg-card text-expresso border border-warm-roast/20 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-coffee-fruit transition-all">
-                  <option value="">No category</option>
+                  <option value="">{t("menu.noCategory")}</option>
                   {categories.map((cat) => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
                 </select>
               </div>
               <div className="flex items-center gap-2">
                 <Checkbox id="is_active" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} />
-                <Label htmlFor="is_active" className="cursor-pointer">Active (visible on Floor)</Label>
+                <Label htmlFor="is_active" className="cursor-pointer">{t("menu.activeLabel")}</Label>
               </div>
               <div className="flex items-center gap-2">
                 <Checkbox id="is_available" checked={form.is_available} onChange={(e) => setForm({ ...form, is_available: e.target.checked })} />
-                <Label htmlFor="is_available" className="cursor-pointer">Available (uncheck to 86 / mark sold out)</Label>
+                <Label htmlFor="is_available" className="cursor-pointer">{t("menu.availableLabel")}</Label>
               </div>
               <div className="flex items-center gap-2">
                 <Checkbox id="track_inventory" checked={form.track_inventory} onChange={(e) => setForm({ ...form, track_inventory: e.target.checked })} />
-                <Label htmlFor="track_inventory" className="cursor-pointer">Track inventory (deplete stock on each sale)</Label>
+                <Label htmlFor="track_inventory" className="cursor-pointer">{t("menu.trackInventoryLabel")}</Label>
               </div>
               {form.track_inventory && (
                 <div>
-                  <Label className="mb-1 block">Low-stock alert at</Label>
+                  <Label className="mb-1 block">{t("menu.lowStockAlert")}</Label>
                   <Input type="number" min={0} value={form.low_stock_threshold} onChange={(e) => setForm({ ...form, low_stock_threshold: e.target.value })} />
-                  <p className="text-xs text-expresso/40 mt-1">Flag the item as &quot;low&quot; once stock falls to this level.</p>
+                  <p className="text-xs text-expresso/40 mt-1">{t("menu.lowStockNote")}</p>
                 </div>
               )}
             </div>
             <Button onClick={handleSave} isLoading={isSaving} leftIcon={<Save className="w-4 h-4" />} className="w-full">
-              {editingId ? "Update Item" : "Create Item"}
+              {editingId ? t("menu.updateItem") : t("menu.createItem")}
             </Button>
           </div>
         </div>
@@ -254,17 +255,17 @@ export default function MenuManagement() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-warm-roast/10 bg-muted/40">
-                <th className="px-6 py-4 text-sm font-semibold text-expresso">Name</th>
-                <th className="px-6 py-4 text-sm font-semibold text-expresso">Category</th>
-                <th className="px-6 py-4 text-sm font-semibold text-expresso">Price</th>
-                <th className="px-6 py-4 text-sm font-semibold text-expresso">Stock</th>
-                <th className="px-6 py-4 text-sm font-semibold text-expresso">Status</th>
-                <th className="px-6 py-4 text-sm font-semibold text-expresso text-right">Actions</th>
+                <th className="px-6 py-4 text-sm font-semibold text-expresso">{t("menu.colName")}</th>
+                <th className="px-6 py-4 text-sm font-semibold text-expresso">{t("menu.colCategory")}</th>
+                <th className="px-6 py-4 text-sm font-semibold text-expresso">{t("menu.colPrice")}</th>
+                <th className="px-6 py-4 text-sm font-semibold text-expresso">{t("menu.colStock")}</th>
+                <th className="px-6 py-4 text-sm font-semibold text-expresso">{t("menu.colStatus")}</th>
+                <th className="px-6 py-4 text-sm font-semibold text-expresso text-right">{t("menu.colActions")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-warm-roast/10">
               {items.length === 0 ? (
-                <tr><td colSpan={6} className="px-6 py-12 text-center text-expresso/40 text-sm">No menu items yet. Click &quot;Add Item&quot; to get started.</td></tr>
+                <tr><td colSpan={6} className="px-6 py-12 text-center text-expresso/40 text-sm">{t("menu.noItems")}</td></tr>
               ) : (
                 items.map((item) => (
                   <tr key={item.id} className="hover:bg-warm-roast/5 transition-colors">
@@ -273,7 +274,7 @@ export default function MenuManagement() {
                     <td className="px-6 py-4 text-sm text-expresso/60">${Number(item.price).toFixed(2)}</td>
                     <td className="px-6 py-4 text-sm">
                       {!item.track_inventory ? (
-                        <span className="text-expresso/40">Untracked</span>
+                        <span className="text-expresso/40">{t("menu.untracked")}</span>
                       ) : (
                         <span className="inline-flex items-center gap-2">
                           <span className={`font-medium ${item.available_quantity <= 0 ? "text-destructive" : item.available_quantity <= item.low_stock_threshold ? "text-amber-600 dark:text-amber-400" : "text-expresso/70"}`}>
@@ -288,17 +289,17 @@ export default function MenuManagement() {
                     <td className="px-6 py-4">
                       <div className="flex flex-wrap items-center gap-1.5">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${item.is_active ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" : "bg-warm-roast/10 text-expresso/60"}`}>
-                          {item.is_active ? "Active" : "Disabled"}
+                          {item.is_active ? t("menu.statusActive") : t("menu.statusDisabled")}
                         </span>
                         {!item.is_available && (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">Sold out</span>
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">{t("menu.statusSoldOut")}</span>
                         )}
                       </div>
                     </td>
                     <td className="px-6 py-4 text-right flex items-center justify-end gap-2">
                       <button
                         onClick={() => handleToggleAvailable(item)}
-                        title={item.is_available ? "Mark sold out (86)" : "Mark available"}
+                        title={item.is_available ? t("menu.markSoldOut") : t("menu.markAvailable")}
                         className={`p-2 transition-colors ${item.is_available ? "text-expresso/40 hover:text-destructive" : "text-green-600 hover:text-green-700"}`}
                       >
                         {item.is_available ? <Ban className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}

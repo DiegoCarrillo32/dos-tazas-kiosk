@@ -16,8 +16,10 @@ import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Label } from "@/components/ui/Label";
 import { Checkbox } from "@/components/ui/Checkbox";
+import { useT } from "@/lib/i18n/LanguageContext";
 
 export default function ModifiersManagement() {
+  const t = useT();
   const { data: modifiers = [], isLoading } = useAllModifiers();
   const createModMut = useCreateModifier();
   const updateModMut = useUpdateModifier();
@@ -27,14 +29,12 @@ export default function ModifiersManagement() {
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  // Modifier form
   const [showModForm, setShowModForm] = useState(false);
   const [editingModId, setEditingModId] = useState<string | null>(null);
   const [modName, setModName] = useState("");
   const [modIsMultiple, setModIsMultiple] = useState(false);
   const [modIsRequired, setModIsRequired] = useState(false);
 
-  // Option form
   const [addingOptionFor, setAddingOptionFor] = useState<string | null>(null);
   const [optName, setOptName] = useState("");
   const [optPrice, setOptPrice] = useState("0");
@@ -80,7 +80,7 @@ export default function ModifiersManagement() {
   };
 
   const handleDeleteMod = (id: string) => {
-    if (!confirm("Delete this modifier and all its options?")) return;
+    if (!confirm(t("modifiers.deleteConfirm"))) return;
     deleteModMut.mutate(id);
   };
 
@@ -106,11 +106,11 @@ export default function ModifiersManagement() {
     <div className="p-6 lg:p-8 space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-expresso">Modifiers</h1>
-          <p className="text-expresso/60 mt-1">Manage item customization options (Milk Type, Size, etc.)</p>
+          <h1 className="text-2xl font-bold text-expresso">{t("modifiers.title")}</h1>
+          <p className="text-expresso/60 mt-1">{t("modifiers.subtitle")}</p>
         </div>
         <Button onClick={openCreateMod} leftIcon={<Plus className="w-4 h-4" />}>
-          Add Modifier
+          {t("modifiers.addModifier")}
         </Button>
       </div>
 
@@ -119,27 +119,27 @@ export default function ModifiersManagement() {
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowModForm(false)} />
           <div className="relative w-full max-w-md bg-card rounded-2xl border border-warm-roast/10 shadow-xl p-6 space-y-5">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-expresso">{editingModId ? "Edit Modifier" : "New Modifier"}</h3>
+              <h3 className="text-lg font-bold text-expresso">{editingModId ? t("modifiers.editModifier") : t("modifiers.newModifier")}</h3>
               <button onClick={() => setShowModForm(false)} className="p-2 text-expresso/40 hover:text-expresso"><X className="w-5 h-5" /></button>
             </div>
             <div className="space-y-4">
               <div>
-                <Label className="mb-1 block">Name *</Label>
+                <Label className="mb-1 block">{t("modifiers.name")}</Label>
                 <Input type="text" value={modName} onChange={(e) => setModName(e.target.value)} placeholder="e.g. Milk Type, Size" />
               </div>
               <div className="flex items-center gap-6">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <Checkbox checked={modIsRequired} onChange={(e) => setModIsRequired(e.target.checked)} />
-                  <span className="text-sm font-medium text-expresso/80">Required</span>
+                  <span className="text-sm font-medium text-expresso/80">{t("modifiers.required")}</span>
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer">
                   <Checkbox checked={modIsMultiple} onChange={(e) => setModIsMultiple(e.target.checked)} />
-                  <span className="text-sm font-medium text-expresso/80">Allow multiple</span>
+                  <span className="text-sm font-medium text-expresso/80">{t("modifiers.allowMultiple")}</span>
                 </label>
               </div>
             </div>
             <Button onClick={handleSaveMod} disabled={!modName.trim()} isLoading={isSaving} leftIcon={<Save className="w-4 h-4" />} className="w-full">
-              {editingModId ? "Update" : "Create"}
+              {editingModId ? t("modifiers.update") : t("modifiers.create")}
             </Button>
           </div>
         </div>
@@ -148,12 +148,13 @@ export default function ModifiersManagement() {
       <div className="space-y-4">
         {modifiers.length === 0 ? (
           <div className="bg-card p-12 rounded-2xl border border-warm-roast/10 text-center text-expresso/40 text-sm">
-            No modifiers yet. Click &quot;Add Modifier&quot; to create one.
+            {t("modifiers.noModifiers")}
           </div>
         ) : (
           modifiers.map((mod) => {
             const isExpanded = expandedId === mod.id;
             const options = mod.options ?? [];
+            const optionLabel = options.length === 1 ? t("modifiers.option") : t("modifiers.options");
             return (
               <div key={mod.id} className="bg-card rounded-2xl border border-warm-roast/10 overflow-hidden shadow-sm">
                 <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-warm-roast/5 transition-colors" onClick={() => setExpandedId(isExpanded ? null : mod.id)}>
@@ -162,9 +163,9 @@ export default function ModifiersManagement() {
                     <div>
                       <h3 className="font-semibold text-expresso">{mod.name}</h3>
                       <div className="flex items-center gap-2 mt-0.5">
-                        {mod.is_required && <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 font-medium">Required</span>}
-                        {mod.is_multiple && <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 font-medium">Multi-select</span>}
-                        <span className="text-xs text-expresso/40">{options.length} option{options.length !== 1 ? "s" : ""}</span>
+                        {mod.is_required && <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 font-medium">{t("modifiers.required")}</span>}
+                        {mod.is_multiple && <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 font-medium">{t("modifiers.multiSelect")}</span>}
+                        <span className="text-xs text-expresso/40">{options.length} {optionLabel}</span>
                       </div>
                     </div>
                   </div>
@@ -187,17 +188,17 @@ export default function ModifiersManagement() {
                     {addingOptionFor === mod.id ? (
                       <div className="flex gap-2 items-end">
                         <div className="flex-1">
-                          <Input type="text" value={optName} onChange={(e) => setOptName(e.target.value)} placeholder="Option name" />
+                          <Input type="text" value={optName} onChange={(e) => setOptName(e.target.value)} placeholder={t("modifiers.optionName")} />
                         </div>
                         <div className="w-28">
-                          <Input type="number" step="0.01" value={optPrice} onChange={(e) => setOptPrice(e.target.value)} placeholder="Extra $" />
+                          <Input type="number" step="0.01" value={optPrice} onChange={(e) => setOptPrice(e.target.value)} placeholder={t("modifiers.extraPrice")} />
                         </div>
-                        <Button onClick={() => handleAddOption(mod.id)} disabled={!optName.trim()} isLoading={createOptMut.isPending}>Add</Button>
+                        <Button onClick={() => handleAddOption(mod.id)} disabled={!optName.trim()} isLoading={createOptMut.isPending}>{t("modifiers.add")}</Button>
                         <button onClick={() => { setAddingOptionFor(null); setOptName(""); setOptPrice("0"); }} className="p-2 text-expresso/40 hover:text-expresso"><X className="w-4 h-4" /></button>
                       </div>
                     ) : (
                       <button onClick={() => { setAddingOptionFor(mod.id); setOptName(""); setOptPrice("0"); }} className="flex items-center gap-2 text-sm font-medium text-expresso/60 hover:text-expresso transition-colors">
-                        <Plus className="w-4 h-4" /> Add Option
+                        <Plus className="w-4 h-4" /> {t("modifiers.addOption")}
                       </button>
                     )}
                   </div>

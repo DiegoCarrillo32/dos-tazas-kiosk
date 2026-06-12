@@ -6,17 +6,30 @@ import { usePathname, useRouter } from "next/navigation";
 import { LayoutDashboard, Menu as MenuIcon, X, History, FileText, Store, LogOut, ArrowLeft, SlidersHorizontal, UsersRound, Settings, BarChart3, Armchair } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
+import { LanguageToggle } from "@/components/ui/LanguageToggle";
+import { useT } from "@/lib/i18n/LanguageContext";
 
-const NAV_ITEMS = [
-  { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/admin/analytics", label: "Analytics", icon: BarChart3 },
-  { href: "/admin/menu", label: "Menu & Inventory", icon: MenuIcon },
-  { href: "/admin/tables", label: "Tables", icon: Armchair },
-  { href: "/admin/modifiers", label: "Modifiers", icon: SlidersHorizontal },
-  { href: "/admin/staff", label: "Staff", icon: UsersRound },
-  { href: "/admin/history", label: "Transaction History", icon: History },
-  { href: "/admin/reports", label: "Financial Reports", icon: FileText },
-  { href: "/admin/settings", label: "Settings", icon: Settings },
+type NavKey =
+  | "admin.dashboard"
+  | "admin.analytics"
+  | "admin.menuInventory"
+  | "admin.tables"
+  | "admin.modifiers"
+  | "admin.staff"
+  | "admin.transactionHistory"
+  | "admin.financialReports"
+  | "admin.settings";
+
+const NAV_ITEMS: { href: string; labelKey: NavKey; icon: React.ElementType }[] = [
+  { href: "/admin", labelKey: "admin.dashboard", icon: LayoutDashboard },
+  { href: "/admin/analytics", labelKey: "admin.analytics", icon: BarChart3 },
+  { href: "/admin/menu", labelKey: "admin.menuInventory", icon: MenuIcon },
+  { href: "/admin/tables", labelKey: "admin.tables", icon: Armchair },
+  { href: "/admin/modifiers", labelKey: "admin.modifiers", icon: SlidersHorizontal },
+  { href: "/admin/staff", labelKey: "admin.staff", icon: UsersRound },
+  { href: "/admin/history", labelKey: "admin.transactionHistory", icon: History },
+  { href: "/admin/reports", labelKey: "admin.financialReports", icon: FileText },
+  { href: "/admin/settings", labelKey: "admin.settings", icon: Settings },
 ];
 
 export default function AdminShell({
@@ -24,6 +37,7 @@ export default function AdminShell({
 }: {
   children: React.ReactNode;
 }) {
+  const t = useT();
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
@@ -39,12 +53,10 @@ export default function AdminShell({
       {/* Mobile Sidebar Navigation Drawer */}
       {isMobileMenuOpen && (
         <div className="md:hidden fixed inset-0 z-50 flex">
-          {/* Backdrop overlay */}
           <div
             className="fixed inset-0 bg-black/40 backdrop-blur-sm"
             onClick={() => setIsMobileMenuOpen(false)}
           />
-          {/* Side Drawer */}
           <aside className="relative w-64 max-w-xs bg-card border-r border-warm-roast/10 flex flex-col z-50 h-full">
             <div className="p-6 flex items-center justify-between border-b border-warm-roast/10">
               <div className="flex items-center gap-3">
@@ -53,7 +65,7 @@ export default function AdminShell({
                 </div>
                 <div>
                   <h1 className="font-bold tracking-tight text-expresso">Dos Tazas</h1>
-                  <p className="text-xs text-expresso/60">Admin Portal</p>
+                  <p className="text-xs text-expresso/60">{t("admin.adminPortal")}</p>
                 </div>
               </div>
               <button
@@ -80,7 +92,7 @@ export default function AdminShell({
                     }`}
                   >
                     <Icon className={`w-5 h-5 ${isActive ? "text-expresso" : "text-expresso/40"}`} />
-                    {item.label}
+                    {t(item.labelKey)}
                   </Link>
                 );
               })}
@@ -93,14 +105,14 @@ export default function AdminShell({
                 className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-expresso/70 hover:bg-warm-roast/5 hover:text-expresso transition-colors"
               >
                 <ArrowLeft className="w-5 h-5 text-expresso/40" />
-                Back to POS
+                {t("nav.backToPOS")}
               </Link>
               <button
                 onClick={handleLogout}
                 className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
               >
                 <LogOut className="w-5 h-5 text-red-500" />
-                Sign Out
+                {t("common.signOut")}
               </button>
             </div>
           </aside>
@@ -116,10 +128,13 @@ export default function AdminShell({
             </div>
             <div>
               <h1 className="font-bold tracking-tight text-expresso">Dos Tazas</h1>
-              <p className="text-xs text-expresso/60">Admin Portal</p>
+              <p className="text-xs text-expresso/60">{t("admin.adminPortal")}</p>
             </div>
           </div>
-          <ThemeToggle />
+          <div className="flex items-center gap-2">
+            <LanguageToggle />
+            <ThemeToggle />
+          </div>
         </div>
 
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
@@ -137,7 +152,7 @@ export default function AdminShell({
                 }`}
               >
                 <Icon className={`w-5 h-5 ${isActive ? "text-expresso" : "text-expresso/40"}`} />
-                {item.label}
+                {t(item.labelKey)}
               </Link>
             );
           })}
@@ -149,14 +164,14 @@ export default function AdminShell({
             className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-expresso/70 hover:bg-warm-roast/5 hover:text-expresso transition-colors"
           >
             <ArrowLeft className="w-5 h-5 text-expresso/40" />
-            Back to POS
+            {t("nav.backToPOS")}
           </Link>
           <button
             onClick={handleLogout}
             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
           >
             <LogOut className="w-5 h-5 text-red-500" />
-            Sign Out
+            {t("common.signOut")}
           </button>
         </div>
       </aside>
@@ -172,11 +187,12 @@ export default function AdminShell({
             >
               <MenuIcon className="w-5 h-5" />
             </button>
-            <h1 className="font-bold tracking-tight text-expresso">Admin Portal</h1>
+            <h1 className="font-bold tracking-tight text-expresso">{t("admin.adminPortal")}</h1>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
+            <LanguageToggle />
             <ThemeToggle />
-            <Link href="/pos/floor" className="text-sm font-medium text-expresso/60 hover:text-expresso dark:text-expresso/40 hover:text-expresso">Back to POS</Link>
+            <Link href="/pos/floor" className="text-sm font-medium text-expresso/60 hover:text-expresso dark:text-expresso/40 hover:text-expresso">{t("nav.backToPOS")}</Link>
           </div>
         </div>
         <div className="flex-1 overflow-y-auto">

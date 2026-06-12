@@ -4,6 +4,7 @@ import { Printer, X } from "lucide-react";
 import type { Order, OrderItem, LocationSettings } from "@/lib/types";
 import { formatMoney } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
+import { useT } from "@/lib/i18n/LanguageContext";
 
 /**
  * Thermal-printer-friendly receipt for a completed (or completing) order.
@@ -19,6 +20,7 @@ export function Receipt({
   settings: LocationSettings | null;
   onClose: () => void;
 }) {
+  const t = useT();
   const currency = settings?.currency ?? "CRC";
   const money = (n: number | string | null | undefined) =>
     formatMoney(Number(n ?? 0), currency);
@@ -54,10 +56,10 @@ export function Receipt({
           <div className="border-t border-dashed border-expresso/40 my-2" />
 
           <div className="flex justify-between">
-            <span>Orden #{order.order_number ?? order.id.slice(0, 8)}</span>
+            <span>{t("receipt.order")} #{order.order_number ?? order.id.slice(0, 8)}</span>
             <span>{dateStr}</span>
           </div>
-          <div>{order.table?.name ? `Mesa: ${order.table.name}` : "Para llevar"}</div>
+          <div>{order.table?.name ? `${t("receipt.table")}: ${order.table.name}` : t("receipt.takeaway")}</div>
 
           <div className="border-t border-dashed border-expresso/40 my-2" />
 
@@ -84,16 +86,16 @@ export function Receipt({
 
           {/* Totals */}
           <div className="space-y-0.5">
-            <Row label="Subtotal" value={money(order.subtotal)} />
+            <Row label={t("receipt.subtotal")} value={money(order.subtotal)} />
             <Row label={`IVA (${taxPct}%)`} value={money(order.tax_amount)} />
             {Number(order.discount_amount) > 0 && (
-              <Row label="Descuento" value={"-" + money(order.discount_amount)} />
+              <Row label={t("receipt.discount")} value={"-" + money(order.discount_amount)} />
             )}
             {Number(order.tip_amount) > 0 && (
-              <Row label="Propina" value={money(order.tip_amount)} />
+              <Row label={t("receipt.tip")} value={money(order.tip_amount)} />
             )}
             <div className="flex justify-between font-bold text-[15px] pt-1 mt-1 border-t border-expresso/40">
-              <span>TOTAL</span>
+              <span>{t("receipt.total")}</span>
               <span className="tabular-nums">{money(order.total_amount)}</span>
             </div>
           </div>
@@ -103,7 +105,7 @@ export function Receipt({
           {/* Payment */}
           <div className="space-y-0.5">
             <Row
-              label="Pago"
+              label={t("receipt.payment")}
               value={
                 order.payment_method === "sinpe"
                   ? "SINPE"
@@ -112,11 +114,11 @@ export function Receipt({
                     : "—"
               }
             />
-            {order.payment_reference && <Row label="Ref." value={order.payment_reference} />}
+            {order.payment_reference && <Row label={t("receipt.reference")} value={order.payment_reference} />}
             {order.payment_method === "cash" && order.amount_tendered != null && (
               <>
-                <Row label="Efectivo" value={money(order.amount_tendered)} />
-                <Row label="Vuelto" value={money(order.change_due)} />
+                <Row label={t("receipt.cash")} value={money(order.amount_tendered)} />
+                <Row label={t("receipt.change")} value={money(order.change_due)} />
               </>
             )}
           </div>
@@ -126,31 +128,31 @@ export function Receipt({
             <>
               <div className="border-t border-dashed border-expresso/40 my-2" />
               <div className="space-y-0.5">
-                <div className="text-center text-[11px] font-bold">FACTURA ELECTRÓNICA</div>
-                <Row label="Nombre" value={order.customer_name} />
-                {order.customer_id && <Row label="Cédula" value={order.customer_id} />}
-                {order.customer_email && <Row label="Correo" value={order.customer_email} />}
+                <div className="text-center text-[11px] font-bold">{t("receipt.invoice")}</div>
+                <Row label={t("receipt.invoiceName")} value={order.customer_name} />
+                {order.customer_id && <Row label={t("receipt.invoiceCedula")} value={order.customer_id} />}
+                {order.customer_email && <Row label={t("receipt.invoiceEmail")} value={order.customer_email} />}
               </div>
             </>
           )}
 
           <div className="border-t border-dashed border-expresso/40 my-2" />
           <div className="text-center text-[11px] whitespace-pre-line">
-            {settings?.receipt_footer?.trim() || "¡Gracias por su visita!"}
+            {settings?.receipt_footer?.trim() || t("receipt.footer")}
           </div>
         </div>
 
         {/* Actions — hidden when printing */}
         <div className="shrink-0 p-4 border-t border-warm-roast/10 bg-card flex gap-3 no-print">
           <Button variant="secondary" onClick={onClose} className="flex-1" leftIcon={<X className="w-4 h-4" />}>
-            Close
+            {t("receipt.close")}
           </Button>
           <Button
             onClick={handlePrint}
             className="flex-1 bg-coffee-fruit hover:bg-fruit-light text-white border-transparent"
             leftIcon={<Printer className="w-4 h-4" />}
           >
-            Print
+            {t("receipt.print")}
           </Button>
         </div>
       </div>

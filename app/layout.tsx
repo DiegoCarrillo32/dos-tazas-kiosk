@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import QueryProvider from "@/lib/QueryProvider";
+import { LanguageProvider } from "@/lib/i18n/LanguageContext";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -26,7 +27,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="es" suppressHydrationWarning>
       <head>
         <script
           dangerouslySetInnerHTML={{
@@ -43,7 +44,9 @@ export default function RootLayout({
         />
       </head>
       <body>
-        <QueryProvider>{children}</QueryProvider>
+        <LanguageProvider>
+          <QueryProvider>{children}</QueryProvider>
+        </LanguageProvider>
       </body>
     </html>
   );

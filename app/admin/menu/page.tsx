@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, Edit2, Trash2, X, Save, Loader2, Ban, CheckCircle2 } from "lucide-react";
 import type { MenuItem } from "@/lib/types";
 import {
@@ -10,6 +10,9 @@ import {
   useUpdateMenuItem,
   useDeleteMenuItem,
   useCreateCategory,
+  useAllModifiers,
+  useMenuItemModifierLinks,
+  useSetMenuItemModifiers,
 } from "@/lib/hooks";
 import { createClient } from "@/utils/supabase/client";
 import { Input } from "@/components/ui/Input";
@@ -51,9 +54,21 @@ export default function MenuManagement() {
   const deleteItemMut = useDeleteMenuItem();
   const createCatMut = useCreateCategory();
 
+  const { data: allModifiers = [] } = useAllModifiers();
+  const setModifiersMut = useSetMenuItemModifiers();
+
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<MenuItemForm>(emptyForm);
+  const [selectedModifierIds, setSelectedModifierIds] = useState<string[]>([]);
+
+  const { data: existingModifierLinks } = useMenuItemModifierLinks(editingId);
+
+  useEffect(() => {
+    if (existingModifierLinks && showForm && editingId) {
+      setSelectedModifierIds(existingModifierLinks);
+    }
+  }, [existingModifierLinks, showForm, editingId]);
 
   const [showCatForm, setShowCatForm] = useState(false);
   const [newCatName, setNewCatName] = useState("");
@@ -71,11 +86,13 @@ export default function MenuManagement() {
   const openCreateForm = () => {
     setEditingId(null);
     setForm(emptyForm);
+    setSelectedModifierIds([]);
     setShowForm(true);
   };
 
   const openEditForm = (item: MenuItem) => {
     setEditingId(item.id);
+    setSelectedModifierIds([]);
     setForm({
       name: item.name,
       description: item.description ?? "",
@@ -95,6 +112,9 @@ export default function MenuManagement() {
       alert(t("menu.nameRequired"));
       return;
     }
+    const saveModifiers = (itemId: string) =>
+      setModifiersMut.mutateAsync({ menuItemId: itemId, modifierIds: selectedModifierIds });
+
     if (editingId) {
       updateItemMut.mutate(
         {
@@ -111,7 +131,13 @@ export default function MenuManagement() {
             is_available: form.is_available,
           },
         },
-        { onSuccess: () => setShowForm(false), onError: () => alert(t("menu.failedToSave")) }
+        {
+          onSuccess: async () => {
+            await saveModifiers(editingId);
+            setShowForm(false);
+          },
+          onError: () => alert(t("menu.failedToSave")),
+        }
       );
     } else {
       const locationId = await getLocationId();
@@ -128,7 +154,13 @@ export default function MenuManagement() {
           low_stock_threshold: parseInt(form.low_stock_threshold) || 0,
           is_available: form.is_available,
         },
-        { onSuccess: () => setShowForm(false), onError: () => alert(t("menu.failedToSave")) }
+        {
+          onSuccess: async (newItem) => {
+            if (newItem?.id) await saveModifiers(newItem.id);
+            setShowForm(false);
+          },
+          onError: () => alert(t("menu.failedToSave")),
+        }
       );
     }
   };
@@ -154,7 +186,7 @@ export default function MenuManagement() {
     );
   };
 
-  const isSaving = createItemMut.isPending || updateItemMut.isPending;
+  const isSaving = createItemMut.isPending || updateItemMut.isPending || setModifiersMut.isPending;
 
   if (isLoading) {
     return (
@@ -242,6 +274,39 @@ export default function MenuManagement() {
                   <p className="text-xs text-expresso/40 mt-1">{t("menu.lowStockNote")}</p>
                 </div>
               )}
+              <div>
+                <Label className="mb-1 block">{t("menu.modifiers")}</Label>
+                {allModifiers.length === 0 ? (
+                  <p className="text-xs text-expresso/40">{t("menu.noModifiersAvailable")}</p>
+                ) : (
+                  <div className="flex flex-wrap gap-2 mt-1">
+                    {allModifiers.map((mod) => {
+                      const selected = selectedModifierIds.includes(mod.id);
+                      return (
+                        <button
+                          key={mod.id}
+                          type="button"
+                          onClick={() =>
+                            setSelectedModifierIds((prev) =>
+                              selected ? prev.filter((id) => id !== mod.id) : [...prev, mod.id]
+                            )
+                          }
+                          className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+                            selected
+                              ? "bg-coffee-fruit text-white border-coffee-fruit"
+                              : "bg-card text-expresso/70 border-warm-roast/20 hover:border-coffee-fruit/50"
+                          }`}
+                        >
+                          {mod.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                {selectedModifierIds.length > 0 && (
+                  <p className="text-xs text-expresso/40 mt-1.5">{t("menu.modifiersHint")}</p>
+                )}
+              </div>
             </div>
             <Button onClick={handleSave} isLoading={isSaving} leftIcon={<Save className="w-4 h-4" />} className="w-full">
               {editingId ? t("menu.updateItem") : t("menu.createItem")}

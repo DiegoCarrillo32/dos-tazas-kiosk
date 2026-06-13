@@ -156,6 +156,9 @@ export const es: Translations = {
     failedToSave: "Error al guardar.",
     deleteConfirm: "¿Eliminar este artículo?",
     failedCategory: "Error al crear la categoría.",
+    modifiers: "Modificadores",
+    modifiersHint: "Los clientes deberán elegir entre estos al ordenar.",
+    noModifiersAvailable: "Sin modificadores aún. Créalos en la página de Modificadores primero.",
   },
   analytics: {
     title: "Analíticas",

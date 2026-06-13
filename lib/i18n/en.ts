@@ -154,6 +154,9 @@ export const en = {
     failedToSave: "Failed to save.",
     deleteConfirm: "Delete this item?",
     failedCategory: "Failed to create category.",
+    modifiers: "Modifiers",
+    modifiersHint: "Customers will be prompted to choose from these when ordering.",
+    noModifiersAvailable: "No modifiers yet. Create some in the Modifiers page first.",
   },
   analytics: {
     title: "Analytics",

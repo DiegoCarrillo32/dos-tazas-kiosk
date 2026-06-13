@@ -28,6 +28,8 @@ import {
   deleteModifier,
   createModifierOption,
   deleteModifierOption,
+  fetchMenuItemModifierLinks,
+  setMenuItemModifiers,
   fetchStaffProfiles,
   updateStaffRole,
   removeStaffProfile,
@@ -325,6 +327,27 @@ export function useDeleteModifierOption() {
     mutationFn: deleteModifierOption,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.modifiers });
+    },
+  });
+}
+
+export function useMenuItemModifierLinks(menuItemId: string | null) {
+  return useQuery({
+    queryKey: ["menuItemModifierLinks", menuItemId ?? ""],
+    queryFn: () => fetchMenuItemModifierLinks(menuItemId!),
+    enabled: !!menuItemId,
+    staleTime: LONG_CACHE,
+  });
+}
+
+export function useSetMenuItemModifiers() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ menuItemId, modifierIds }: { menuItemId: string; modifierIds: string[] }) =>
+      setMenuItemModifiers(menuItemId, modifierIds),
+    onSuccess: (_data, { menuItemId }) => {
+      qc.invalidateQueries({ queryKey: ["menuItemModifierLinks", menuItemId] });
+      qc.invalidateQueries({ queryKey: queryKeys.modifiersForItem(menuItemId) });
     },
   });
 }

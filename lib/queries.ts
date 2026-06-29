@@ -153,6 +153,30 @@ export async function fetchModifiersForItem(
   return (data ?? []) as Modifier[];
 }
 
+/**
+ * Fetch every menu-item → modifier link for the location in a single query and
+ * return it as a `menuItemId → modifierId[]` map. Combined with
+ * `fetchAllModifiers`, this lets the POS resolve a product's modifiers from an
+ * in-memory cache (no per-tap network round-trips).
+ */
+export async function fetchMenuItemModifierMap(): Promise<
+  Record<string, string[]>
+> {
+  const locationId = await getLocationId();
+  const { data, error } = await supabase()
+    .from("menu_item_modifiers")
+    .select("menu_item_id, modifier_id, menu_items!inner(location_id)")
+    .eq("menu_items.location_id", locationId);
+
+  if (error) throw error;
+
+  const map: Record<string, string[]> = {};
+  for (const row of (data ?? []) as { menu_item_id: string; modifier_id: string }[]) {
+    (map[row.menu_item_id] ??= []).push(row.modifier_id);
+  }
+  return map;
+}
+
 export async function fetchAllModifiers(): Promise<Modifier[]> {
   const locationId = await getLocationId();
   const { data, error } = await supabase()

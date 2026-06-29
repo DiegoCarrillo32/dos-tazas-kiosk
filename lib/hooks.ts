@@ -7,6 +7,7 @@ import {
   fetchAllMenuItems,
   fetchModifiersForItem,
   fetchAllModifiers,
+  fetchMenuItemModifierMap,
   fetchParkedOrders,
   fetchTodayAnalytics,
   fetchCompletedOrders,
@@ -55,6 +56,7 @@ export const queryKeys = {
   allMenuItems: ["allMenuItems"] as const,
   modifiers: ["modifiers"] as const,
   modifiersForItem: (id: string) => ["modifiersForItem", id] as const,
+  menuItemModifierMap: ["menuItemModifierMap"] as const,
   parkedOrders: ["parkedOrders"] as const,
   todayAnalytics: ["todayAnalytics"] as const,
   completedOrders: (start?: string, end?: string) =>
@@ -110,6 +112,15 @@ export function useAllModifiers() {
   return useQuery({
     queryKey: queryKeys.modifiers,
     queryFn: fetchAllModifiers,
+    staleTime: LONG_CACHE,
+  });
+}
+
+/** menuItemId → modifierId[] for the whole location, cached for fast taps. */
+export function useMenuItemModifierMap() {
+  return useQuery({
+    queryKey: queryKeys.menuItemModifierMap,
+    queryFn: fetchMenuItemModifierMap,
     staleTime: LONG_CACHE,
   });
 }
@@ -348,6 +359,7 @@ export function useSetMenuItemModifiers() {
     onSuccess: (_data, { menuItemId }) => {
       qc.invalidateQueries({ queryKey: ["menuItemModifierLinks", menuItemId] });
       qc.invalidateQueries({ queryKey: queryKeys.modifiersForItem(menuItemId) });
+      qc.invalidateQueries({ queryKey: queryKeys.menuItemModifierMap });
     },
   });
 }

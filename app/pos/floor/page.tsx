@@ -1,9 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Coffee, Plus, Minus, Trash2, Send, Loader2, X, ShoppingBag, Armchair } from "lucide-react";
 import type { MenuItem, ModifierOption, CartItem, SelectedModifier, Modifier, OrderItem } from "@/lib/types";
-import { fetchModifiersForItem } from "@/lib/queries";
 import {
   useCategories,
   useMenuItems,
@@ -13,6 +12,8 @@ import {
   useParkedOrders,
   useOrdersRealtime,
   useLocationSettings,
+  useAllModifiers,
+  useMenuItemModifierMap,
 } from "@/lib/hooks";
 import { formatMoney } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
@@ -150,7 +151,22 @@ export default function FloorView() {
   const { data: tables = [] } = useTables();
   const { data: parkedOrders = [] } = useParkedOrders();
   const { data: settings } = useLocationSettings();
+  const { data: allModifiers = [] } = useAllModifiers();
+  const { data: modifierMap = {} } = useMenuItemModifierMap();
   const currency = settings?.currency ?? "CRC";
+
+  // Resolve each product's modifiers from cache so taps are instant (no fetch).
+  const modsByItem = useMemo(() => {
+    const byId = new Map(allModifiers.map((m) => [m.id, m]));
+    const map = new Map<string, Modifier[]>();
+    for (const [itemId, modifierIds] of Object.entries(modifierMap)) {
+      map.set(
+        itemId,
+        modifierIds.map((id) => byId.get(id)).filter((m): m is Modifier => !!m)
+      );
+    }
+    return map;
+  }, [allModifiers, modifierMap]);
   const createOrderMut = useCreateOrder();
   const appendOrderMut = useAppendToOrder();
   useOrdersRealtime();
@@ -173,7 +189,6 @@ export default function FloorView() {
 
   const [drawerItem, setDrawerItem] = useState<MenuItem | null>(null);
   const [drawerModifiers, setDrawerModifiers] = useState<Modifier[]>([]);
-  const [isLoadingModifiers, setIsLoadingModifiers] = useState(false);
 
   const isLoading = catsLoading || itemsLoading;
 
@@ -190,30 +205,18 @@ export default function FloorView() {
 
   const totalQuantity = orderItems.reduce((sum, item) => sum + item.quantity, 0);
 
-  const handleProductClick = async (product: MenuItem) => {
-    setIsLoadingModifiers(true);
-    try {
-      const mods = await fetchModifiersForItem(product.id);
-      if (mods.length > 0) {
-        setDrawerItem(product);
-        setDrawerModifiers(mods);
-      } else {
-        addToOrder({
-          cartId: generateCartId(),
-          menuItem: product,
-          quantity: 1,
-          selectedModifiers: [],
-        });
-      }
-    } catch {
+  const handleProductClick = (product: MenuItem) => {
+    const mods = modsByItem.get(product.id) ?? [];
+    if (mods.length > 0) {
+      setDrawerItem(product);
+      setDrawerModifiers(mods);
+    } else {
       addToOrder({
         cartId: generateCartId(),
         menuItem: product,
         quantity: 1,
         selectedModifiers: [],
       });
-    } finally {
-      setIsLoadingModifiers(false);
     }
   };
 
@@ -303,12 +306,6 @@ export default function FloorView() {
           onConfirm={addToOrder}
           onClose={() => { setDrawerItem(null); setDrawerModifiers([]); }}
         />
-      )}
-
-      {isLoadingModifiers && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/20 backdrop-blur-sm">
-          <Loader2 className="w-8 h-8 animate-spin text-white" />
-        </div>
       )}
 
       {/* Left: Categories & Products */}

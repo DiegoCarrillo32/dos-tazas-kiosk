@@ -2,6 +2,7 @@
 
 import { DollarSign, ShoppingBag, Coffee, Loader2 } from "lucide-react";
 import { useTodayAnalytics } from "@/lib/hooks";
+import { formatMoney } from "@/lib/utils";
 import { useT } from "@/lib/i18n/LanguageContext";
 
 export default function AdminDashboard() {
@@ -17,10 +18,13 @@ export default function AdminDashboard() {
   }
 
   const metrics = [
-    { label: t("dashboard.grossRevenue"), value: `$${analytics.grossRevenue.toFixed(2)}`, icon: DollarSign },
+    // Net sales (ex-IVA), not gross — gross includes tax and tips, which
+    // aren't shop revenue. All figures render in colones, matching the
+    // Counter and Receipt rather than the stray "$" this page used to show.
+    { label: t("analytics.netSales"), value: formatMoney(analytics.netSales, "CRC"), icon: DollarSign },
     { label: t("dashboard.totalOrders"), value: analytics.totalOrders.toString(), icon: ShoppingBag },
     { label: t("dashboard.itemsSold"), value: analytics.totalItemsSold.toString(), icon: Coffee },
-    { label: t("dashboard.avgOrderValue"), value: `$${analytics.averageOrderValue.toFixed(2)}`, icon: DollarSign },
+    { label: t("dashboard.avgOrderValue"), value: formatMoney(analytics.averageOrderValue, "CRC"), icon: DollarSign },
   ];
 
   return (

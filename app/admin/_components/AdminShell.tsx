@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, Menu as MenuIcon, X, History, FileText, Store, LogOut, ArrowLeft, SlidersHorizontal, UsersRound, Settings, BarChart3, Armchair } from "lucide-react";
+import { LayoutDashboard, Menu as MenuIcon, X, History, FileText, Store, LogOut, ArrowLeft, SlidersHorizontal, UsersRound, Settings, BarChart3, Armchair, Wallet } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { LanguageToggle } from "@/components/ui/LanguageToggle";
@@ -16,6 +16,7 @@ type NavKey =
   | "admin.tables"
   | "admin.modifiers"
   | "admin.staff"
+  | "admin.cash"
   | "admin.transactionHistory"
   | "admin.financialReports"
   | "admin.settings";
@@ -27,6 +28,7 @@ const NAV_ITEMS: { href: string; labelKey: NavKey; icon: React.ElementType }[] =
   { href: "/admin/tables", labelKey: "admin.tables", icon: Armchair },
   { href: "/admin/modifiers", labelKey: "admin.modifiers", icon: SlidersHorizontal },
   { href: "/admin/staff", labelKey: "admin.staff", icon: UsersRound },
+  { href: "/admin/cash", labelKey: "admin.cash", icon: Wallet },
   { href: "/admin/history", labelKey: "admin.transactionHistory", icon: History },
   { href: "/admin/reports", labelKey: "admin.financialReports", icon: FileText },
   { href: "/admin/settings", labelKey: "admin.settings", icon: Settings },

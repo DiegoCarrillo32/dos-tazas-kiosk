@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Label } from "@/components/ui/Label";
 import { Checkbox } from "@/components/ui/Checkbox";
+import { formatMoney } from "@/lib/utils";
 import { useT } from "@/lib/i18n/LanguageContext";
 
 type MenuItemForm = {
@@ -241,7 +242,7 @@ export default function MenuManagement() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label className="mb-1 block">{t("menu.price")}</Label>
-                  <Input type="number" step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
+                  <Input type="number" inputMode="numeric" step={1} min={0} value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
                 </div>
                 <div>
                   <Label className="mb-1 block">{t("menu.stock")}</Label>
@@ -336,7 +337,7 @@ export default function MenuManagement() {
                   <tr key={item.id} className="hover:bg-warm-roast/5 transition-colors">
                     <td className="px-6 py-4 text-sm font-medium text-expresso">{item.name}</td>
                     <td className="px-6 py-4 text-sm text-expresso/60">{item.category?.name ?? "—"}</td>
-                    <td className="px-6 py-4 text-sm text-expresso/60">${Number(item.price).toFixed(2)}</td>
+                    <td className="px-6 py-4 text-sm text-expresso/60">{formatMoney(item.price, "CRC")}</td>
                     <td className="px-6 py-4 text-sm">
                       {!item.track_inventory ? (
                         <span className="text-expresso/40">{t("menu.untracked")}</span>

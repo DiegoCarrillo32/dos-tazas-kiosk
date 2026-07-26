@@ -5,12 +5,16 @@ import type {
   Modifier,
   ModifierOption,
   Order,
-  OrderItem,
   CartItem,
   PaymentMethod,
   LocationSettings,
   Table,
   UserProfile,
+  CashMovementType,
+  CountedBreakdown,
+  SalesSummary,
+  ShiftListItem,
+  ShiftSummary,
 } from "./types";
 
 // ─── Helpers ───────────────────────────────────────────────────────
@@ -369,53 +373,126 @@ export async function completeOrder(params: {
   if (error) throw error;
 }
 
-export async function cancelOrder(orderId: string): Promise<void> {
-  const { error } = await supabase()
-    .from("orders")
-    .update({ status: "cancelled" })
-    .eq("id", orderId);
+/**
+ * Void an UNPAID order (draft/parked). Goes through the `void_order` RPC
+ * rather than a direct table write so the action is audited with a reason
+ * and cannot be pointed at an order that already took money.
+ */
+export async function voidOrder(
+  orderId: string,
+  reason?: string | null
+): Promise<void> {
+  const { error } = await supabase().rpc("void_order", {
+    p_order_id: orderId,
+    p_reason: reason ?? null,
+  });
+  if (error) throw error;
+}
+
+/**
+ * Reverse a COMPLETED order (admin only). Restores stock and removes the
+ * sale from the shift's expected cash.
+ */
+export async function refundOrder(
+  orderId: string,
+  reason?: string | null
+): Promise<void> {
+  const { error } = await supabase().rpc("reverse_completed_order", {
+    p_order_id: orderId,
+    p_reason: reason ?? null,
+  });
   if (error) throw error;
 }
 
 // ─── Analytics & History ───────────────────────────────────────────
 
+/**
+ * Today's headline figures for the admin dashboard.
+ *
+ * Delegates to `sales_summary` so "today" means today in the shop's
+ * timezone — the same business day the analytics page and the Z-report
+ * use — rather than the browser's idea of midnight.
+ */
 export async function fetchTodayAnalytics(): Promise<{
   grossRevenue: number;
+  netSales: number;
+  tipAmount: number;
   totalOrders: number;
   totalItemsSold: number;
   averageOrderValue: number;
 }> {
-  const locationId = await getLocationId();
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
+  const today = await currentBusinessDate();
+  const summary = await fetchSalesSummary(today, today);
 
-  const { data: orders, error } = await supabase()
-    .from("orders")
-    .select("total_amount, order_items(quantity)")
-    .eq("location_id", locationId)
-    .eq("status", "completed")
-    .gte("created_at", todayStart.toISOString());
-
-  if (error) throw error;
-
-  const grossRevenue = (orders ?? []).reduce(
-    (sum: number, o: { total_amount: number }) => sum + Number(o.total_amount),
-    0
-  );
-  const totalOrders = (orders ?? []).length;
-  const totalItemsSold = (orders ?? []).reduce(
-    (sum: number, o: { order_items: { quantity: number }[] }) =>
-      sum + (o.order_items ?? []).reduce((s: number, i: { quantity: number }) => s + i.quantity, 0),
-    0
-  );
-  const averageOrderValue = totalOrders > 0 ? grossRevenue / totalOrders : 0;
-
-  return { grossRevenue, totalOrders, totalItemsSold, averageOrderValue };
+  return {
+    grossRevenue: Number(summary.gross_sales) || 0,
+    netSales: Number(summary.net_sales) || 0,
+    tipAmount: Number(summary.tip_amount) || 0,
+    totalOrders: Number(summary.order_count) || 0,
+    totalItemsSold: Number(summary.items_sold) || 0,
+    averageOrderValue: Number(summary.average_ticket) || 0,
+  };
 }
 
+/** Today's date (YYYY-MM-DD) in the shop's timezone. */
+export async function currentBusinessDate(): Promise<string> {
+  const timeZone = await getTimeZone();
+  // en-CA formats as YYYY-MM-DD, which is exactly the shape the RPCs want.
+  return new Date().toLocaleDateString("en-CA", { timeZone });
+}
+
+/**
+ * Convert an inclusive local business-date range into the absolute UTC
+ * instants that bound it.
+ *
+ * The previous implementation compared `created_at` against bare
+ * "YYYY-MM-DD" strings, which Postgres reads as UTC midnight. Costa Rica is
+ * UTC-6, so a one-day report silently dropped that evening's sales (they are
+ * already "tomorrow" in UTC) and pulled in the previous evening's instead.
+ * Building the bounds from the local timezone fixes the window.
+ */
+function localDayRangeToUtc(
+  startDate: string,
+  endDate: string,
+  timeZone: string
+): { from: string; to: string } {
+  // Offset (in minutes) of the target zone at the given instant.
+  const offsetMinutes = (date: Date): number => {
+    const asUtc = new Date(
+      date.toLocaleString("en-US", { timeZone: "UTC" })
+    ).getTime();
+    const asZoned = new Date(
+      date.toLocaleString("en-US", { timeZone })
+    ).getTime();
+    return (asUtc - asZoned) / 60000;
+  };
+
+  const localMidnight = (day: string, addDays = 0): string => {
+    const [y, m, d] = day.split("-").map(Number);
+    // Start from the naive UTC instant, then correct by the zone's offset
+    // at (approximately) that moment.
+    const naive = Date.UTC(y, m - 1, d + addDays, 0, 0, 0, 0);
+    const off = offsetMinutes(new Date(naive));
+    return new Date(naive + off * 60000).toISOString();
+  };
+
+  return { from: localMidnight(startDate), to: localMidnight(endDate, 1) };
+}
+
+async function getTimeZone(): Promise<string> {
+  const settings = await fetchLocationSettings();
+  return settings?.timezone || "America/Costa_Rica";
+}
+
+/**
+ * Completed + refunded orders in an inclusive local date range.
+ * Both statuses are returned so History shows reversals rather than
+ * silently dropping them.
+ */
 export async function fetchCompletedOrders(
   startDate?: string,
-  endDate?: string
+  endDate?: string,
+  limit = 200
 ): Promise<Order[]> {
   const locationId = await getLocationId();
   let query = supabase()
@@ -424,15 +501,17 @@ export async function fetchCompletedOrders(
       "*, table:tables(name), order_items(*, menu_item:menu_items(name), modifiers:order_item_modifiers(*))"
     )
     .eq("location_id", locationId)
-    .eq("status", "completed")
-    .order("created_at", { ascending: false });
+    .in("status", ["completed", "refunded"])
+    .order("created_at", { ascending: false })
+    .limit(limit);
 
-  if (startDate) {
-    query = query.gte("created_at", startDate);
-  }
-  if (endDate) {
-    // End of the day
-    query = query.lte("created_at", endDate + "T23:59:59.999Z");
+  if (startDate && endDate) {
+    const { from, to } = localDayRangeToUtc(
+      startDate,
+      endDate,
+      await getTimeZone()
+    );
+    query = query.gte("created_at", from).lt("created_at", to);
   }
 
   const { data, error } = await query;
@@ -452,44 +531,138 @@ function csvCell(value: unknown): string {
   return s;
 }
 
+type ExportRow = {
+  order_number: number | null;
+  order_id: string;
+  local_time: string;
+  status: string;
+  table_name: string | null;
+  staff_name: string | null;
+  item_count: number;
+  subtotal: number;
+  tax_amount: number;
+  discount_amount: number;
+  tip_amount: number;
+  total_amount: number;
+  payment_method: string | null;
+  payment_reference: string | null;
+  amount_tendered: number | null;
+  change_due: number | null;
+  customer_name: string | null;
+  customer_id: string | null;
+  customer_email: string | null;
+};
+
+/**
+ * Full accounting export. The previous version emitted only
+ * id/date/count/total/method, which is not enough to reconcile a day or
+ * file IVA — the money breakdown (net, IVA, discount, tip) and the cash
+ * detail (tendered, change) were all missing.
+ *
+ * Timestamps come back already converted to the shop's local timezone by
+ * `orders_for_export`, so the CSV matches what the analytics page showed.
+ */
 export async function exportOrdersCSV(
   startDate: string,
   endDate: string
 ): Promise<string> {
-  const orders = await fetchCompletedOrders(startDate, endDate);
+  const { data, error } = await supabase().rpc("orders_for_export", {
+    p_start: startDate,
+    p_end: endDate,
+  });
+  if (error) throw error;
+  const rows = (data ?? []) as ExportRow[];
 
   const header = [
+    "Order #",
     "Order ID",
-    "Date",
+    "Date/Time",
+    "Status",
+    "Table",
+    "Staff",
     "Items",
-    "Total Amount",
+    "Subtotal (net)",
+    "IVA",
+    "Discount",
+    "Tip",
+    "Total",
     "Payment Method",
     "Reference",
+    "Tendered",
+    "Change",
     "Customer Name",
     "Customer ID",
     "Customer Email",
   ];
-  const rows = orders.map((o) => {
-    const itemCount = (o.order_items ?? []).reduce(
-      (s: number, i: OrderItem) => s + i.quantity,
-      0
-    );
-    return [
-      o.id,
-      new Date(o.created_at).toLocaleString(),
-      itemCount,
-      o.total_amount,
-      o.payment_method ?? "",
-      o.payment_reference ?? "",
-      o.customer_name ?? "",
-      o.customer_id ?? "",
-      o.customer_email ?? "",
+
+  const body = rows.map((r) =>
+    [
+      r.order_number ?? "",
+      r.order_id,
+      r.local_time?.replace("T", " ").slice(0, 19) ?? "",
+      r.status,
+      r.table_name ?? "",
+      r.staff_name ?? "",
+      r.item_count,
+      r.subtotal,
+      r.tax_amount,
+      r.discount_amount,
+      r.tip_amount,
+      r.total_amount,
+      r.payment_method ?? "",
+      r.payment_reference ?? "",
+      r.amount_tendered ?? "",
+      r.change_due ?? "",
+      r.customer_name ?? "",
+      r.customer_id ?? "",
+      r.customer_email ?? "",
     ]
       .map(csvCell)
-      .join(",");
-  });
+      .join(",")
+  );
 
-  return [header.map(csvCell).join(","), ...rows].join("\r\n");
+  return [header.map(csvCell).join(","), ...body].join("\r\n");
+}
+
+/** Z-report style CSV: one row per shift with the reconciliation figures. */
+export async function exportShiftsCSV(): Promise<string> {
+  const shifts = await fetchRecentShifts(200);
+
+  const header = [
+    "Opened",
+    "Closed",
+    "Opened By",
+    "Closed By",
+    "Status",
+    "Opening Float",
+    "Orders",
+    "Gross Sales",
+    "Expected Cash",
+    "Counted Cash",
+    "Variance",
+    "Note",
+  ];
+
+  const body = shifts.map((s) =>
+    [
+      new Date(s.opened_at).toLocaleString("es-CR"),
+      s.closed_at ? new Date(s.closed_at).toLocaleString("es-CR") : "",
+      s.opened_by_name ?? "",
+      s.closed_by_name ?? "",
+      s.status,
+      s.opening_float,
+      s.order_count,
+      s.gross_sales,
+      s.expected_cash ?? "",
+      s.counted_cash ?? "",
+      s.cash_variance ?? "",
+      s.closing_note ?? "",
+    ]
+      .map(csvCell)
+      .join(",")
+  );
+
+  return [header.map(csvCell).join(","), ...body].join("\r\n");
 }
 
 // ─── Tables ────────────────────────────────────────────────────────
@@ -635,77 +808,81 @@ export async function inviteStaffMember(
   if (profileError) throw profileError;
 }
 
+// ─── Shifts & cash drawer ──────────────────────────────────────────
+
+/** Summary of a shift. Omit `shiftId` for the currently open one. */
+export async function fetchShiftSummary(
+  shiftId?: string | null
+): Promise<ShiftSummary | null> {
+  const { data, error } = await supabase().rpc("shift_summary", {
+    p_shift_id: shiftId ?? null,
+  });
+  if (error) throw error;
+  return (data as ShiftSummary | null) ?? null;
+}
+
+export async function fetchRecentShifts(limit = 30): Promise<ShiftListItem[]> {
+  const { data, error } = await supabase().rpc("recent_shifts", {
+    p_limit: limit,
+  });
+  if (error) throw error;
+  return (data ?? []) as ShiftListItem[];
+}
+
+export async function openShift(openingFloat: number): Promise<string> {
+  const { data, error } = await supabase().rpc("open_shift", {
+    p_opening_float: openingFloat,
+  });
+  if (error) throw error;
+  return data as string;
+}
+
+export async function closeShift(params: {
+  countedCash: number;
+  countedBreakdown?: CountedBreakdown | null;
+  note?: string | null;
+}): Promise<ShiftSummary> {
+  const { data, error } = await supabase().rpc("close_shift", {
+    p_counted_cash: params.countedCash,
+    p_counted_breakdown: params.countedBreakdown ?? null,
+    p_note: params.note ?? null,
+  });
+  if (error) throw error;
+  return data as ShiftSummary;
+}
+
+export async function recordCashMovement(params: {
+  type: CashMovementType;
+  amount: number;
+  reason: string;
+}): Promise<void> {
+  const { error } = await supabase().rpc("record_cash_movement", {
+    p_type: params.type,
+    p_amount: params.amount,
+    p_reason: params.reason,
+  });
+  if (error) throw error;
+}
+
 // ─── Analytics ─────────────────────────────────────────────────────
 
-export type AnalyticsData = {
-  totalRevenue: number;
-  totalOrders: number;
-  averageOrderValue: number;
-  revenueByDay: { date: string; revenue: number }[];
-  ordersByHour: { hour: string; orders: number }[];
-  topItems: { name: string; quantity: number; revenue: number }[];
-};
-
-export async function fetchAnalyticsData(
-  startDate?: string,
-  endDate?: string
-): Promise<AnalyticsData> {
-  const orders = await fetchCompletedOrders(startDate, endDate);
-
-  let totalRevenue = 0;
-  const totalOrders = orders.length;
-
-  const revenueByDayMap: Record<string, number> = {};
-  const ordersByHourMap: Record<string, number> = {};
-  const itemMap: Record<string, { quantity: number; revenue: number }> = {};
-
-  // Initialize hours
-  for (let i = 0; i < 24; i++) {
-    const hour = i.toString().padStart(2, "0") + ":00";
-    ordersByHourMap[hour] = 0;
-  }
-
-  orders.forEach((order) => {
-    totalRevenue += Number(order.total_amount);
-
-    const date = new Date(order.created_at);
-    const dayString = date.toISOString().split("T")[0]; // YYYY-MM-DD
-    const hourString = date.getHours().toString().padStart(2, "0") + ":00";
-
-    revenueByDayMap[dayString] = (revenueByDayMap[dayString] || 0) + Number(order.total_amount);
-    ordersByHourMap[hourString] += 1;
-
-    (order.order_items || []).forEach((item) => {
-      const itemName = item.menu_item?.name || "Unknown Item";
-      if (!itemMap[itemName]) {
-        itemMap[itemName] = { quantity: 0, revenue: 0 };
-      }
-      itemMap[itemName].quantity += item.quantity;
-      itemMap[itemName].revenue += Number(item.total_price);
-    });
+/**
+ * Sales figures for an inclusive local date range.
+ *
+ * All aggregation happens in SQL (`sales_summary`), which buckets on the
+ * shop's local business day rather than UTC. The previous client-side
+ * version mixed UTC day bucketing with local hour bucketing, so every sale
+ * after 6pm was credited to the following day, and it shipped every order
+ * and line item to the browser to reduce them there.
+ */
+export async function fetchSalesSummary(
+  startDate: string,
+  endDate: string
+): Promise<SalesSummary> {
+  const { data, error } = await supabase().rpc("sales_summary", {
+    p_start: startDate,
+    p_end: endDate,
   });
-
-  const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
-
-  const revenueByDay = Object.entries(revenueByDayMap)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, revenue]) => ({ date, revenue }));
-
-  const ordersByHour = Object.entries(ordersByHourMap)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([hour, orders]) => ({ hour, orders }));
-
-  const topItems = Object.entries(itemMap)
-    .sort(([, a], [, b]) => b.quantity - a.quantity)
-    .slice(0, 10)
-    .map(([name, stats]) => ({ name, ...stats }));
-
-  return {
-    totalRevenue,
-    totalOrders,
-    averageOrderValue,
-    revenueByDay,
-    ordersByHour,
-    topItems,
-  };
+  if (error) throw error;
+  return data as SalesSummary;
 }

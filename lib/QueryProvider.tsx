@@ -42,7 +42,17 @@ export default function QueryProvider({
   return (
     <PersistQueryClientProvider
       client={queryClient}
-      persistOptions={{ persister, maxAge: ONE_DAY }}
+      persistOptions={{
+        persister,
+        maxAge: ONE_DAY,
+        // Bump this whenever a persisted query's return SHAPE changes (not
+        // just its data). Without a buster, a kiosk that was open before a
+        // deploy rehydrates yesterday's cached payload under today's query
+        // key and crashes on the new fields it doesn't have — this is
+        // exactly what happened to the old `analytics` key when it went
+        // from the client-aggregated shape to `sales_summary`'s richer one.
+        buster: "2026-07-26-shift-cash-reconciliation",
+      }}
     >
       {children}
     </PersistQueryClientProvider>

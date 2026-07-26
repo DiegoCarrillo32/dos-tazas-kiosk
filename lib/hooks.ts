@@ -11,11 +11,18 @@ import {
   fetchParkedOrders,
   fetchTodayAnalytics,
   fetchCompletedOrders,
-  fetchAnalyticsData,
+  fetchSalesSummary,
+  currentBusinessDate,
+  fetchShiftSummary,
+  fetchRecentShifts,
+  openShift,
+  closeShift,
+  recordCashMovement,
   createOrder,
   appendToOrder,
   completeOrder,
-  cancelOrder,
+  voidOrder,
+  refundOrder,
   fetchTables,
   createTable,
   updateTable,
@@ -40,7 +47,7 @@ import {
   fetchLocationSettings,
   updateLocationSettings,
 } from "./queries";
-import type { CartItem, PaymentMethod } from "./types";
+import type { CartItem, CashMovementType, CountedBreakdown, PaymentMethod } from "./types";
 
 // ─── Cache durations ───────────────────────────────────────────────
 
@@ -67,6 +74,10 @@ export const queryKeys = {
   currentProfile: ["currentProfile"] as const,
   locationSettings: ["locationSettings"] as const,
   tables: ["tables"] as const,
+  currentShift: ["currentShift"] as const,
+  shiftSummary: (id: string) => ["shiftSummary", id] as const,
+  recentShifts: ["recentShifts"] as const,
+  businessDate: ["businessDate"] as const,
 };
 
 // ─── Categories ────────────────────────────────────────────────────
@@ -154,6 +165,21 @@ export function useOrdersRealtime(): boolean {
         () => {
           qc.invalidateQueries({ queryKey: queryKeys.parkedOrders });
           qc.invalidateQueries({ queryKey: queryKeys.todayAnalytics });
+          // A completed/refunded order changes the drawer's expected cash.
+          qc.invalidateQueries({ queryKey: queryKeys.currentShift });
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "cash_movements" },
+        () => qc.invalidateQueries({ queryKey: queryKeys.currentShift })
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "shifts" },
+        () => {
+          qc.invalidateQueries({ queryKey: queryKeys.currentShift });
+          qc.invalidateQueries({ queryKey: queryKeys.recentShifts });
         }
       )
       .subscribe((status) => setConnected(status === "SUBSCRIBED"));
@@ -209,12 +235,30 @@ export function useCompleteOrder() {
   });
 }
 
-export function useCancelOrder() {
+/** Void an unpaid (parked/draft) order. Available to all staff. */
+export function useVoidOrder() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (orderId: string) => cancelOrder(orderId),
+    mutationFn: (params: { orderId: string; reason?: string | null }) =>
+      voidOrder(params.orderId, params.reason),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.parkedOrders });
+      qc.invalidateQueries({ queryKey: queryKeys.currentShift });
+    },
+  });
+}
+
+/** Reverse a completed order. Admin only — enforced server-side. */
+export function useRefundOrder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (params: { orderId: string; reason?: string | null }) =>
+      refundOrder(params.orderId, params.reason),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["completedOrders"] });
+      qc.invalidateQueries({ queryKey: ["analytics"] });
+      qc.invalidateQueries({ queryKey: queryKeys.todayAnalytics });
+      qc.invalidateQueries({ queryKey: queryKeys.currentShift });
     },
   });
 }
@@ -237,11 +281,87 @@ export function useCompletedOrders(startDate?: string, endDate?: string) {
   });
 }
 
-export function useAnalytics(startDate?: string, endDate?: string) {
+export function useSalesSummary(startDate?: string, endDate?: string) {
   return useQuery({
     queryKey: queryKeys.analytics(startDate, endDate),
-    queryFn: () => fetchAnalyticsData(startDate, endDate),
+    queryFn: () => fetchSalesSummary(startDate!, endDate!),
+    enabled: !!startDate && !!endDate,
     staleTime: SHORT_CACHE,
+  });
+}
+
+/** Today's date (YYYY-MM-DD) in the shop's timezone, not the browser's. */
+export function useBusinessDate() {
+  return useQuery({
+    queryKey: queryKeys.businessDate,
+    queryFn: currentBusinessDate,
+    staleTime: MED_CACHE,
+  });
+}
+
+// ─── Shifts & cash drawer ──────────────────────────────────────────
+
+/** The currently open shift's live summary (X-report), or null if none is open. */
+export function useCurrentShift() {
+  return useQuery({
+    queryKey: queryKeys.currentShift,
+    queryFn: () => fetchShiftSummary(null),
+    staleTime: SHORT_CACHE,
+  });
+}
+
+export function useShiftSummary(shiftId: string | null) {
+  return useQuery({
+    queryKey: queryKeys.shiftSummary(shiftId ?? ""),
+    queryFn: () => fetchShiftSummary(shiftId),
+    enabled: !!shiftId,
+    staleTime: SHORT_CACHE,
+  });
+}
+
+export function useRecentShifts(limit = 30) {
+  return useQuery({
+    queryKey: queryKeys.recentShifts,
+    queryFn: () => fetchRecentShifts(limit),
+    staleTime: SHORT_CACHE,
+  });
+}
+
+/** Invalidate everything that depends on the drawer's running total. */
+function invalidateShift(qc: ReturnType<typeof useQueryClient>) {
+  qc.invalidateQueries({ queryKey: queryKeys.currentShift });
+  qc.invalidateQueries({ queryKey: queryKeys.recentShifts });
+}
+
+export function useOpenShift() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (openingFloat: number) => openShift(openingFloat),
+    onSuccess: () => invalidateShift(qc),
+  });
+}
+
+export function useCloseShift() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (params: {
+      countedCash: number;
+      countedBreakdown?: CountedBreakdown | null;
+      note?: string | null;
+    }) => closeShift(params),
+    onSuccess: () => invalidateShift(qc),
+  });
+}
+
+export function useRecordCashMovement() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (params: {
+      type: CashMovementType;
+      amount: number;
+      reason: string;
+    }) => recordCashMovement(params),
+    onSuccess: () => invalidateShift(qc),
   });
 }
 

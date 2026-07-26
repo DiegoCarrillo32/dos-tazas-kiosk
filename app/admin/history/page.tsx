@@ -1,37 +1,56 @@
 "use client";
 
 import { useState } from "react";
-import { Search, Eye, Loader2, X, Printer } from "lucide-react";
+import { format, subDays } from "date-fns";
+import { Search, Eye, Loader2, X, Printer, RotateCcw } from "lucide-react";
 import type { Order, OrderItem } from "@/lib/types";
-import { useCompletedOrders, useLocationSettings } from "@/lib/hooks";
+import { useCompletedOrders, useLocationSettings, useCurrentProfile, useRefundOrder } from "@/lib/hooks";
 import { Button } from "@/components/ui/Button";
+import { DatePicker } from "@/components/ui/DatePicker";
 import { Receipt } from "@/components/Receipt";
+import { formatMoney } from "@/lib/utils";
 import { useT } from "@/lib/i18n/LanguageContext";
 
 export default function TransactionHistory() {
   const t = useT();
-  const { data: history = [], isLoading } = useCompletedOrders();
+  const [startDate, setStartDate] = useState<Date | undefined>(subDays(new Date(), 30));
+  const [endDate, setEndDate] = useState<Date | undefined>(new Date());
+  const startStr = startDate ? format(startDate, "yyyy-MM-dd") : undefined;
+  const endStr = endDate ? format(endDate, "yyyy-MM-dd") : undefined;
+
+  const { data: history = [], isLoading } = useCompletedOrders(startStr, endStr);
   const { data: settings } = useLocationSettings();
+  const { data: currentUser } = useCurrentProfile();
+  const isAdmin = currentUser?.role === "admin";
+  const refundMut = useRefundOrder();
+
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [receiptOrder, setReceiptOrder] = useState<Order | null>(null);
 
-  const filtered = history.filter((o) =>
-    o.id.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filtered = history.filter((o) => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return true;
+    const orderNumberMatch = o.order_number != null && String(o.order_number).includes(q);
+    return orderNumberMatch || o.id.toLowerCase().includes(q);
+  });
 
   const formatDate = (dateStr: string) =>
     new Date(dateStr).toLocaleString([], {
       year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
     });
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-expresso/40" />
-      </div>
+  const handleRefund = (order: Order) => {
+    const reason = prompt(t("history.refundReason")) ?? "";
+    if (!confirm(t("history.confirmRefund", { id: String(order.order_number ?? order.id.slice(0, 8)) }))) return;
+    refundMut.mutate(
+      { orderId: order.id, reason: reason.trim() || null },
+      {
+        onSuccess: () => setSelectedOrder(null),
+        onError: () => alert(t("history.alertFailedRefund")),
+      }
     );
-  }
+  };
 
   return (
     <div className="p-6 lg:p-8 space-y-6">
@@ -47,10 +66,12 @@ export default function TransactionHistory() {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={t("history.searchPlaceholder")}
+            placeholder={t("history.searchByOrderNumber")}
             className="w-full pl-9 pr-4 py-2 bg-card border border-warm-roast/10 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-coffee-fruit shadow-sm"
           />
         </div>
+        <DatePicker date={startDate} setDate={setStartDate} placeholder={t("history.startDate")} className="w-full sm:w-44" />
+        <DatePicker date={endDate} setDate={setEndDate} placeholder={t("history.endDate")} className="w-full sm:w-44" />
       </div>
 
       {selectedOrder && (
@@ -58,13 +79,21 @@ export default function TransactionHistory() {
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setSelectedOrder(null)} />
           <div className="relative w-full max-w-lg bg-card rounded-2xl border border-warm-roast/10 shadow-xl p-6 max-h-[80vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-expresso">{t("history.orderDetail")}{selectedOrder.id.slice(0, 8)}</h3>
+              <h3 className="text-lg font-bold text-expresso">
+                {t("history.orderDetail")}{selectedOrder.order_number ?? selectedOrder.id.slice(0, 8)}
+              </h3>
               <button onClick={() => setSelectedOrder(null)} className="p-2 text-expresso/40 hover:text-expresso"><X className="w-5 h-5" /></button>
             </div>
             <div className="space-y-3 text-sm">
               <div className="flex justify-between"><span className="text-expresso/60">{t("history.date")}</span><span className="font-medium text-expresso">{formatDate(selectedOrder.created_at)}</span></div>
               <div className="flex justify-between"><span className="text-expresso/60">{t("history.table")}</span><span className="text-expresso">{selectedOrder.table?.name ?? t("common.takeaway")}</span></div>
-              <div className="flex justify-between"><span className="text-expresso/60">{t("history.total")}</span><span className="font-bold text-expresso">${Number(selectedOrder.total_amount).toFixed(2)}</span></div>
+              <div className="flex justify-between">
+                <span className="text-expresso/60">{t("history.colStatus")}</span>
+                <span className={selectedOrder.status === "refunded" ? "text-red-600 dark:text-red-400 font-medium" : "text-expresso"}>
+                  {selectedOrder.status === "refunded" ? t("history.statusRefunded") : t("history.statusCompleted")}
+                </span>
+              </div>
+              <div className="flex justify-between"><span className="text-expresso/60">{t("history.total")}</span><span className="font-bold text-expresso">{formatMoney(selectedOrder.total_amount, "CRC")}</span></div>
               <div className="flex justify-between"><span className="text-expresso/60">{t("history.payment")}</span><span className="text-expresso">{selectedOrder.payment_method?.toUpperCase() ?? "—"}</span></div>
               {selectedOrder.payment_reference && (<div className="flex justify-between"><span className="text-expresso/60">{t("history.reference")}</span><span className="text-expresso">{selectedOrder.payment_reference}</span></div>)}
               {selectedOrder.customer_name && (
@@ -81,20 +110,31 @@ export default function TransactionHistory() {
                   {(selectedOrder.order_items ?? []).map((item: OrderItem) => (
                     <div key={item.id} className="flex justify-between">
                       <span>{item.quantity}× {item.menu_item?.name ?? "Item"}</span>
-                      <span>${Number(item.total_price).toFixed(2)}</span>
+                      <span>{formatMoney(item.total_price, "CRC")}</span>
                     </div>
                   ))}
                 </div>
               </div>
             </div>
-            <div className="mt-5 pt-4 border-t border-warm-roast/10">
+            <div className="mt-5 pt-4 border-t border-warm-roast/10 flex flex-col sm:flex-row gap-3">
               <Button
                 onClick={() => setReceiptOrder(selectedOrder)}
                 leftIcon={<Printer className="w-4 h-4" />}
-                className="w-full bg-coffee-fruit hover:bg-fruit-light text-white border-transparent"
+                className="flex-1 bg-coffee-fruit hover:bg-fruit-light text-white border-transparent"
               >
                 {t("history.printReceipt")}
               </Button>
+              {isAdmin && selectedOrder.status === "completed" && (
+                <Button
+                  variant="secondary"
+                  onClick={() => handleRefund(selectedOrder)}
+                  isLoading={refundMut.isPending}
+                  leftIcon={!refundMut.isPending && <RotateCcw className="w-4 h-4" />}
+                  className="flex-1 text-red-600 dark:text-red-400 border-red-200 dark:border-red-900/40 hover:bg-red-50 dark:hover:bg-red-950/30"
+                >
+                  {t("history.refund")}
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -118,22 +158,34 @@ export default function TransactionHistory() {
                 <th className="px-6 py-4 text-sm font-semibold text-expresso">{t("history.colItems")}</th>
                 <th className="px-6 py-4 text-sm font-semibold text-expresso">{t("history.colTotal")}</th>
                 <th className="px-6 py-4 text-sm font-semibold text-expresso">{t("history.colPayment")}</th>
+                <th className="px-6 py-4 text-sm font-semibold text-expresso">{t("history.colStatus")}</th>
                 <th className="px-6 py-4 text-sm font-semibold text-expresso text-right">{t("history.colActions")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-warm-roast/10">
-              {filtered.length === 0 ? (
-                <tr><td colSpan={6} className="px-6 py-12 text-center text-expresso/40 text-sm">{searchQuery ? t("history.noMatching") : t("history.noOrders")}</td></tr>
+              {isLoading ? (
+                <tr><td colSpan={7} className="px-6 py-12 text-center"><Loader2 className="w-6 h-6 animate-spin text-expresso/40 mx-auto" /></td></tr>
+              ) : filtered.length === 0 ? (
+                <tr><td colSpan={7} className="px-6 py-12 text-center text-expresso/40 text-sm">{searchQuery ? t("history.noMatching") : t("history.noOrders")}</td></tr>
               ) : (
                 filtered.map((order) => {
                   const itemCount = (order.order_items ?? []).reduce((s: number, i: OrderItem) => s + i.quantity, 0);
                   return (
                     <tr key={order.id} className="hover:bg-warm-roast/5 transition-colors">
-                      <td className="px-6 py-4 text-sm font-mono font-medium text-expresso">{order.id.slice(0, 8)}…</td>
+                      <td className="px-6 py-4 text-sm font-mono font-medium text-expresso">
+                        {order.order_number ? `#${order.order_number}` : `${order.id.slice(0, 8)}…`}
+                      </td>
                       <td className="px-6 py-4 text-sm text-expresso/60">{formatDate(order.created_at)}</td>
                       <td className="px-6 py-4 text-sm text-expresso/60">{itemCount}</td>
-                      <td className="px-6 py-4 text-sm font-medium text-expresso">${Number(order.total_amount).toFixed(2)}</td>
+                      <td className="px-6 py-4 text-sm font-medium text-expresso">{formatMoney(order.total_amount, "CRC")}</td>
                       <td className="px-6 py-4 text-sm text-expresso/60">{order.payment_method?.toUpperCase() ?? "—"}</td>
+                      <td className="px-6 py-4 text-sm">
+                        {order.status === "refunded" ? (
+                          <span className="text-red-600 dark:text-red-400 font-medium">{t("history.statusRefunded")}</span>
+                        ) : (
+                          <span className="text-expresso/60">{t("history.statusCompleted")}</span>
+                        )}
+                      </td>
                       <td className="px-6 py-4 text-right">
                         <button onClick={() => setSelectedOrder(order)} className="p-2 text-expresso/40 hover:text-expresso transition-colors"><Eye className="w-4 h-4" /></button>
                       </td>

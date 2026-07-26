@@ -11,14 +11,18 @@ import {
   CheckCircle2,
   Loader2,
   Ban,
+  Wallet,
+  AlertTriangle,
 } from "lucide-react";
+import Link from "next/link";
 import type { Order, OrderItem, PaymentMethod } from "@/lib/types";
 import {
   useParkedOrders,
   useCompleteOrder,
-  useCancelOrder,
+  useVoidOrder,
   useLocationSettings,
   useOrdersRealtime,
+  useCurrentShift,
 } from "@/lib/hooks";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
@@ -32,15 +36,17 @@ export default function CounterView() {
   const t = useT();
   const { data: orders = [], isLoading, refetch, isRefetching } = useParkedOrders();
   const { data: settings } = useLocationSettings();
+  const { data: shift } = useCurrentShift();
   const live = useOrdersRealtime();
   const completeOrderMut = useCompleteOrder();
-  const cancelOrderMut = useCancelOrder();
+  const voidOrderMut = useVoidOrder();
 
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
   const [sinpeRef, setSinpeRef] = useState("");
   const [tip, setTip] = useState("");
   const [tendered, setTendered] = useState("");
+  const [voidReason, setVoidReason] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [receiptOrder, setReceiptOrder] = useState<Order | null>(null);
 
@@ -50,9 +56,14 @@ export default function CounterView() {
   const [invoiceId, setInvoiceId] = useState("");
   const [invoiceEmail, setInvoiceEmail] = useState("");
 
-  const filteredOrders = orders.filter((o) =>
-    o.id.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredOrders = orders.filter((o) => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return true;
+    const orderNumberMatch =
+      o.order_number != null &&
+      (String(o.order_number).includes(q) || `#${o.order_number}`.includes(q));
+    return orderNumberMatch || o.id.toLowerCase().includes(q);
+  });
 
   const currentSelected = selectedOrder
     ? orders.find((o) => o.id === selectedOrder.id) ?? null
@@ -68,7 +79,11 @@ export default function CounterView() {
   const currency = settings?.currency ?? "CRC";
   const tipEnabled = settings?.tip_enabled ?? false;
   const tipAmount = Math.max(0, parseFloat(tip) || 0);
-  const totalDue = subtotal + taxAmount + tipAmount;
+  // What the customer owes before any tip — the base a tip % should be
+  // calculated on, not the ex-IVA subtotal (a 15% tip on ₡1200 IVA-included
+  // should be 15% of ₡1200, not of the ₡1062 pre-tax figure).
+  const preTipTotal = subtotal + taxAmount;
+  const totalDue = preTipTotal + tipAmount;
   const tenderedAmount = parseFloat(tendered) || 0;
   const changeDue = tenderedAmount - totalDue;
 
@@ -78,6 +93,7 @@ export default function CounterView() {
     setSinpeRef("");
     setTip("");
     setTendered("");
+    setVoidReason("");
     setNeedsInvoice(false);
     setInvoiceName("");
     setInvoiceId("");
@@ -131,7 +147,8 @@ export default function CounterView() {
           resetCheckout();
           setReceiptOrder(completed);
         },
-        onError: () => alert(t("counter.alertFailedComplete")),
+        onError: (err: unknown) =>
+          alert(err instanceof Error ? err.message : t("counter.alertFailedComplete")),
       }
     );
   };
@@ -139,10 +156,13 @@ export default function CounterView() {
   const handleVoidOrder = () => {
     if (!currentSelected) return;
     if (!confirm(t("counter.confirmVoid", { id: currentSelected.id.slice(0, 8) }))) return;
-    cancelOrderMut.mutate(currentSelected.id, {
-      onSuccess: resetCheckout,
-      onError: () => alert(t("counter.alertFailedVoid")),
-    });
+    voidOrderMut.mutate(
+      { orderId: currentSelected.id, reason: voidReason.trim() || null },
+      {
+        onSuccess: resetCheckout,
+        onError: () => alert(t("counter.alertFailedVoid")),
+      }
+    );
   };
 
   const formatTime = (dateStr: string) =>
@@ -151,7 +171,37 @@ export default function CounterView() {
   const itemLabel = (count: number) => count === 1 ? t("common.item") : t("common.items");
 
   return (
-    <div className="flex flex-col lg:flex-row h-full">
+    <div className="flex flex-col h-full">
+      {/* Shift status banner — checkout needs an open shift so cash sales
+          land on the right drawer; a closed shift here would otherwise be
+          a silent dead end at the "Complete Checkout" button. */}
+      {!shift ? (
+        <div className="shrink-0 px-4 py-2.5 bg-amber-50 dark:bg-amber-950/30 border-b border-amber-200 dark:border-amber-900/40 flex items-center justify-between gap-3">
+          <span className="flex items-center gap-2 text-sm font-medium text-amber-800 dark:text-amber-300">
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            {t("counter.noShiftWarning")}
+          </span>
+          <Link
+            href="/admin/cash"
+            className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg bg-coffee-fruit text-white hover:bg-fruit-light transition-colors"
+          >
+            <Wallet className="w-4 h-4" />
+            {t("counter.openShiftCta")}
+          </Link>
+        </div>
+      ) : (
+        <div className="shrink-0 px-4 py-1.5 bg-warm-roast/5 border-b border-warm-roast/10 flex items-center justify-between gap-3 text-xs text-expresso/60">
+          <span className="flex items-center gap-1.5">
+            <Wallet className="w-3.5 h-3.5" />
+            {t("counter.shiftExpectedCash")}: <span className="font-semibold text-expresso">{formatMoney(shift.expected_cash, "CRC")}</span>
+          </span>
+          <Link href="/admin/cash" className="hover:text-expresso hover:underline">
+            {t("cash.title")}
+          </Link>
+        </div>
+      )}
+
+      <div className="flex flex-col lg:flex-row flex-1 min-h-0">
       {receiptOrder && (
         <ReceiptView
           order={receiptOrder}
@@ -320,7 +370,7 @@ export default function CounterView() {
                       <button
                         key={pct}
                         type="button"
-                        onClick={() => setTip((subtotal * (pct / 100)).toFixed(2))}
+                        onClick={() => setTip(String(Math.round(preTipTotal * (pct / 100))))}
                         className="px-4 py-2 text-sm rounded-lg bg-warm-roast/10 text-expresso/70 hover:bg-warm-roast/20 transition-colors"
                       >
                         {pct}%
@@ -335,7 +385,8 @@ export default function CounterView() {
                     </button>
                     <Input
                       type="number"
-                      inputMode="decimal"
+                      inputMode="numeric"
+                      step={1}
                       min={0}
                       value={tip}
                       onChange={(e) => setTip(e.target.value)}
@@ -383,16 +434,17 @@ export default function CounterView() {
                     <Label className="block">{t("counter.amountTendered")}</Label>
                     <Input
                       type="number"
-                      inputMode="decimal"
+                      inputMode="numeric"
+                      step={1}
                       min={0}
                       value={tendered}
                       onChange={(e) => setTendered(e.target.value)}
-                      placeholder={totalDue.toFixed(2)}
+                      placeholder={String(Math.round(totalDue))}
                     />
                     <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
-                        onClick={() => setTendered(totalDue.toFixed(2))}
+                        onClick={() => setTendered(String(Math.round(totalDue)))}
                         className="px-3 py-1.5 text-sm rounded-lg bg-warm-roast/10 text-expresso/70 hover:bg-warm-roast/20 transition-colors"
                       >
                         {t("counter.exact")}
@@ -450,31 +502,41 @@ export default function CounterView() {
             </div>
 
             {/* Complete */}
-            <div className="p-6 lg:p-8 pt-4 border-t border-warm-roast/10 bg-card shrink-0 flex flex-col sm:flex-row gap-3">
-              <Button
-                size="lg"
-                variant="secondary"
-                onClick={handleVoidOrder}
-                disabled={completeOrderMut.isPending}
-                isLoading={cancelOrderMut.isPending}
-                leftIcon={!cancelOrderMut.isPending && <Ban className="w-5 h-5" />}
-                className="w-full sm:w-auto text-red-600 dark:text-red-400 border-red-200 dark:border-red-900/40 hover:bg-red-50 dark:hover:bg-red-950/30"
-              >
-                {t("counter.void")}
-              </Button>
-              <Button
-                size="lg"
-                onClick={handleCompleteOrder}
-                disabled={!paymentMethod || cancelOrderMut.isPending || (paymentMethod === "cash" && tenderedAmount < totalDue)}
-                isLoading={completeOrderMut.isPending}
-                leftIcon={!completeOrderMut.isPending && <CheckCircle2 className="w-5 h-5" />}
-                className="flex-1 bg-coffee-fruit hover:bg-fruit-light text-white border-transparent"
-              >
-                {t("counter.completeCheckout")}
-              </Button>
+            <div className="p-6 lg:p-8 pt-4 border-t border-warm-roast/10 bg-card shrink-0 space-y-3">
+              <Input
+                type="text"
+                value={voidReason}
+                onChange={(e) => setVoidReason(e.target.value)}
+                placeholder={t("counter.voidReasonPlaceholder")}
+                className="text-sm"
+              />
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Button
+                  size="lg"
+                  variant="secondary"
+                  onClick={handleVoidOrder}
+                  disabled={completeOrderMut.isPending}
+                  isLoading={voidOrderMut.isPending}
+                  leftIcon={!voidOrderMut.isPending && <Ban className="w-5 h-5" />}
+                  className="w-full sm:w-auto text-red-600 dark:text-red-400 border-red-200 dark:border-red-900/40 hover:bg-red-50 dark:hover:bg-red-950/30"
+                >
+                  {t("counter.void")}
+                </Button>
+                <Button
+                  size="lg"
+                  onClick={handleCompleteOrder}
+                  disabled={!paymentMethod || voidOrderMut.isPending || (paymentMethod === "cash" && tenderedAmount < totalDue)}
+                  isLoading={completeOrderMut.isPending}
+                  leftIcon={!completeOrderMut.isPending && <CheckCircle2 className="w-5 h-5" />}
+                  className="flex-1 bg-coffee-fruit hover:bg-fruit-light text-white border-transparent"
+                >
+                  {t("counter.completeCheckout")}
+                </Button>
+              </div>
             </div>
           </div>
         )}
+      </div>
       </div>
     </div>
   );

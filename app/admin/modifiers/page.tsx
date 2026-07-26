@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Label } from "@/components/ui/Label";
 import { Checkbox } from "@/components/ui/Checkbox";
+import { formatMoney } from "@/lib/utils";
 import { useT } from "@/lib/i18n/LanguageContext";
 
 export default function ModifiersManagement() {
@@ -180,7 +181,7 @@ export default function ModifiersManagement() {
                       <div key={opt.id} className="flex items-center justify-between bg-card p-3 rounded-lg border border-warm-roast/10">
                         <div>
                           <span className="font-medium text-sm text-expresso">{opt.name}</span>
-                          {Number(opt.extra_price) > 0 && <span className="ml-2 text-xs text-expresso/60">+${Number(opt.extra_price).toFixed(2)}</span>}
+                          {Number(opt.extra_price) > 0 && <span className="ml-2 text-xs text-expresso/60">+{formatMoney(opt.extra_price, "CRC")}</span>}
                         </div>
                         <button onClick={() => deleteOptMut.mutate(opt.id)} className="p-1.5 text-expresso/40 hover:text-destructive transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
                       </div>
@@ -191,7 +192,7 @@ export default function ModifiersManagement() {
                           <Input type="text" value={optName} onChange={(e) => setOptName(e.target.value)} placeholder={t("modifiers.optionName")} />
                         </div>
                         <div className="w-28">
-                          <Input type="number" step="0.01" value={optPrice} onChange={(e) => setOptPrice(e.target.value)} placeholder={t("modifiers.extraPrice")} />
+                          <Input type="number" inputMode="numeric" step={1} min={0} value={optPrice} onChange={(e) => setOptPrice(e.target.value)} placeholder={t("modifiers.extraPrice")} />
                         </div>
                         <Button onClick={() => handleAddOption(mod.id)} disabled={!optName.trim()} isLoading={createOptMut.isPending}>{t("modifiers.add")}</Button>
                         <button onClick={() => { setAddingOptionFor(null); setOptName(""); setOptPrice("0"); }} className="p-2 text-expresso/40 hover:text-expresso"><X className="w-4 h-4" /></button>

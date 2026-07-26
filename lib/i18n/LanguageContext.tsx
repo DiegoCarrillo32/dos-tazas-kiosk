@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useState } from "react";
 import { en } from "./en";
 import { es } from "./es";
 
@@ -34,17 +34,29 @@ const LanguageContext = createContext<{
   t: (k) => k,
 });
 
-export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const [lang, setLangState] = useState<Lang>("es");
+/** One year, in seconds — the language should outlive any single shift. */
+const LANG_MAX_AGE = 60 * 60 * 24 * 365;
 
-  useEffect(() => {
-    const saved = localStorage.getItem("lang") as Lang;
-    if (saved === "en" || saved === "es") setLangState(saved);
-  }, []);
+/**
+ * The preference lives in a cookie rather than localStorage so the server
+ * can read it while rendering. localStorage is only legible after hydration,
+ * which forced a `useEffect` that flipped the language *after* first paint —
+ * an English user watched the whole POS render in Spanish and then swap.
+ * The root layout reads the cookie and seeds `initialLang`, so the very
+ * first HTML is already in the right language (and `<html lang>` matches it).
+ */
+export function LanguageProvider({
+  children,
+  initialLang = "es",
+}: {
+  children: React.ReactNode;
+  initialLang?: Lang;
+}) {
+  const [lang, setLangState] = useState<Lang>(initialLang);
 
   const setLang = (l: Lang) => {
     setLangState(l);
-    localStorage.setItem("lang", l);
+    document.cookie = `lang=${l}; path=/; max-age=${LANG_MAX_AGE}; samesite=lax`;
   };
 
   const t: TFn = (key, vars) => {

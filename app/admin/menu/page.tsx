@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Plus, Edit2, Trash2, X, Save, Loader2, Ban, CheckCircle2, Check } from "lucide-react";
 import type { MenuItem, Category } from "@/lib/types";
 import {
@@ -65,15 +65,22 @@ export default function MenuManagement() {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<MenuItemForm>(emptyForm);
-  const [selectedModifierIds, setSelectedModifierIds] = useState<string[]>([]);
-
   const { data: existingModifierLinks } = useMenuItemModifierLinks(editingId);
 
-  useEffect(() => {
-    if (existingModifierLinks && showForm && editingId) {
-      setSelectedModifierIds(existingModifierLinks);
-    }
-  }, [existingModifierLinks, showForm, editingId]);
+  // The item's saved modifiers arrive asynchronously, so rather than copying
+  // them into state from an effect (which renders the form once with a stale
+  // empty selection first), the selection is derived: null means "untouched,
+  // show what the server has", and any toggle takes over with a local list.
+  const [modifierOverride, setModifierOverride] = useState<string[] | null>(null);
+  const selectedModifierIds =
+    modifierOverride ?? (editingId ? existingModifierLinks ?? [] : []);
+
+  const toggleModifier = (modId: string) =>
+    setModifierOverride(
+      selectedModifierIds.includes(modId)
+        ? selectedModifierIds.filter((id) => id !== modId)
+        : [...selectedModifierIds, modId]
+    );
 
   const [showCatForm, setShowCatForm] = useState(false);
   const [newCatName, setNewCatName] = useState("");
@@ -93,13 +100,13 @@ export default function MenuManagement() {
   const openCreateForm = () => {
     setEditingId(null);
     setForm(emptyForm);
-    setSelectedModifierIds([]);
+    setModifierOverride(null);
     setShowForm(true);
   };
 
   const openEditForm = (item: MenuItem) => {
     setEditingId(item.id);
-    setSelectedModifierIds([]);
+    setModifierOverride(null);
     setForm({
       name: item.name,
       description: item.description ?? "",
@@ -369,11 +376,7 @@ export default function MenuManagement() {
                         <button
                           key={mod.id}
                           type="button"
-                          onClick={() =>
-                            setSelectedModifierIds((prev) =>
-                              selected ? prev.filter((id) => id !== mod.id) : [...prev, mod.id]
-                            )
-                          }
+                          onClick={() => toggleModifier(mod.id)}
                           className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
                             selected
                               ? "bg-coffee-fruit text-white border-coffee-fruit"

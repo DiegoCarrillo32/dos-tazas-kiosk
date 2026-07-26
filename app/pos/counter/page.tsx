@@ -85,13 +85,26 @@ export default function CounterView() {
   const currency = settings?.currency ?? "CRC";
   const tipEnabled = settings?.tip_enabled ?? false;
   const tipAmount = Math.max(0, parseFloat(tip) || 0);
+  // Mirrors complete_order's arithmetic exactly (subtotal + IVA - discount
+  // + tip). Leaving the discount out here would quote the customer a total
+  // the server never charges, so the cashier would hand back too little
+  // change and the printed receipt would disagree with the books.
+  const discountAmount = Number(currentSelected?.discount_amount ?? 0);
   // What the customer owes before any tip — the base a tip % should be
   // calculated on, not the ex-IVA subtotal (a 15% tip on ₡1200 IVA-included
   // should be 15% of ₡1200, not of the ₡1062 pre-tax figure).
-  const preTipTotal = subtotal + taxAmount;
+  const preTipTotal = subtotal + taxAmount - discountAmount;
   const totalDue = preTipTotal + tipAmount;
   const tenderedAmount = parseFloat(tendered) || 0;
   const changeDue = tenderedAmount - totalDue;
+
+  // complete_order refuses payment outside an open shift, so without the
+  // `shift` guard the cashier taps Complete and gets a raw, untranslated
+  // Postgres error. The banner above already offers the one-tap fix.
+  const canCompleteCheckout =
+    !!shift &&
+    !!paymentMethod &&
+    !(paymentMethod === "cash" && tenderedAmount < totalDue);
 
   const resetCheckout = () => {
     setSelectedOrder(null);
@@ -363,6 +376,12 @@ export default function CounterView() {
                     <span>IVA ({taxRatePct}%)</span>
                     <span>{formatMoney(taxAmount, currency)}</span>
                   </div>
+                  {discountAmount > 0 && (
+                    <div className="flex justify-between text-expresso/70">
+                      <span>{t("receipt.discount")}</span>
+                      <span>-{formatMoney(discountAmount, currency)}</span>
+                    </div>
+                  )}
                   {tipAmount > 0 && (
                     <div className="flex justify-between text-expresso/70">
                       <span>{t("counter.tip")}</span>
@@ -540,7 +559,7 @@ export default function CounterView() {
                 <Button
                   size="lg"
                   onClick={handleCompleteOrder}
-                  disabled={!paymentMethod || voidOrderMut.isPending || (paymentMethod === "cash" && tenderedAmount < totalDue)}
+                  disabled={!canCompleteCheckout || voidOrderMut.isPending}
                   isLoading={completeOrderMut.isPending}
                   leftIcon={!completeOrderMut.isPending && <CheckCircle2 className="w-5 h-5" />}
                   className="flex-1 bg-coffee-fruit hover:bg-fruit-light text-white border-transparent"

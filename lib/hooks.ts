@@ -31,6 +31,8 @@ import {
   updateMenuItem,
   deleteMenuItem,
   createCategory,
+  updateCategory,
+  deleteCategory,
   createModifier,
   updateModifier,
   deleteModifier,
@@ -407,6 +409,31 @@ export function useCreateCategory() {
     mutationFn: createCategory,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.categories });
+    },
+  });
+}
+
+export function useUpdateCategory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, updates }: { id: string; updates: Parameters<typeof updateCategory>[1] }) =>
+      updateCategory(id, updates),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.categories });
+      qc.invalidateQueries({ queryKey: queryKeys.menuItems });
+      qc.invalidateQueries({ queryKey: queryKeys.allMenuItems });
+    },
+  });
+}
+
+export function useDeleteCategory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: deleteCategory,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.categories });
+      qc.invalidateQueries({ queryKey: queryKeys.menuItems });
+      qc.invalidateQueries({ queryKey: queryKeys.allMenuItems });
     },
   });
 }

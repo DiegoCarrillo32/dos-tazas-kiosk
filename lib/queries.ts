@@ -132,6 +132,26 @@ export async function createCategory(
   return data as Category;
 }
 
+export async function updateCategory(
+  id: string,
+  updates: Partial<Pick<Category, "name" | "sort_order">>
+): Promise<Category> {
+  const { data, error } = await supabase()
+    .from("categories")
+    .update(updates)
+    .eq("id", id)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data as Category;
+}
+
+export async function deleteCategory(id: string): Promise<void> {
+  const { error } = await supabase().from("categories").delete().eq("id", id);
+  if (error) throw error;
+}
+
 // ─── Modifiers ─────────────────────────────────────────────────────
 
 export async function fetchModifiersForItem(

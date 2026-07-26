@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Edit2, Trash2, X, Save, Loader2, Ban, CheckCircle2 } from "lucide-react";
-import type { MenuItem } from "@/lib/types";
+import { Plus, Edit2, Trash2, X, Save, Loader2, Ban, CheckCircle2, Check } from "lucide-react";
+import type { MenuItem, Category } from "@/lib/types";
 import {
   useAllMenuItems,
   useCategories,
@@ -10,6 +10,8 @@ import {
   useUpdateMenuItem,
   useDeleteMenuItem,
   useCreateCategory,
+  useUpdateCategory,
+  useDeleteCategory,
   useAllModifiers,
   useMenuItemModifierLinks,
   useSetMenuItemModifiers,
@@ -54,6 +56,8 @@ export default function MenuManagement() {
   const updateItemMut = useUpdateMenuItem();
   const deleteItemMut = useDeleteMenuItem();
   const createCatMut = useCreateCategory();
+  const updateCatMut = useUpdateCategory();
+  const deleteCatMut = useDeleteCategory();
 
   const { data: allModifiers = [] } = useAllModifiers();
   const setModifiersMut = useSetMenuItemModifiers();
@@ -73,6 +77,8 @@ export default function MenuManagement() {
 
   const [showCatForm, setShowCatForm] = useState(false);
   const [newCatName, setNewCatName] = useState("");
+  const [editingCatId, setEditingCatId] = useState<string | null>(null);
+  const [editCatName, setEditCatName] = useState("");
 
   const isLoading = itemsLoading || catsLoading;
 
@@ -181,10 +187,38 @@ export default function MenuManagement() {
     createCatMut.mutate(
       { location_id: locationId, name: newCatName.trim(), sort_order: categories.length },
       {
-        onSuccess: () => { setNewCatName(""); setShowCatForm(false); },
+        onSuccess: () => setNewCatName(""),
         onError: () => alert(t("menu.failedCategory")),
       }
     );
+  };
+
+  const startEditCategory = (cat: Category) => {
+    setEditingCatId(cat.id);
+    setEditCatName(cat.name);
+  };
+
+  const saveEditCategory = () => {
+    if (!editingCatId) return;
+    const name = editCatName.trim();
+    if (!name) return;
+    updateCatMut.mutate(
+      { id: editingCatId, updates: { name } },
+      {
+        onSuccess: () => setEditingCatId(null),
+        onError: () => alert(t("menu.failedCategory")),
+      }
+    );
+  };
+
+  const handleDeleteCategory = (cat: Category) => {
+    if (!confirm(t("menu.deleteCategoryConfirm", { name: cat.name }))) return;
+    deleteCatMut.mutate(cat.id, {
+      onError: (err: unknown) => {
+        const code = (err as { code?: string })?.code;
+        alert(code === "23503" ? t("menu.categoryInUse") : t("menu.failedToDeleteCategory"));
+      },
+    });
   };
 
   const isSaving = createItemMut.isPending || updateItemMut.isPending || setModifiersMut.isPending;
@@ -215,10 +249,58 @@ export default function MenuManagement() {
       </div>
 
       {showCatForm && (
-        <div className="bg-card p-4 rounded-xl border border-warm-roast/10 flex gap-3">
-          <Input type="text" value={newCatName} onChange={(e) => setNewCatName(e.target.value)} placeholder={t("menu.categoryPlaceholder")} className="flex-1" />
-          <Button onClick={handleCreateCategory} disabled={!newCatName.trim()} isLoading={createCatMut.isPending}>{t("common.create")}</Button>
-          <button onClick={() => setShowCatForm(false)} className="p-2 text-expresso/40 hover:text-expresso"><X className="w-4 h-4" /></button>
+        <div className="bg-card p-4 rounded-xl border border-warm-roast/10 space-y-3">
+          <div className="flex gap-3">
+            <Input
+              type="text"
+              value={newCatName}
+              onChange={(e) => setNewCatName(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleCreateCategory()}
+              placeholder={t("menu.categoryPlaceholder")}
+              className="flex-1"
+            />
+            <Button onClick={handleCreateCategory} disabled={!newCatName.trim()} isLoading={createCatMut.isPending}>{t("common.create")}</Button>
+            <button onClick={() => setShowCatForm(false)} className="p-2 text-expresso/40 hover:text-expresso"><X className="w-4 h-4" /></button>
+          </div>
+          {categories.length > 0 && (
+            <ul className="divide-y divide-warm-roast/10 border-t border-warm-roast/10">
+              {categories.map((cat) => (
+                <li key={cat.id} className="flex items-center gap-2 py-2">
+                  {editingCatId === cat.id ? (
+                    <>
+                      <Input
+                        type="text"
+                        value={editCatName}
+                        onChange={(e) => setEditCatName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") saveEditCategory();
+                          if (e.key === "Escape") setEditingCatId(null);
+                        }}
+                        className="flex-1"
+                        autoFocus
+                      />
+                      <button onClick={saveEditCategory} className="p-2 text-green-600 hover:text-green-700" title={t("common.save")}>
+                        <Check className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => setEditingCatId(null)} className="p-2 text-expresso/40 hover:text-expresso" title={t("common.cancel")}>
+                        <X className="w-4 h-4" />
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="flex-1 text-sm text-expresso">{cat.name}</span>
+                      <button onClick={() => startEditCategory(cat)} className="p-2 text-expresso/40 hover:text-coffee-fruit transition-colors" title={t("menu.renameCategory")}>
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => handleDeleteCategory(cat)} className="p-2 text-expresso/40 hover:text-destructive transition-colors" title={t("menu.deleteCategoryTitle")}>
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
 

@@ -13,8 +13,8 @@ import {
   Ban,
   Wallet,
   AlertTriangle,
+  Lock,
 } from "lucide-react";
-import Link from "next/link";
 import type { Order, OrderItem, PaymentMethod } from "@/lib/types";
 import {
   useParkedOrders,
@@ -29,6 +29,7 @@ import { Button } from "@/components/ui/Button";
 import { Label } from "@/components/ui/Label";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { Receipt as ReceiptView } from "@/components/Receipt";
+import { OpenShiftDialog, CloseShiftDialog } from "@/components/ShiftDialogs";
 import { formatMoney } from "@/lib/utils";
 import { useT } from "@/lib/i18n/LanguageContext";
 
@@ -49,6 +50,11 @@ export default function CounterView() {
   const [voidReason, setVoidReason] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [receiptOrder, setReceiptOrder] = useState<Order | null>(null);
+
+  // Shift open/close is a till action, so staff drive it from here rather
+  // than the admin-only Cash Drawer page.
+  const [showOpenShift, setShowOpenShift] = useState(false);
+  const [showCloseShift, setShowCloseShift] = useState(false);
 
   // Invoice form
   const [needsInvoice, setNeedsInvoice] = useState(false);
@@ -181,13 +187,13 @@ export default function CounterView() {
             <AlertTriangle className="w-4 h-4 shrink-0" />
             {t("counter.noShiftWarning")}
           </span>
-          <Link
-            href="/admin/cash"
-            className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg bg-coffee-fruit text-white hover:bg-fruit-light transition-colors"
+          <button
+            onClick={() => setShowOpenShift(true)}
+            className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg bg-coffee-fruit text-white hover:bg-fruit-light transition-colors"
           >
             <Wallet className="w-4 h-4" />
             {t("counter.openShiftCta")}
-          </Link>
+          </button>
         </div>
       ) : (
         <div className="shrink-0 px-4 py-1.5 bg-warm-roast/5 border-b border-warm-roast/10 flex items-center justify-between gap-3 text-xs text-expresso/60">
@@ -195,9 +201,13 @@ export default function CounterView() {
             <Wallet className="w-3.5 h-3.5" />
             {t("counter.shiftExpectedCash")}: <span className="font-semibold text-expresso">{formatMoney(shift.expected_cash, "CRC")}</span>
           </span>
-          <Link href="/admin/cash" className="hover:text-expresso hover:underline">
-            {t("cash.title")}
-          </Link>
+          <button
+            onClick={() => setShowCloseShift(true)}
+            className="shrink-0 inline-flex items-center gap-1.5 px-2 py-1.5 font-medium rounded-lg hover:bg-warm-roast/10 hover:text-expresso transition-colors"
+          >
+            <Lock className="w-3.5 h-3.5" />
+            {t("cash.closeShift")}
+          </button>
         </div>
       )}
 
@@ -208,6 +218,11 @@ export default function CounterView() {
           settings={settings ?? null}
           onClose={() => setReceiptOrder(null)}
         />
+      )}
+
+      {showOpenShift && <OpenShiftDialog onClose={() => setShowOpenShift(false)} />}
+      {showCloseShift && shift && (
+        <CloseShiftDialog shift={shift} onClose={() => setShowCloseShift(false)} />
       )}
 
       {/* Left: Order Queue */}

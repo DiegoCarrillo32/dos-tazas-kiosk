@@ -93,6 +93,19 @@ export default function TransactionHistory() {
                   {selectedOrder.status === "refunded" ? t("history.statusRefunded") : t("history.statusCompleted")}
                 </span>
               </div>
+              {Number(selectedOrder.discount_amount) > 0 && (
+                <div className="flex justify-between gap-3">
+                  <span className="text-expresso/60">{t("history.discount")}</span>
+                  <span className="text-right text-coffee-fruit font-medium">
+                    -{formatMoney(selectedOrder.discount_amount, "CRC")}
+                    {selectedOrder.discount_reason && (
+                      <span className="block text-xs font-normal text-expresso/60">
+                        {selectedOrder.discount_reason}
+                      </span>
+                    )}
+                  </span>
+                </div>
+              )}
               <div className="flex justify-between"><span className="text-expresso/60">{t("history.total")}</span><span className="font-bold text-expresso">{formatMoney(selectedOrder.total_amount, "CRC")}</span></div>
               <div className="flex justify-between"><span className="text-expresso/60">{t("history.payment")}</span><span className="text-expresso">{selectedOrder.payment_method?.toUpperCase() ?? "—"}</span></div>
               {selectedOrder.payment_reference && (<div className="flex justify-between"><span className="text-expresso/60">{t("history.reference")}</span><span className="text-expresso">{selectedOrder.payment_reference}</span></div>)}

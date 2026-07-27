@@ -80,6 +80,13 @@ export type OrderStatus =
   | "refunded";
 export type PaymentMethod = "card" | "cash" | "sinpe";
 
+/**
+ * How a checkout discount was keyed in. The client sends the type and the
+ * raw value ("percent", 10); `complete_order` derives the colón figure, so
+ * a tampered client cannot dictate what comes off the till.
+ */
+export type DiscountType = "percent" | "amount";
+
 export type LocationSettings = {
   location_id: string;
   currency: string;
@@ -206,7 +213,15 @@ export type Order = {
   subtotal: number;
   tax_amount: number;
   tax_rate: number;
+  /**
+   * Money taken off at checkout, tax included. `subtotal` and `tax_amount`
+   * are already net of it (complete_order re-splits the discounted gross),
+   * so this is a record of what was given away, not a term to subtract:
+   * total_amount = subtotal + tax_amount + tip_amount.
+   */
   discount_amount: number;
+  /** Required whenever discount_amount > 0 — enforced by complete_order. */
+  discount_reason: string | null;
   tip_amount: number;
   total_amount: number;
   amount_tendered: number | null;

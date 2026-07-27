@@ -27,6 +27,11 @@ export function Receipt({
   const taxPct = Math.round(Number(order.tax_rate ?? 0.13) * 100);
   const items = order.order_items ?? [];
 
+  const discount = Number(order.discount_amount ?? 0);
+  // The list price of the lines above: subtotal and tax are stored net of
+  // the discount, so adding it back recovers what the items came to.
+  const grossItems = Number(order.subtotal) + Number(order.tax_amount) + discount;
+
   const businessName = settings?.business_legal_name?.trim() || "Dos Tazas";
   const dateStr = new Date(order.created_at).toLocaleString("es-CR", {
     year: "numeric",
@@ -84,13 +89,25 @@ export function Receipt({
 
           <div className="border-t border-dashed border-expresso/40 my-2" />
 
-          {/* Totals */}
+          {/* Totals. `subtotal` and `tax_amount` are already net of any
+              discount, so a discounted receipt opens with the list price of
+              the lines printed above and shows what came off — otherwise the
+              column would not add up to the total. */}
           <div className="space-y-0.5">
+            {discount > 0 && (
+              <>
+                <Row label={t("receipt.itemsTotal")} value={money(grossItems)} />
+                <Row
+                  label={
+                    t("receipt.discount") +
+                    (order.discount_reason ? ` (${order.discount_reason})` : "")
+                  }
+                  value={"-" + money(discount)}
+                />
+              </>
+            )}
             <Row label={t("receipt.subtotal")} value={money(order.subtotal)} />
             <Row label={`IVA (${taxPct}%)`} value={money(order.tax_amount)} />
-            {Number(order.discount_amount) > 0 && (
-              <Row label={t("receipt.discount")} value={"-" + money(order.discount_amount)} />
-            )}
             {Number(order.tip_amount) > 0 && (
               <Row label={t("receipt.tip")} value={money(order.tip_amount)} />
             )}

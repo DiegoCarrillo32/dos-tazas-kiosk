@@ -7,6 +7,7 @@ import type {
   Order,
   CartItem,
   PaymentMethod,
+  DiscountType,
   LocationSettings,
   Table,
   UserProfile,
@@ -377,9 +378,15 @@ export async function completeOrder(params: {
   customerName: string | null;
   customerId: string | null;
   customerEmail: string | null;
+  discountType?: DiscountType | null;
+  discountValue?: number;
+  discountReason?: string | null;
 }): Promise<void> {
-  // complete_order recomputes the total (incl. tip) and validates the
-  // cash tendered server-side before marking the order completed.
+  // complete_order recomputes the total (discount, IVA re-split, tip) and
+  // validates the cash tendered server-side before marking the order
+  // completed. The discount goes over as type + raw value, never as a
+  // finished amount — the server derives the figure and refuses one
+  // without a reason.
   const { error } = await supabase().rpc("complete_order", {
     p_order_id: params.orderId,
     p_payment_method: params.paymentMethod,
@@ -389,6 +396,9 @@ export async function completeOrder(params: {
     p_customer_name: params.customerName,
     p_customer_id: params.customerId,
     p_customer_email: params.customerEmail,
+    p_discount_type: params.discountType ?? null,
+    p_discount_value: params.discountValue ?? 0,
+    p_discount_reason: params.discountReason ?? null,
   });
   if (error) throw error;
 }
@@ -562,6 +572,7 @@ type ExportRow = {
   subtotal: number;
   tax_amount: number;
   discount_amount: number;
+  discount_reason: string | null;
   tip_amount: number;
   total_amount: number;
   payment_method: string | null;
@@ -604,6 +615,7 @@ export async function exportOrdersCSV(
     "Subtotal (net)",
     "IVA",
     "Discount",
+    "Discount Reason",
     "Tip",
     "Total",
     "Payment Method",
@@ -627,6 +639,7 @@ export async function exportOrdersCSV(
       r.subtotal,
       r.tax_amount,
       r.discount_amount,
+      r.discount_reason ?? "",
       r.tip_amount,
       r.total_amount,
       r.payment_method ?? "",

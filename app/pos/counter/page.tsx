@@ -15,7 +15,7 @@ import {
   AlertTriangle,
   Lock,
 } from "lucide-react";
-import type { Order, OrderItem, PaymentMethod } from "@/lib/types";
+import type { DiscountType, Order, OrderItem, PaymentMethod } from "@/lib/types";
 import {
   useParkedOrders,
   useCompleteOrder,
@@ -30,8 +30,23 @@ import { Label } from "@/components/ui/Label";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { Receipt as ReceiptView } from "@/components/Receipt";
 import { OpenShiftDialog, CloseShiftDialog } from "@/components/ShiftDialogs";
-import { formatMoney } from "@/lib/utils";
+import { cn, formatMoney } from "@/lib/utils";
 import { useT } from "@/lib/i18n/LanguageContext";
+
+/** Round to cents the way Postgres `round(n, 2)` does on the server side. */
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
+/**
+ * One-tap discount reasons, covering what actually recurs at the counter.
+ * The free-text field below them stays editable for anything else.
+ */
+const DISCOUNT_REASON_KEYS = [
+  "discountReasonStaff",
+  "discountReasonFriends",
+  "discountReasonLoyalty",
+  "discountReasonServiceIssue",
+  "discountReasonComp",
+] as const;
 
 export default function CounterView() {
   const t = useT();
@@ -47,6 +62,9 @@ export default function CounterView() {
   const [sinpeRef, setSinpeRef] = useState("");
   const [tip, setTip] = useState("");
   const [tendered, setTendered] = useState("");
+  const [discountType, setDiscountType] = useState<DiscountType>("percent");
+  const [discountValue, setDiscountValue] = useState("");
+  const [discountReason, setDiscountReason] = useState("");
   const [voidReason, setVoidReason] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [receiptOrder, setReceiptOrder] = useState<Order | null>(null);
@@ -83,17 +101,45 @@ export default function CounterView() {
     Number(currentSelected?.tax_rate ?? settings?.tax_rate ?? 0.13) * 100
   );
   const currency = settings?.currency ?? "CRC";
+  const currencySymbol = currency === "CRC" ? "₡" : "$";
   const tipEnabled = settings?.tip_enabled ?? false;
   const tipAmount = Math.max(0, parseFloat(tip) || 0);
-  // Mirrors complete_order's arithmetic exactly (subtotal + IVA - discount
-  // + tip). Leaving the discount out here would quote the customer a total
-  // the server never charges, so the cashier would hand back too little
-  // change and the printed receipt would disagree with the books.
-  const discountAmount = Number(currentSelected?.discount_amount ?? 0);
+
+  // Everything below mirrors complete_order's arithmetic exactly. The server
+  // is what actually charges, so any drift here would quote the customer a
+  // total the till never takes — the cashier hands back the wrong change and
+  // the printed receipt disagrees with the books.
+
+  // List price of the order, IVA included: the sum of the line prices shown
+  // in the summary, and the base a discount comes off.
+  const grossBeforeDiscount = subtotal + taxAmount;
+
+  const discountInput = Math.max(0, parseFloat(discountValue) || 0);
+  const rawDiscount = round2(
+    discountType === "percent"
+      ? (grossBeforeDiscount * Math.min(discountInput, 100)) / 100
+      : discountInput
+  );
+  // A keyed amount can overshoot the order; show it capped but block
+  // checkout rather than silently charging zero.
+  const discountExceedsTotal = rawDiscount > grossBeforeDiscount;
+  const discountAmount = Math.min(rawDiscount, grossBeforeDiscount);
+  const discountReasonMissing = discountAmount > 0 && !discountReason.trim();
+
+  // Prices are IVA-inclusive, so a discount takes the tax inside it down
+  // too: the IVA owed is the IVA on what the customer actually paid, not on
+  // the list price. Split the discounted gross in the original proportion.
+  const discountedGross = grossBeforeDiscount - discountAmount;
+  const taxDue =
+    discountAmount > 0 && grossBeforeDiscount > 0
+      ? round2((taxAmount * discountedGross) / grossBeforeDiscount)
+      : taxAmount;
+  const netDue = round2(discountedGross - taxDue);
+
   // What the customer owes before any tip — the base a tip % should be
   // calculated on, not the ex-IVA subtotal (a 15% tip on ₡1200 IVA-included
   // should be 15% of ₡1200, not of the ₡1062 pre-tax figure).
-  const preTipTotal = subtotal + taxAmount - discountAmount;
+  const preTipTotal = discountedGross;
   const totalDue = preTipTotal + tipAmount;
   const tenderedAmount = parseFloat(tendered) || 0;
   const changeDue = tenderedAmount - totalDue;
@@ -104,7 +150,14 @@ export default function CounterView() {
   const canCompleteCheckout =
     !!shift &&
     !!paymentMethod &&
+    !discountExceedsTotal &&
+    !discountReasonMissing &&
     !(paymentMethod === "cash" && tenderedAmount < totalDue);
+
+  const clearDiscount = () => {
+    setDiscountValue("");
+    setDiscountReason("");
+  };
 
   const resetCheckout = () => {
     setSelectedOrder(null);
@@ -113,6 +166,7 @@ export default function CounterView() {
     setTip("");
     setTendered("");
     setVoidReason("");
+    clearDiscount();
     setNeedsInvoice(false);
     setInvoiceName("");
     setInvoiceId("");
@@ -133,14 +187,24 @@ export default function CounterView() {
       alert(t("counter.alertInvoiceRequired"));
       return;
     }
+    if (discountExceedsTotal) {
+      alert(t("counter.alertDiscountTooLarge"));
+      return;
+    }
+    if (discountReasonMissing) {
+      alert(t("counter.alertDiscountReason"));
+      return;
+    }
 
     const completed: Order = {
       ...currentSelected,
       status: "completed",
       payment_method: paymentMethod,
       payment_reference: paymentMethod === "sinpe" ? sinpeRef : null,
-      subtotal,
-      tax_amount: taxAmount,
+      subtotal: netDue,
+      tax_amount: taxDue,
+      discount_amount: discountAmount,
+      discount_reason: discountAmount > 0 ? discountReason.trim() : null,
       tip_amount: tipAmount,
       total_amount: totalDue,
       amount_tendered: paymentMethod === "cash" ? tenderedAmount : null,
@@ -160,6 +224,18 @@ export default function CounterView() {
         customerName: needsInvoice ? invoiceName : null,
         customerId: needsInvoice ? invoiceId : null,
         customerEmail: needsInvoice ? invoiceEmail : null,
+        // Send what was keyed, not the computed figure — the server derives
+        // the amount itself and rejects a discount with no reason.
+        discountType: discountAmount > 0 ? discountType : null,
+        // Capped the same way the displayed figure is, so a fat-fingered
+        // "150%" charges what the screen quoted instead of erroring out.
+        discountValue:
+          discountAmount > 0
+            ? discountType === "percent"
+              ? Math.min(discountInput, 100)
+              : discountInput
+            : 0,
+        discountReason: discountAmount > 0 ? discountReason.trim() : null,
       },
       {
         onSuccess: () => {
@@ -296,6 +372,9 @@ export default function CounterView() {
                     setTip("");
                     setTendered("");
                     setNeedsInvoice(false);
+                    // A discount belongs to the order it was keyed against;
+                    // carrying it to the next one would quietly comp a sale.
+                    clearDiscount();
                   }}
                   className={`w-full text-left p-4 rounded-xl border transition-all ${
                     currentSelected?.id === order.id
@@ -368,20 +447,36 @@ export default function CounterView() {
                 </div>
                 {/* Money breakdown */}
                 <div className="space-y-1.5 border-t border-warm-roast/10 mt-4 pt-4 text-sm">
+                  {discountAmount > 0 && (
+                    <>
+                      {/* With a discount the breakdown starts from the list
+                          price of the lines above, so the customer can see
+                          what came off before IVA is restated. */}
+                      <div className="flex justify-between text-expresso/70">
+                        <span>{t("counter.itemsTotal")}</span>
+                        <span>{formatMoney(grossBeforeDiscount, currency)}</span>
+                      </div>
+                      <div className="flex justify-between text-coffee-fruit font-medium">
+                        <span>
+                          {t("counter.discount")}
+                          {discountReason.trim() && (
+                            <span className="text-expresso/50 font-normal">
+                              {" "}· {discountReason.trim()}
+                            </span>
+                          )}
+                        </span>
+                        <span>-{formatMoney(discountAmount, currency)}</span>
+                      </div>
+                    </>
+                  )}
                   <div className="flex justify-between text-expresso/70">
                     <span>{t("counter.subtotal")}</span>
-                    <span>{formatMoney(subtotal, currency)}</span>
+                    <span>{formatMoney(netDue, currency)}</span>
                   </div>
                   <div className="flex justify-between text-expresso/70">
                     <span>IVA ({taxRatePct}%)</span>
-                    <span>{formatMoney(taxAmount, currency)}</span>
+                    <span>{formatMoney(taxDue, currency)}</span>
                   </div>
-                  {discountAmount > 0 && (
-                    <div className="flex justify-between text-expresso/70">
-                      <span>{t("receipt.discount")}</span>
-                      <span>-{formatMoney(discountAmount, currency)}</span>
-                    </div>
-                  )}
                   {tipAmount > 0 && (
                     <div className="flex justify-between text-expresso/70">
                       <span>{t("counter.tip")}</span>
@@ -393,6 +488,122 @@ export default function CounterView() {
                     <span>{formatMoney(totalDue, currency)}</span>
                   </div>
                 </div>
+              </div>
+
+              {/* Discount — sits above Tip so the tip percentages are taken
+                  on what the customer actually owes. */}
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-expresso/60 uppercase tracking-wider">
+                  {t("counter.discount")}
+                </h3>
+                <div className="flex flex-wrap items-center gap-2">
+                  {[10, 15, 20].map((pct) => {
+                    const active =
+                      discountType === "percent" && discountValue === String(pct);
+                    return (
+                      <button
+                        key={pct}
+                        type="button"
+                        onClick={() => {
+                          setDiscountType("percent");
+                          setDiscountValue(String(pct));
+                        }}
+                        className={cn(
+                          "px-4 py-2.5 text-sm rounded-lg transition-colors",
+                          active
+                            ? "bg-coffee-fruit text-white"
+                            : "bg-warm-roast/10 text-expresso/70 hover:bg-warm-roast/20"
+                        )}
+                      >
+                        {pct}%
+                      </button>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    onClick={clearDiscount}
+                    className="px-4 py-2.5 text-sm rounded-lg bg-warm-roast/10 text-expresso/70 hover:bg-warm-roast/20 transition-colors"
+                  >
+                    {t("counter.discountNone")}
+                  </button>
+                  <div className="inline-flex rounded-lg border border-warm-roast/20 overflow-hidden">
+                    {(["percent", "amount"] as DiscountType[]).map((type) => (
+                      <button
+                        key={type}
+                        type="button"
+                        onClick={() => setDiscountType(type)}
+                        title={
+                          type === "percent"
+                            ? t("counter.discountPercent")
+                            : t("counter.discountCustom")
+                        }
+                        className={cn(
+                          "px-4 py-2.5 text-sm font-medium transition-colors",
+                          discountType === type
+                            ? "bg-warm-roast text-white"
+                            : "bg-card text-expresso/70 hover:bg-warm-roast/10"
+                        )}
+                      >
+                        {type === "percent" ? "%" : currencySymbol}
+                      </button>
+                    ))}
+                  </div>
+                  <Input
+                    type="number"
+                    inputMode="numeric"
+                    step={1}
+                    min={0}
+                    value={discountValue}
+                    onChange={(e) => setDiscountValue(e.target.value)}
+                    placeholder={
+                      discountType === "percent"
+                        ? t("counter.discountPercent")
+                        : t("counter.discountCustom")
+                    }
+                    className="w-32"
+                  />
+                </div>
+
+                {discountExceedsTotal && (
+                  <p className="text-sm font-medium text-red-600 dark:text-red-400">
+                    {t("counter.alertDiscountTooLarge")}
+                  </p>
+                )}
+
+                {/* A discount without an attributable reason is
+                    indistinguishable from money walking out the door, so the
+                    reason is required here and again server-side. */}
+                {discountAmount > 0 && (
+                  <div className="bg-card p-4 rounded-xl border border-warm-roast/10 space-y-3">
+                    <Label className="block">{t("counter.discountReason")}</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {DISCOUNT_REASON_KEYS.map((key) => {
+                        const label = t(`counter.${key}`);
+                        return (
+                          <button
+                            key={key}
+                            type="button"
+                            onClick={() => setDiscountReason(label)}
+                            className={cn(
+                              "px-3 py-2.5 text-sm rounded-lg transition-colors",
+                              discountReason.trim() === label
+                                ? "bg-coffee-fruit text-white"
+                                : "bg-warm-roast/10 text-expresso/70 hover:bg-warm-roast/20"
+                            )}
+                          >
+                            {label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <Input
+                      type="text"
+                      value={discountReason}
+                      onChange={(e) => setDiscountReason(e.target.value)}
+                      placeholder={t("counter.discountReasonPlaceholder")}
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Tip */}

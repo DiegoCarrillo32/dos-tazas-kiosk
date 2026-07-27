@@ -49,7 +49,7 @@ import {
   fetchLocationSettings,
   updateLocationSettings,
 } from "./queries";
-import type { CartItem, CashMovementType, CountedBreakdown, PaymentMethod } from "./types";
+import type { CartItem, CashMovementType, CountedBreakdown, DiscountType, PaymentMethod } from "./types";
 
 // ─── Cache durations ───────────────────────────────────────────────
 
@@ -228,6 +228,9 @@ export function useCompleteOrder() {
       customerName: string | null;
       customerId: string | null;
       customerEmail: string | null;
+      discountType?: DiscountType | null;
+      discountValue?: number;
+      discountReason?: string | null;
     }) => completeOrder(params),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.parkedOrders });

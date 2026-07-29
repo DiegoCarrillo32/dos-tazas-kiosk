@@ -27,14 +27,44 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // getUser() re-validates against the Supabase auth server on every
+  // request. That's the right check when it succeeds, but a network
+  // hiccup (kiosk wifi, a Supabase incident) makes it fail even for a
+  // genuinely logged-in staff member — and unlike loading cached menu
+  // data, being kicked to /login mid-shift stops the till outright. Fall
+  // back to getSession(), a pure cookie read with no network call, so a
+  // real session survives Supabase being briefly unreachable. Every
+  // actual data access still carries the JWT to PostgREST, where RLS is
+  // the real authorization boundary — this check only decides whether to
+  // redirect, never what a request is allowed to see.
+  let authed = false;
+  try {
+    const { data, error } = await supabase.auth.getUser();
+    if (data.user) {
+      authed = true;
+    } else if (error) {
+      const { data: sessionData } = await supabase.auth.getSession();
+      authed = !!sessionData.session;
+    }
+  } catch {
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      authed = !!sessionData.session;
+    } catch {
+      authed = false;
+    }
+  }
 
   if (
-    !user &&
+    !authed &&
     !request.nextUrl.pathname.startsWith('/login') &&
-    request.nextUrl.pathname !== '/'
+    request.nextUrl.pathname !== '/' &&
+    // /offline is the service worker's navigation fallback (public/sw.js)
+    // — a public, static page by design so it works with no session and
+    // no network. Redirecting it to /login would get followed and cached
+    // under the /offline key during the SW's install-time precache,
+    // silently replacing the offline message with the login page.
+    request.nextUrl.pathname !== '/offline'
   ) {
     // no user, potentially respond by redirecting the user to the login page
     const url = request.nextUrl.clone();

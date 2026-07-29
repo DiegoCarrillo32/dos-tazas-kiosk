@@ -8,19 +8,42 @@ export default async function AdminLayout({
   children: React.ReactNode;
 }) {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
 
-  if (!user) {
+  // Same network-tolerant check as app/pos/layout.tsx: a transient failure
+  // to reach the Supabase auth server shouldn't log out a real session.
+  let userId: string | null = null;
+  try {
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser();
+    if (user) {
+      userId = user.id;
+    } else if (error) {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      userId = session?.user.id ?? null;
+    }
+  } catch {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    userId = session?.user.id ?? null;
+  }
+
+  if (!userId) {
     redirect("/login");
   }
 
-  // RBAC: only admins can access
+  // RBAC: only admins can access. Admin isn't part of the offline-first
+  // surface (see the POS floor/counter), so unlike the POS layout above,
+  // a role we can't verify safely defaults to "not admin" rather than
+  // letting the page through.
   const { data: profile } = await supabase
     .from("user_profiles")
     .select("role")
-    .eq("id", user.id)
+    .eq("id", userId)
     .single();
 
   if (profile?.role !== "admin") {

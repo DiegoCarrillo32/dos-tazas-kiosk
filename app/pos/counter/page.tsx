@@ -17,7 +17,6 @@ import {
 } from "lucide-react";
 import type { DiscountType, Order, OrderItem, PaymentMethod } from "@/lib/types";
 import {
-  useParkedOrders,
   useCompleteOrder,
   useVoidOrder,
   useLocationSettings,
@@ -32,9 +31,12 @@ import { Receipt as ReceiptView } from "@/components/Receipt";
 import { OpenShiftDialog, CloseShiftDialog } from "@/components/ShiftDialogs";
 import { cn, formatMoney } from "@/lib/utils";
 import { useT } from "@/lib/i18n/LanguageContext";
-
-/** Round to cents the way Postgres `round(n, 2)` does on the server side. */
-const round2 = (n: number) => Math.round(n * 100) / 100;
+import { priceCheckout, changeDue as computeChangeDue, toClientCharge } from "@/lib/pricing";
+import { useConnectionStatus } from "@/lib/offline/useConnectionStatus";
+import { useMergedParkedOrders, type QueueOrder } from "@/lib/offline/useMergedParkedOrders";
+import { attachPayment, discardLocalEntry, enqueuePaymentForServerOrder } from "@/lib/offline/outbox";
+import { isNetworkError } from "@/lib/offline/sync";
+import type { OfflineOrderSnapshot, OfflinePaymentPayload } from "@/lib/offline/types";
 
 /**
  * One-tap discount reasons, covering what actually recurs at the counter.
@@ -50,14 +52,15 @@ const DISCOUNT_REASON_KEYS = [
 
 export default function CounterView() {
   const t = useT();
-  const { data: orders = [], isLoading, refetch, isRefetching } = useParkedOrders();
+  const { orders, isLoading, refetch, isRefetching, pendingCount, failedCount } = useMergedParkedOrders();
   const { data: settings } = useLocationSettings();
   const { data: shift } = useCurrentShift();
   const live = useOrdersRealtime();
+  const conn = useConnectionStatus();
   const completeOrderMut = useCompleteOrder();
   const voidOrderMut = useVoidOrder();
 
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<QueueOrder | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
   const [sinpeRef, setSinpeRef] = useState("");
   const [tip, setTip] = useState("");
@@ -68,6 +71,8 @@ export default function CounterView() {
   const [voidReason, setVoidReason] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [receiptOrder, setReceiptOrder] = useState<Order | null>(null);
+  const [receiptProvisional, setReceiptProvisional] = useState<{ offlineRef: string } | null>(null);
+  const [isQueueingPayment, setIsQueueingPayment] = useState(false);
 
   // Shift open/close is a till action, so staff drive it from here rather
   // than the admin-only Cash Drawer page.
@@ -105,53 +110,42 @@ export default function CounterView() {
   const tipEnabled = settings?.tip_enabled ?? false;
   const tipAmount = Math.max(0, parseFloat(tip) || 0);
 
-  // Everything below mirrors complete_order's arithmetic exactly. The server
-  // is what actually charges, so any drift here would quote the customer a
-  // total the till never takes — the cashier hands back the wrong change and
-  // the printed receipt disagrees with the books.
-
-  // List price of the order, IVA included: the sum of the line prices shown
-  // in the summary, and the base a discount comes off.
-  const grossBeforeDiscount = subtotal + taxAmount;
-
+  // The math below mirrors complete_order's arithmetic exactly (see
+  // lib/pricing.ts for the shared implementation and the SQL line
+  // references) — the server is what actually charges, so any drift here
+  // would quote the customer a total the till never takes.
   const discountInput = Math.max(0, parseFloat(discountValue) || 0);
-  const rawDiscount = round2(
-    discountType === "percent"
-      ? (grossBeforeDiscount * Math.min(discountInput, 100)) / 100
-      : discountInput
-  );
-  // A keyed amount can overshoot the order; show it capped but block
-  // checkout rather than silently charging zero.
-  const discountExceedsTotal = rawDiscount > grossBeforeDiscount;
-  const discountAmount = Math.min(rawDiscount, grossBeforeDiscount);
+  const grossBeforeDiscount = subtotal + taxAmount;
+  const math = priceCheckout({
+    gross: grossBeforeDiscount,
+    tax: taxAmount,
+    discountType,
+    discountValue: discountInput,
+    tip: tipAmount,
+  });
+  const {
+    discountAmount,
+    subtotal: netDue,
+    taxAmount: taxDue,
+    preTipTotal,
+    totalAmount: totalDue,
+    discountExceedsGross: discountExceedsTotal,
+  } = math;
   const discountReasonMissing = discountAmount > 0 && !discountReason.trim();
-
-  // Prices are IVA-inclusive, so a discount takes the tax inside it down
-  // too: the IVA owed is the IVA on what the customer actually paid, not on
-  // the list price. Split the discounted gross in the original proportion.
-  const discountedGross = grossBeforeDiscount - discountAmount;
-  const taxDue =
-    discountAmount > 0 && grossBeforeDiscount > 0
-      ? round2((taxAmount * discountedGross) / grossBeforeDiscount)
-      : taxAmount;
-  const netDue = round2(discountedGross - taxDue);
-
-  // What the customer owes before any tip — the base a tip % should be
-  // calculated on, not the ex-IVA subtotal (a 15% tip on ₡1200 IVA-included
-  // should be 15% of ₡1200, not of the ₡1062 pre-tax figure).
-  const preTipTotal = discountedGross;
-  const totalDue = preTipTotal + tipAmount;
   const tenderedAmount = parseFloat(tendered) || 0;
-  const changeDue = tenderedAmount - totalDue;
+  const changeDue = computeChangeDue(totalDue, tenderedAmount);
 
   // complete_order refuses payment outside an open shift, so without the
   // `shift` guard the cashier taps Complete and gets a raw, untranslated
   // Postgres error. The banner above already offers the one-tap fix.
+  // A __payPending order already has a queued payment (another device, or
+  // this one before reconnecting) — paying it again would double-charge.
   const canCompleteCheckout =
     !!shift &&
     !!paymentMethod &&
     !discountExceedsTotal &&
     !discountReasonMissing &&
+    !currentSelected?.__payPending &&
     !(paymentMethod === "cash" && tenderedAmount < totalDue);
 
   const clearDiscount = () => {
@@ -172,6 +166,43 @@ export default function CounterView() {
     setInvoiceId("");
     setInvoiceEmail("");
   };
+
+  function buildOfflinePayment(): OfflinePaymentPayload {
+    return {
+      payment_method: paymentMethod as PaymentMethod,
+      payment_reference: paymentMethod === "sinpe" ? sinpeRef : null,
+      tip_amount: tipAmount,
+      amount_tendered: paymentMethod === "cash" ? tenderedAmount : null,
+      customer_name: needsInvoice ? invoiceName : null,
+      customer_id: needsInvoice ? invoiceId : null,
+      customer_email: needsInvoice ? invoiceEmail : null,
+      // Send what was keyed, not the computed figure — the same reasoning
+      // as the online path below: the server derives the amount itself.
+      discount_type: discountAmount > 0 ? discountType : null,
+      discount_value:
+        discountAmount > 0
+          ? discountType === "percent"
+            ? Math.min(discountInput, 100)
+            : discountInput
+          : 0,
+      discount_reason: discountAmount > 0 ? discountReason.trim() : null,
+    };
+  }
+
+  function buildSnapshotFromOrder(order: QueueOrder): OfflineOrderSnapshot {
+    return {
+      offlineRef: "", // overwritten by enqueuePaymentForServerOrder with this entry's own ref
+      tableName: order.table?.name ?? null,
+      itemCount: (order.order_items ?? []).reduce((s, i) => s + i.quantity, 0),
+      lines: (order.order_items ?? []).map((i) => ({
+        name: i.menu_item?.name ?? "Item",
+        quantity: i.quantity,
+        modifiers: (i.modifiers ?? []).map((m) => m.name),
+      })),
+      totalAmount: Number(order.total_amount),
+      currency,
+    };
+  }
 
   const handleCompleteOrder = () => {
     if (!currentSelected || !paymentMethod) return;
@@ -195,6 +226,7 @@ export default function CounterView() {
       alert(t("counter.alertDiscountReason"));
       return;
     }
+    if (currentSelected.__payPending) return; // button is disabled; belt & braces
 
     const completed: Order = {
       ...currentSelected,
@@ -213,6 +245,44 @@ export default function CounterView() {
       customer_id: needsInvoice ? invoiceId : null,
       customer_email: needsInvoice ? invoiceEmail : null,
     };
+
+    // A not-yet-synced local order (parked while offline): promote its
+    // existing outbox entry in place rather than queuing a second one —
+    // same client_uuid, so it's still exactly one eventual server order.
+    if (currentSelected.__local) {
+      const payment = buildOfflinePayment();
+      const clientCharge = toClientCharge(math, paymentMethod === "cash" ? tenderedAmount : null);
+      setIsQueueingPayment(true);
+      attachPayment(currentSelected.__local.entryId, payment, clientCharge, shift?.shift_id ?? null)
+        .then((updated) => {
+          if (!updated) {
+            alert(t("counter.alertFailedComplete"));
+            return;
+          }
+          resetCheckout();
+          setReceiptOrder(completed);
+          setReceiptProvisional({ offlineRef: updated.offlineRef });
+        })
+        .finally(() => setIsQueueingPayment(false));
+      return;
+    }
+
+    // A real server order, but there's no connection right now — queue
+    // the payment rather than blocking the sale.
+    if (conn === "offline") {
+      const payment = buildOfflinePayment();
+      const clientCharge = toClientCharge(math, paymentMethod === "cash" ? tenderedAmount : null);
+      const snapshot = buildSnapshotFromOrder(currentSelected);
+      setIsQueueingPayment(true);
+      enqueuePaymentForServerOrder(currentSelected.id, payment, clientCharge, snapshot, shift?.shift_id ?? null)
+        .then((entry) => {
+          resetCheckout();
+          setReceiptOrder(completed);
+          setReceiptProvisional({ offlineRef: entry.offlineRef });
+        })
+        .finally(() => setIsQueueingPayment(false));
+      return;
+    }
 
     completeOrderMut.mutate(
       {
@@ -241,15 +311,45 @@ export default function CounterView() {
         onSuccess: () => {
           resetCheckout();
           setReceiptOrder(completed);
+          setReceiptProvisional(null);
         },
-        onError: (err: unknown) =>
-          alert(err instanceof Error ? err.message : t("counter.alertFailedComplete")),
+        onError: (err: unknown) => {
+          // navigator.onLine said "online" but the request itself couldn't
+          // reach Supabase — queue the payment instead of losing it.
+          if (isNetworkError(err)) {
+            const payment = buildOfflinePayment();
+            const clientCharge = toClientCharge(math, paymentMethod === "cash" ? tenderedAmount : null);
+            const snapshot = buildSnapshotFromOrder(currentSelected);
+            setIsQueueingPayment(true);
+            enqueuePaymentForServerOrder(currentSelected.id, payment, clientCharge, snapshot, shift?.shift_id ?? null)
+              .then((entry) => {
+                resetCheckout();
+                setReceiptOrder(completed);
+                setReceiptProvisional({ offlineRef: entry.offlineRef });
+              })
+              .finally(() => setIsQueueingPayment(false));
+            return;
+          }
+          alert(err instanceof Error ? err.message : t("counter.alertFailedComplete"));
+        },
       }
     );
   };
 
   const handleVoidOrder = () => {
     if (!currentSelected) return;
+
+    // Nothing was ever sent for a purely local order — discard, don't void.
+    if (currentSelected.__local) {
+      if (!confirm(t("offline.confirmDiscardLocal"))) return;
+      discardLocalEntry(currentSelected.__local.entryId).then(() => resetCheckout());
+      return;
+    }
+    if (conn === "offline") {
+      alert(t("offline.needsConnection"));
+      return;
+    }
+
     if (!confirm(t("counter.confirmVoid", { id: currentSelected.id.slice(0, 8) }))) return;
     voidOrderMut.mutate(
       { orderId: currentSelected.id, reason: voidReason.trim() || null },
@@ -305,7 +405,11 @@ export default function CounterView() {
         <ReceiptView
           order={receiptOrder}
           settings={settings ?? null}
-          onClose={() => setReceiptOrder(null)}
+          onClose={() => {
+            setReceiptOrder(null);
+            setReceiptProvisional(null);
+          }}
+          provisional={receiptProvisional ?? undefined}
         />
       )}
 
@@ -327,6 +431,17 @@ export default function CounterView() {
               <span className={`w-2 h-2 rounded-full ${live ? "bg-green-500 animate-pulse" : "bg-expresso/30"}`} />
               {live ? t("counter.live") : "…"}
             </span>
+            {(pendingCount > 0 || failedCount > 0) && (
+              <span
+                className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                  failedCount > 0
+                    ? "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300"
+                    : "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+                }`}
+              >
+                {failedCount > 0 ? failedCount : pendingCount}
+              </span>
+            )}
           </h2>
           <button
             onClick={() => refetch()}
@@ -383,8 +498,28 @@ export default function CounterView() {
                   }`}
                 >
                   <div className="flex justify-between items-start mb-2">
-                    <span className="font-mono font-semibold text-sm text-expresso">
-                      {order.order_number ? `#${order.order_number}` : `${order.id.slice(0, 8)}…`}
+                    <span className="font-mono font-semibold text-sm text-expresso flex items-center gap-1.5">
+                      {order.__local
+                        ? order.__local.offlineRef
+                        : order.order_number
+                          ? `#${order.order_number}`
+                          : `${order.id.slice(0, 8)}…`}
+                      {order.__local && (
+                        <span
+                          className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wide ${
+                            order.__local.status === "failed"
+                              ? "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300"
+                              : "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+                          }`}
+                        >
+                          {order.__local.status === "failed" ? t("offline.stateFailed") : t("offline.statePending")}
+                        </span>
+                      )}
+                      {order.__payPending && (
+                        <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wide bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
+                          {t("offline.statePending")}
+                        </span>
+                      )}
                     </span>
                     <span className="text-sm font-bold text-expresso">
                       {formatMoney(Number(order.total_amount), currency)}
@@ -418,10 +553,20 @@ export default function CounterView() {
                 <div className="flex justify-between items-center mb-4">
                   <div>
                     <h2 className="text-xl font-bold text-expresso">
-                      {t("counter.order")} {currentSelected.order_number ? `#${currentSelected.order_number}` : `#${currentSelected.id.slice(0, 8)}`}
+                      {t("counter.order")}{" "}
+                      {currentSelected.__local
+                        ? currentSelected.__local.offlineRef
+                        : currentSelected.order_number
+                          ? `#${currentSelected.order_number}`
+                          : `#${currentSelected.id.slice(0, 8)}`}
                     </h2>
                     <p className="text-expresso/60 text-sm">
                       {currentSelected.table?.name ?? t("common.takeaway")} · {formatTime(currentSelected.created_at)}
+                      {currentSelected.__payPending && (
+                        <span className="ml-2 text-amber-700 dark:text-amber-400 font-medium">
+                          · {t("offline.statePending")}
+                        </span>
+                      )}
                     </p>
                   </div>
                   <div className="text-3xl font-black text-expresso">
@@ -760,18 +905,18 @@ export default function CounterView() {
                   size="lg"
                   variant="secondary"
                   onClick={handleVoidOrder}
-                  disabled={completeOrderMut.isPending}
+                  disabled={completeOrderMut.isPending || isQueueingPayment || (conn === "offline" && !currentSelected.__local)}
                   isLoading={voidOrderMut.isPending}
                   leftIcon={!voidOrderMut.isPending && <Ban className="w-5 h-5" />}
                   className="w-full sm:w-auto text-red-600 dark:text-red-400 border-red-200 dark:border-red-900/40 hover:bg-red-50 dark:hover:bg-red-950/30"
                 >
-                  {t("counter.void")}
+                  {currentSelected.__local ? t("offline.discardLocal") : t("counter.void")}
                 </Button>
                 <Button
                   size="lg"
                   onClick={handleCompleteOrder}
-                  disabled={!canCompleteCheckout || voidOrderMut.isPending}
-                  isLoading={completeOrderMut.isPending}
+                  disabled={!canCompleteCheckout || voidOrderMut.isPending || isQueueingPayment}
+                  isLoading={completeOrderMut.isPending || isQueueingPayment}
                   leftIcon={!completeOrderMut.isPending && <CheckCircle2 className="w-5 h-5" />}
                   className="flex-1 bg-coffee-fruit hover:bg-fruit-light text-white border-transparent"
                 >

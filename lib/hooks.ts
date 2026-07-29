@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/utils/supabase/client";
+import { kick as kickOfflineSync } from "./offline/sync";
 import {
   fetchCategories,
   fetchMenuItems,
@@ -11,6 +12,7 @@ import {
   fetchParkedOrders,
   fetchTodayAnalytics,
   fetchCompletedOrders,
+  fetchOfflineSyncFlags,
   fetchSalesSummary,
   currentBusinessDate,
   fetchShiftSummary,
@@ -80,6 +82,7 @@ export const queryKeys = {
   shiftSummary: (id: string) => ["shiftSummary", id] as const,
   recentShifts: ["recentShifts"] as const,
   businessDate: ["businessDate"] as const,
+  offlineSyncFlags: ["offlineSyncFlags"] as const,
 };
 
 // ─── Categories ────────────────────────────────────────────────────
@@ -159,6 +162,12 @@ export function useOrdersRealtime(): boolean {
 
   useEffect(() => {
     const supabase = createClient();
+    // A live websocket to Supabase is the best evidence available that the
+    // API is actually reachable — better than navigator.onLine, which
+    // lies constantly (captive portals, "connected, no internet"). Kick
+    // the offline outbox drain the moment this flips from disconnected to
+    // connected rather than waiting for the next polling interval.
+    let wasConnected = false;
     const channel = supabase
       .channel("orders-realtime")
       .on(
@@ -184,7 +193,14 @@ export function useOrdersRealtime(): boolean {
           qc.invalidateQueries({ queryKey: queryKeys.recentShifts });
         }
       )
-      .subscribe((status) => setConnected(status === "SUBSCRIBED"));
+      .subscribe((status) => {
+        const isConnected = status === "SUBSCRIBED";
+        setConnected(isConnected);
+        if (isConnected && !wasConnected) {
+          kickOfflineSync();
+        }
+        wasConnected = isConnected;
+      });
 
     return () => {
       supabase.removeChannel(channel);
@@ -282,6 +298,15 @@ export function useCompletedOrders(startDate?: string, endDate?: string) {
   return useQuery({
     queryKey: queryKeys.completedOrders(startDate, endDate),
     queryFn: () => fetchCompletedOrders(startDate, endDate),
+    staleTime: SHORT_CACHE,
+  });
+}
+
+/** Orders an offline sync flagged for review — see fetchOfflineSyncFlags. */
+export function useOfflineSyncFlags() {
+  return useQuery({
+    queryKey: queryKeys.offlineSyncFlags,
+    queryFn: () => fetchOfflineSyncFlags(),
     staleTime: SHORT_CACHE,
   });
 }

@@ -15,10 +15,14 @@ export function Receipt({
   order,
   settings,
   onClose,
+  provisional,
 }: {
   order: Order;
   settings: LocationSettings | null;
   onClose: () => void;
+  /** Set when this order hasn't actually reached the server yet — the sale
+   * happened (money in the drawer), but syncing it is still queued. */
+  provisional?: { offlineRef: string };
 }) {
   const t = useT();
   const currency = settings?.currency ?? "CRC";
@@ -61,7 +65,11 @@ export function Receipt({
           <div className="border-t border-dashed border-expresso/40 my-2" />
 
           <div className="flex justify-between">
-            <span>{t("receipt.order")} #{order.order_number ?? order.id.slice(0, 8)}</span>
+            <span>
+              {provisional
+                ? `${t("receipt.provisionalRef")}: ${provisional.offlineRef}`
+                : `${t("receipt.order")} #${order.order_number ?? order.id.slice(0, 8)}`}
+            </span>
             <span>{dateStr}</span>
           </div>
           <div>{order.table?.name ? `${t("receipt.table")}: ${order.table.name}` : t("receipt.takeaway")}</div>
@@ -149,6 +157,16 @@ export function Receipt({
                 <Row label={t("receipt.invoiceName")} value={order.customer_name} />
                 {order.customer_id && <Row label={t("receipt.invoiceCedula")} value={order.customer_id} />}
                 {order.customer_email && <Row label={t("receipt.invoiceEmail")} value={order.customer_email} />}
+              </div>
+            </>
+          )}
+
+          {provisional && (
+            <>
+              <div className="border-t border-dashed border-expresso/40 my-2" />
+              <div className="border border-expresso/60 rounded p-2 text-center text-[11px] font-bold leading-snug">
+                {t("receipt.provisionalTitle")}
+                <div className="font-normal mt-0.5">{t("receipt.provisionalBody")}</div>
               </div>
             </>
           )}

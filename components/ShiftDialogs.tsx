@@ -10,6 +10,8 @@ import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
 import { DenominationCounter, denominationTotal } from "@/components/DenominationCounter";
 import { useT } from "@/lib/i18n/LanguageContext";
+import { useOutbox } from "@/lib/offline/useOutbox";
+import { SyncQueueDialog } from "@/components/SyncQueueDialog";
 
 /**
  * Opening and closing a shift is a floor-staff action, not an admin one —
@@ -105,6 +107,14 @@ export function CloseShiftDialog({
   const closeMut = useCloseShift();
   const [breakdown, setBreakdown] = useState<CountedBreakdown>({});
   const [closingNote, setClosingNote] = useState("");
+  const [showQueue, setShowQueue] = useState(false);
+  // close_shift computes the Z-report from what the SERVER already knows —
+  // it has no idea a device still has unsent sales in its own outbox. This
+  // guard lives here (not at the counter/admin call sites) so every path
+  // to this dialog inherits it: closing early would understate the
+  // drawer's expected cash by exactly what's still queued.
+  const { pendingCount, failedCount } = useOutbox();
+  const blockedByOutbox = pendingCount + failedCount;
 
   const countedTotal = denominationTotal(breakdown);
   const balanced = countedTotal === shift.expected_cash;
@@ -123,6 +133,18 @@ export function CloseShiftDialog({
   return (
     <ShiftModal onClose={onClose} title={t("cash.closeShiftTitle")} wide>
       <div className="space-y-5">
+        {blockedByOutbox > 0 && (
+          <div className="p-4 rounded-xl border border-red-200 dark:border-red-900/40 bg-red-50 dark:bg-red-950/30 space-y-3">
+            <p className="flex items-start gap-2 text-sm font-medium text-red-800 dark:text-red-300">
+              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+              {t("cash.cannotCloseWithPending", { n: blockedByOutbox })}
+            </p>
+            <Button size="sm" variant="secondary" onClick={() => setShowQueue(true)}>
+              {t("cash.viewPendingOrders")}
+            </Button>
+          </div>
+        )}
+        {showQueue && <SyncQueueDialog onClose={() => setShowQueue(false)} />}
         <p className="text-sm text-expresso/60">{t("cash.countTheDrawer")}</p>
         <DenominationCounter breakdown={breakdown} onChange={setBreakdown} />
 
@@ -172,6 +194,7 @@ export function CloseShiftDialog({
           size="lg"
           className="w-full bg-coffee-fruit hover:bg-fruit-light text-white border-transparent"
           isLoading={closeMut.isPending}
+          disabled={blockedByOutbox > 0}
           onClick={handleCloseShift}
         >
           {t("cash.closeShiftButton")}

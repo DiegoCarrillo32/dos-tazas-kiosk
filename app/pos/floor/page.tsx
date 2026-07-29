@@ -14,10 +14,14 @@ import {
   useLocationSettings,
   useAllModifiers,
   useMenuItemModifierMap,
+  useCurrentShift,
 } from "@/lib/hooks";
 import { formatMoney } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 import { useT } from "@/lib/i18n/LanguageContext";
+import { useConnectionStatus } from "@/lib/offline/useConnectionStatus";
+import { enqueuePark } from "@/lib/offline/outbox";
+import { isNetworkError } from "@/lib/offline/sync";
 
 const generateCartId = () => Math.random().toString(36).substring(2, 11);
 
@@ -169,6 +173,8 @@ export default function FloorView() {
   }, [allModifiers, modifierMap]);
   const createOrderMut = useCreateOrder();
   const appendOrderMut = useAppendToOrder();
+  const { data: shift } = useCurrentShift();
+  const conn = useConnectionStatus();
   useOrdersRealtime();
 
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
@@ -257,11 +263,34 @@ export default function FloorView() {
     setOrderItems((items) => items.filter((item) => item.cartId !== cartId));
   };
 
-  const isSending = createOrderMut.isPending || appendOrderMut.isPending;
+  const [isQueueing, setIsQueueing] = useState(false);
+  const isSending = createOrderMut.isPending || appendOrderMut.isPending || isQueueing;
+
+  const queueCart = async () => {
+    setIsQueueing(true);
+    try {
+      await enqueuePark(
+        { cartItems: orderItems, tableId: selectedTableId, tableName: selectedTableName, currency },
+        shift?.shift_id ?? null
+      );
+      setOrderItems([]);
+      setIsOrderExpanded(false);
+    } finally {
+      setIsQueueing(false);
+    }
+  };
 
   const handleSend = () => {
     if (orderItems.length === 0) return;
+
     if (openTab) {
+      // No offline path exists for adding to an already-parked tab — the
+      // sync RPCs only ever create a new order, never append to one — so
+      // this stays online-only rather than silently dropping the add.
+      if (conn === "offline") {
+        alert(t("floor.appendNeedsConnection"));
+        return;
+      }
       appendOrderMut.mutate(
         { orderId: openTab.id, cartItems: orderItems },
         {
@@ -272,18 +301,33 @@ export default function FloorView() {
           onError: () => alert(t("floor.failedToAddToTab")),
         }
       );
-    } else {
-      createOrderMut.mutate(
-        { cartItems: orderItems, tableId: selectedTableId },
-        {
-          onSuccess: () => {
-            setOrderItems([]);
-            setIsOrderExpanded(false);
-          },
-          onError: () => alert(t("floor.failedToSendOrder")),
-        }
-      );
+      return;
     }
+
+    if (conn === "offline") {
+      void queueCart();
+      return;
+    }
+
+    createOrderMut.mutate(
+      { cartItems: orderItems, tableId: selectedTableId },
+      {
+        onSuccess: () => {
+          setOrderItems([]);
+          setIsOrderExpanded(false);
+        },
+        onError: (err) => {
+          // navigator.onLine said "online" but the request itself
+          // couldn't reach Supabase (flaky wifi, captive portal) — queue
+          // it rather than showing an error and losing the cart.
+          if (isNetworkError(err)) {
+            void queueCart();
+          } else {
+            alert(t("floor.failedToSendOrder"));
+          }
+        },
+      }
+    );
   };
 
   if (isLoading) {

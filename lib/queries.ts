@@ -20,25 +20,88 @@ import type {
 
 // ─── Helpers ───────────────────────────────────────────────────────
 
+// Memoized rather than constructed per call: createClient() sets up its own
+// auth-refresh timer, so calling this at every query call site (as before)
+// spawned one per site. One client per tab is what @supabase/ssr expects.
+let _client: ReturnType<typeof createClient> | null = null;
 function supabase() {
-  return createClient();
+  return (_client ??= createClient());
 }
 
+const PROFILE_CACHE_KEY = "dostazas.cachedProfile";
+
+function readCachedProfile(): UserProfile | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(PROFILE_CACHE_KEY);
+    return raw ? (JSON.parse(raw) as UserProfile) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedProfile(profile: UserProfile) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(profile));
+  } catch {
+    // Storage full or unavailable — the cache is a convenience, not a
+    // requirement, so just skip it rather than fail the caller.
+  }
+}
+
+let profileMemo: UserProfile | null = null;
+
+/**
+ * `auth.getUser()` and the profile select are both network calls, so both
+ * fail offline even when the caller already has everything they need
+ * cached. Fall back to `getSession()` (a cookie read, no network) to
+ * confirm there's still a logged-in user, then to a locally cached
+ * profile — but only if it belongs to THAT same session's user, so a
+ * device that switched accounts never serves the previous person's
+ * location.
+ */
 export async function getCurrentProfile(): Promise<UserProfile | null> {
-  const {
-    data: { user },
-  } = await supabase().auth.getUser();
-  if (!user) return null;
+  if (profileMemo) return profileMemo;
 
-  const { data } = await supabase()
-    .from("user_profiles")
-    .select("*")
-    .eq("id", user.id)
-    .single();
-  return data as UserProfile | null;
+  try {
+    const {
+      data: { user },
+    } = await supabase().auth.getUser();
+    if (user) {
+      const { data } = await supabase()
+        .from("user_profiles")
+        .select("*")
+        .eq("id", user.id)
+        .single();
+      if (data) {
+        profileMemo = data as UserProfile;
+        writeCachedProfile(profileMemo);
+        return profileMemo;
+      }
+    }
+  } catch {
+    // Offline or Supabase unreachable — fall through to the cached profile.
+  }
+
+  try {
+    const {
+      data: { session },
+    } = await supabase().auth.getSession();
+    const cached = readCachedProfile();
+    if (session && cached && cached.id === session.user.id) {
+      profileMemo = cached;
+      return profileMemo;
+    }
+  } catch {
+    // getSession() is a local cookie read and shouldn't throw, but if the
+    // client itself can't be reached, there's nothing left to try.
+  }
+
+  return null;
 }
 
-async function getLocationId(): Promise<string> {
+export async function getLocationId(): Promise<string> {
   const profile = await getCurrentProfile();
   if (!profile) throw new Error("Not authenticated");
   return profile.location_id;
@@ -320,7 +383,7 @@ export async function setMenuItemModifiers(
 
 // ─── Orders ────────────────────────────────────────────────────────
 
-function cartItemsToRpcItems(cartItems: CartItem[]) {
+export function cartItemsToRpcItems(cartItems: CartItem[]) {
   // The client only sends item/quantity/option IDs — never prices — so
   // server-side pricing cannot be tampered with.
   return cartItems.map((item) => ({
@@ -433,6 +496,100 @@ export async function refundOrder(
   });
   if (error) throw error;
 }
+
+/**
+ * Replay an order that was built and/or paid entirely offline
+ * (`supabase/migrations/00019_offline_sync.sql`, `sync_offline_order`).
+ * `p_client_uuid` is the idempotency key: calling this twice with the same
+ * value is a clean no-op — `replayed: true` and the original result, never
+ * a duplicate order. `null` payment parks only; a payment attached prices
+ * and charges in the same call.
+ */
+export async function syncOfflineOrder(params: {
+  clientUuid: string;
+  items: ReturnType<typeof cartItemsToRpcItems>;
+  offlineRef: string | null;
+  deviceId: string;
+  tableId: string | null;
+  clientAgeSeconds: number;
+  expectedShiftId: string | null;
+  payment: SyncPaymentPayload | null;
+  clientCharge: unknown;
+}): Promise<SyncRpcResult> {
+  const { data, error } = await supabase().rpc("sync_offline_order", {
+    p_client_uuid: params.clientUuid,
+    p_items: params.items,
+    p_offline_ref: params.offlineRef,
+    p_device_id: params.deviceId,
+    p_table_id: params.tableId,
+    p_client_age_seconds: params.clientAgeSeconds,
+    p_expected_shift_id: params.expectedShiftId,
+    p_payment: params.payment,
+    p_client_charge: params.clientCharge,
+  });
+  if (error) throw error;
+  return data as SyncRpcResult;
+}
+
+/**
+ * Replay a payment for an order that was created ONLINE but paid during an
+ * outage (`sync_offline_payment`). Idempotency reuses `orders.client_uuid`
+ * — null on an online-created order, so setting it here is free. If a
+ * second device already paid the same order offline, this returns a
+ * `conflict: "already_paid"` response rather than double-charging or
+ * raising — see the migration header for why that's loud, not silent.
+ */
+export async function syncOfflinePayment(params: {
+  orderId: string;
+  clientUuid: string;
+  clientAgeSeconds: number;
+  expectedShiftId: string | null;
+  payment: SyncPaymentPayload;
+  clientCharge: unknown;
+}): Promise<SyncRpcResult | SyncRpcConflict> {
+  const { data, error } = await supabase().rpc("sync_offline_payment", {
+    p_order_id: params.orderId,
+    p_client_uuid: params.clientUuid,
+    p_client_age_seconds: params.clientAgeSeconds,
+    p_expected_shift_id: params.expectedShiftId,
+    p_payment: params.payment,
+    p_client_charge: params.clientCharge,
+  });
+  if (error) throw error;
+  return data as SyncRpcResult | SyncRpcConflict;
+}
+
+export type SyncPaymentPayload = {
+  payment_method: PaymentMethod;
+  payment_reference: string | null;
+  tip_amount: number;
+  amount_tendered: number | null;
+  customer_name: string | null;
+  customer_id: string | null;
+  customer_email: string | null;
+  discount_type: DiscountType | null;
+  discount_value: number;
+  discount_reason: string | null;
+};
+
+export type SyncRpcResult = {
+  order_id: string;
+  order_number: number | null;
+  status: "parked" | "completed";
+  replayed: boolean;
+  total_amount: number;
+  server_total_amount: number | null;
+  discrepancy: number;
+  warnings: unknown[];
+};
+
+export type SyncRpcConflict = {
+  conflict: "already_paid" | "not_parked";
+  order_id: string;
+  order_number?: number | null;
+  paid_total?: number;
+  status?: string;
+};
 
 // ─── Analytics & History ───────────────────────────────────────────
 
@@ -547,6 +704,37 @@ export async function fetchCompletedOrders(
   const { data, error } = await query;
   if (error) throw error;
   return (data ?? []) as Order[];
+}
+
+/**
+ * Orders an offline sync flagged for a human: the till charged something
+ * different from what server-authoritative pricing said (sync_discrepancy),
+ * or a guard was downgraded to a warning instead of blocking the sale
+ * (sync_warnings) — a sold-out item, a stock guard, a missing discount
+ * reason. Without this view the entire flagging apparatus in
+ * 00019_offline_sync.sql writes to a table nobody reads.
+ */
+export async function fetchOfflineSyncFlags(limit = 200): Promise<Order[]> {
+  const locationId = await getLocationId();
+  // sync_discrepancy/sync_warnings comparisons on a jsonb column don't
+  // round-trip cleanly through PostgREST's .or() filter string, and the
+  // volume here is inherently small (only ever synced offline orders), so
+  // filtering client-side after a bounded, most-recent-first fetch is the
+  // more robust choice over a fragile filter string.
+  const { data, error } = await supabase()
+    .from("orders")
+    .select(
+      "*, table:tables(name), order_items(*, menu_item:menu_items(name), modifiers:order_item_modifiers(*))"
+    )
+    .eq("location_id", locationId)
+    .not("synced_at", "is", null)
+    .order("synced_at", { ascending: false })
+    .limit(limit);
+
+  if (error) throw error;
+  return ((data ?? []) as Order[]).filter(
+    (o) => Number(o.sync_discrepancy ?? 0) !== 0 || (o.sync_warnings?.length ?? 0) > 0
+  );
 }
 
 // ─── CSV Export ────────────────────────────────────────────────────
@@ -862,9 +1050,13 @@ export async function fetchRecentShifts(limit = 30): Promise<ShiftListItem[]> {
   return (data ?? []) as ShiftListItem[];
 }
 
-export async function openShift(openingFloat: number): Promise<string> {
+export async function openShift(
+  openingFloat: number,
+  clientUuid?: string | null
+): Promise<string> {
   const { data, error } = await supabase().rpc("open_shift", {
     p_opening_float: openingFloat,
+    p_client_uuid: clientUuid ?? null,
   });
   if (error) throw error;
   return data as string;

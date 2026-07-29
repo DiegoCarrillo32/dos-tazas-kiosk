@@ -1,12 +1,18 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { Coffee, MonitorPlay, LogOut, UserCircle } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { LanguageToggle } from "@/components/ui/LanguageToggle";
 import { useT } from "@/lib/i18n/LanguageContext";
+import { initSyncEngine } from "@/lib/offline/sync";
+import { useOutbox } from "@/lib/offline/useOutbox";
+import { OfflineBanner } from "@/components/OfflineBanner";
+import ServiceWorkerRegistrar, { clearOfflineShell } from "@/components/ServiceWorkerRegistrar";
 
 export default function POSNav({
   children,
@@ -19,14 +25,44 @@ export default function POSNav({
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
+  const qc = useQueryClient();
+  const { pendingCount, failedCount } = useOutbox();
+
+  useEffect(() => {
+    initSyncEngine(qc);
+  }, [qc]);
 
   const handleLogout = async () => {
+    // Signing out drops the session the queued RPC calls need to
+    // authenticate as — a queued sale would never be able to sync again.
+    // The outbox itself isn't cleared (IndexedDB survives signOut), so
+    // this is a hard block, not a warning: there's no safe way to proceed.
+    const stillPending = pendingCount + failedCount;
+    if (stillPending > 0) {
+      alert(t("offline.cannotLogoutPending", { n: stillPending }));
+      return;
+    }
     await supabase.auth.signOut();
+    clearOfflineShell();
     router.push("/login");
   };
 
+  const badgeCount = failedCount > 0 ? failedCount : pendingCount;
+  const pendingBadge = badgeCount > 0 && (
+    <span
+      className={`inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full text-[10px] font-bold ${
+        failedCount > 0
+          ? "bg-red-500 text-white"
+          : "bg-amber-500 text-white"
+      }`}
+    >
+      {badgeCount}
+    </span>
+  );
+
   return (
     <div className="flex flex-col h-screen bg-background overflow-hidden">
+      <ServiceWorkerRegistrar />
       {/* Top Navigation Bar */}
       <header className="h-16 flex items-center justify-between px-4 sm:px-6 bg-card border-b border-warm-roast/10 shrink-0 shadow-sm z-10">
         <div className="flex items-center gap-2">
@@ -61,6 +97,7 @@ export default function POSNav({
           >
             <MonitorPlay className="w-4 h-4" />
             {t("nav.counterView")}
+            {pendingBadge}
           </Link>
         </div>
 
@@ -88,6 +125,8 @@ export default function POSNav({
         </div>
       </header>
 
+      <OfflineBanner />
+
       {/* Main Content Area */}
       <main className="flex-1 overflow-hidden relative">
         {children}
@@ -106,11 +145,22 @@ export default function POSNav({
         </Link>
         <Link
           href="/pos/counter"
-          className={`flex flex-col items-center justify-center w-full h-full gap-1 transition-colors ${
+          className={`relative flex flex-col items-center justify-center w-full h-full gap-1 transition-colors ${
             pathname === "/pos/counter" ? "text-expresso" : "text-expresso/60"
           }`}
         >
-          <MonitorPlay className="w-5 h-5" />
+          <span className="relative">
+            <MonitorPlay className="w-5 h-5" />
+            {badgeCount > 0 && (
+              <span
+                className={`absolute -top-1 -right-1.5 inline-flex items-center justify-center min-w-[14px] h-3.5 px-0.5 rounded-full text-[9px] font-bold ${
+                  failedCount > 0 ? "bg-red-500 text-white" : "bg-amber-500 text-white"
+                }`}
+              >
+                {badgeCount}
+              </span>
+            )}
+          </span>
           <span className="text-xs font-medium">{t("nav.counter")}</span>
         </Link>
         {isAdmin && (

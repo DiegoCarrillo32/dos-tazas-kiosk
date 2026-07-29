@@ -4,7 +4,13 @@ import { useState } from "react";
 import { format, subDays } from "date-fns";
 import { Search, Eye, Loader2, X, Printer, RotateCcw } from "lucide-react";
 import type { Order, OrderItem } from "@/lib/types";
-import { useCompletedOrders, useLocationSettings, useCurrentProfile, useRefundOrder } from "@/lib/hooks";
+import {
+  useCompletedOrders,
+  useLocationSettings,
+  useCurrentProfile,
+  useRefundOrder,
+  useOfflineSyncFlags,
+} from "@/lib/hooks";
 import { Button } from "@/components/ui/Button";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { Receipt } from "@/components/Receipt";
@@ -19,6 +25,7 @@ export default function TransactionHistory() {
   const endStr = endDate ? format(endDate, "yyyy-MM-dd") : undefined;
 
   const { data: history = [], isLoading } = useCompletedOrders(startStr, endStr);
+  const { data: syncFlags = [] } = useOfflineSyncFlags();
   const { data: settings } = useLocationSettings();
   const { data: currentUser } = useCurrentProfile();
   const isAdmin = currentUser?.role === "admin";
@@ -58,6 +65,44 @@ export default function TransactionHistory() {
         <h1 className="text-2xl font-bold text-expresso">{t("history.title")}</h1>
         <p className="text-expresso/60 mt-1">{t("history.subtitle")}</p>
       </div>
+
+      {syncFlags.length > 0 && (
+        <div className="bg-card rounded-2xl border border-amber-200 dark:border-amber-900/40 overflow-hidden shadow-sm">
+          <div className="px-6 py-4 border-b border-amber-200 dark:border-amber-900/40 bg-amber-50 dark:bg-amber-950/30">
+            <h2 className="font-bold text-expresso">{t("history.offlineSyncTitle")}</h2>
+            <p className="text-sm text-expresso/60 mt-0.5">{t("history.offlineSyncSubtitle")}</p>
+          </div>
+          <div className="divide-y divide-warm-roast/10">
+            {syncFlags.map((order) => {
+              const discrepancy = Number(order.sync_discrepancy ?? 0);
+              const warningCount = order.sync_warnings?.length ?? 0;
+              return (
+                <button
+                  key={order.id}
+                  onClick={() => setSelectedOrder(order)}
+                  className="w-full text-left px-6 py-3 flex items-center justify-between gap-4 hover:bg-warm-roast/5 transition-colors"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className="font-mono font-semibold text-sm text-expresso shrink-0">
+                      {order.order_number ? `#${order.order_number}` : order.offline_ref}
+                    </span>
+                    <span className="text-sm text-expresso/60 truncate">
+                      {discrepancy !== 0 &&
+                        t("history.offlineSyncDiscrepancy", {
+                          charged: formatMoney(order.total_amount, "CRC"),
+                          server: formatMoney(order.server_total_amount ?? order.total_amount, "CRC"),
+                        })}
+                      {discrepancy !== 0 && warningCount > 0 && " · "}
+                      {warningCount > 0 && t("history.offlineSyncWarnings", { n: warningCount })}
+                    </span>
+                  </div>
+                  <span className="text-xs text-expresso/40 shrink-0">{formatDate(order.created_at)}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-col sm:flex-row gap-4 mb-6">
         <div className="relative flex-1">

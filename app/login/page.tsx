@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
+import { Eye, EyeOff } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
@@ -18,6 +19,7 @@ export default function LoginPage() {
   const t = useT();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
   const supabase = createClient();
 
@@ -73,9 +75,23 @@ export default function LoginPage() {
             <Label htmlFor="password">{t("login.password")}</Label>
             <Input
               id="password"
-              type="password"
+              type={showPassword ? "text" : "password"}
               {...register("password", { required: t("login.passwordRequired") })}
               error={errors.password?.message}
+              rightElement={
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  aria-label={showPassword ? t("login.hidePassword") : t("login.showPassword")}
+                  className="flex h-9 w-9 items-center justify-center rounded-md text-expresso/40 hover:text-expresso/70 focus:outline-none focus:ring-2 focus:ring-coffee-fruit/30"
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </button>
+              }
             />
           </div>
 

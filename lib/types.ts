@@ -233,6 +233,20 @@ export type Order = {
   customer_email: string | null;
   created_at: string;
   updated_at: string;
+  // Offline sync (supabase/migrations/00019_offline_sync.sql)
+  /** Idempotency key set by sync_offline_order/sync_offline_payment; null for an order created online. */
+  client_uuid?: string | null;
+  device_id?: string | null;
+  /** The "OFF-A7F3" printed on the provisional receipt, kept for matching after sync. */
+  offline_ref?: string | null;
+  /** When the sale actually happened, per the client's reported age — not when this row was written. */
+  occurred_at?: string | null;
+  synced_at?: string | null;
+  /** What server-authoritative pricing said the order should have totalled; total_amount holds what was actually charged. */
+  server_total_amount?: number | null;
+  client_charge?: Record<string, unknown> | null;
+  sync_discrepancy?: number | null;
+  sync_warnings?: unknown[] | null;
   // Joined data
   order_items?: OrderItem[];
   table?: { name: string } | null;

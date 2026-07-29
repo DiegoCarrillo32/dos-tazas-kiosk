@@ -1,6 +1,6 @@
 "use client";
 
-import { ShiftModal } from "@/components/ShiftDialogs";
+import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { useOutbox } from "@/lib/offline/useOutbox";
 import type { OutboxEntry } from "@/lib/offline/types";
@@ -11,7 +11,7 @@ import { RefreshCw } from "lucide-react";
 /**
  * The queue panel for orders taken offline — what's still pending, what
  * synced (and as which real order number, so it can be matched against
- * paper), and what failed and needs a human. Reuses ShiftModal, the same
+ * paper), and what failed and needs a human. Reuses Modal, the same
  * primitive the shift open/close dialogs use.
  */
 export function SyncQueueDialog({ onClose }: { onClose: () => void }) {
@@ -23,7 +23,7 @@ export function SyncQueueDialog({ onClose }: { onClose: () => void }) {
   const sorted = [...entries].sort((a, b) => b.seq - a.seq);
 
   return (
-    <ShiftModal onClose={onClose} title={t("offline.queueTitle")} wide>
+    <Modal onClose={onClose} title={t("offline.queueTitle")} size="lg">
       <div className="space-y-3">
         {sorted.length === 0 ? (
           <p className="text-sm text-expresso/60 text-center py-6">{t("offline.queueEmpty")}</p>
@@ -47,7 +47,7 @@ export function SyncQueueDialog({ onClose }: { onClose: () => void }) {
           {t("offline.retryAll")}
         </Button>
       </div>
-    </ShiftModal>
+    </Modal>
   );
 }
 

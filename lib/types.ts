@@ -1,75 +1,47 @@
-// Database types matching supabase/migrations/00001_initial_schema.sql
+// App-level types layered on the generated database schema
+// (lib/database.types.ts, regenerated from the live project — see its
+// header). Table-backed types below are DERIVED from that schema, not
+// hand-duplicated: a column renamed or dropped in a migration becomes a
+// compile error here instead of a silent runtime mismatch. RPC return
+// shapes (ShiftSummary, SalesSummary, ...) and client-only shapes
+// (CartItem, ...) further down have no table to derive from and stay
+// hand-written.
 
-export type Location = {
-  id: string;
-  name: string;
-  address: string | null;
-  created_at: string;
-  updated_at: string;
-};
+import type { Tables } from "./database.types";
 
-export type UserProfile = {
-  id: string;
-  location_id: string;
+export type Location = Tables<"locations">;
+
+export type UserProfile = Omit<Tables<"user_profiles">, "role"> & {
   role: "admin" | "staff";
-  first_name: string | null;
-  last_name: string | null;
-  created_at: string;
-  updated_at: string;
 };
 
-export type Category = {
-  id: string;
-  location_id: string;
-  name: string;
+/**
+ * `sort_order` is nullable in the schema (a bare column default, not a
+ * NOT NULL constraint) but every write path here always supplies a
+ * number — narrowed back to `number` so callers don't need to guard a
+ * case that doesn't happen in practice.
+ */
+export type Category = Omit<Tables<"categories">, "sort_order"> & {
   sort_order: number;
-  created_at: string;
 };
 
-export type MenuItem = {
-  id: string;
-  location_id: string;
-  category_id: string | null;
-  name: string;
-  description: string | null;
-  price: number;
+export type MenuItem = Omit<Tables<"menu_items">, "available_quantity"> & {
+  /** Same nullable-in-schema, always-populated-in-practice case as Category.sort_order. */
   available_quantity: number;
-  is_active: boolean;
-  track_inventory: boolean;
-  low_stock_threshold: number;
-  is_available: boolean;
-  created_at: string;
-  updated_at: string;
   // Joined data
   category?: Category;
 };
 
-export type Modifier = {
-  id: string;
-  location_id: string;
-  name: string;
-  is_multiple: boolean;
-  is_required: boolean;
-  created_at: string;
+export type Modifier = Tables<"modifiers"> & {
   // Joined data
   options?: ModifierOption[];
 };
 
-export type ModifierOption = {
-  id: string;
-  modifier_id: string;
-  name: string;
-  extra_price: number;
-  created_at: string;
-};
+export type ModifierOption = Tables<"modifier_options">;
 
-export type Table = {
-  id: string;
-  location_id: string;
-  name: string;
+export type Table = Omit<Tables<"tables">, "sort_order"> & {
+  /** Same nullable-in-schema, always-populated-in-practice case as Category.sort_order. */
   sort_order: number;
-  created_at: string;
-  updated_at: string;
 };
 
 export type OrderStatus =
@@ -87,21 +59,7 @@ export type PaymentMethod = "card" | "cash" | "sinpe";
  */
 export type DiscountType = "percent" | "amount";
 
-export type LocationSettings = {
-  location_id: string;
-  currency: string;
-  tax_rate: number;
-  prices_include_tax: boolean;
-  tip_enabled: boolean;
-  timezone: string;
-  business_legal_name: string | null;
-  tax_id: string | null;
-  address: string | null;
-  phone: string | null;
-  receipt_footer: string | null;
-  created_at: string;
-  updated_at: string;
-};
+export type LocationSettings = Tables<"location_settings">;
 
 // ─── Shifts & cash drawer ──────────────────────────────────────────
 
@@ -201,80 +159,47 @@ export type SalesSummary = {
   top_items: { name: string; quantity: number; revenue: number }[];
 };
 
-export type Order = {
-  id: string;
-  location_id: string;
-  user_id: string | null;
+/**
+ * `shift_id`: set by complete_order at payment time — the shift whose
+ * drawer took the money.
+ *
+ * `discount_amount`: money taken off at checkout, tax included.
+ * `subtotal`/`tax_amount` are already net of it (complete_order re-splits
+ * the discounted gross), so this is a record of what was given away, not
+ * a term to subtract: total_amount = subtotal + tax_amount + tip_amount.
+ *
+ * `discount_reason`: required whenever discount_amount > 0 — enforced by
+ * complete_order.
+ *
+ * Offline-sync columns (supabase/migrations/00019_offline_sync.sql):
+ * `client_uuid` is the idempotency key set by sync_offline_order /
+ * sync_offline_payment (null for an order created online); `offline_ref`
+ * is the "OFF-A7F3" printed on the provisional receipt, kept for matching
+ * after sync; `occurred_at` is when the sale actually happened per the
+ * client's reported age, NOT when this row was written; `client_charge`
+ * and `sync_warnings` are typed loosely (jsonb in the schema) since
+ * nothing live reads their shape beyond length/presence checks.
+ */
+export type Order = Omit<
+  Tables<"orders">,
+  "status" | "payment_method" | "client_charge" | "sync_warnings"
+> & {
   status: OrderStatus;
-  table_id: string | null;
-  /** Set by complete_order at payment time — the shift whose drawer took the money. */
-  shift_id: string | null;
-  order_number: number | null;
-  subtotal: number;
-  tax_amount: number;
-  tax_rate: number;
-  /**
-   * Money taken off at checkout, tax included. `subtotal` and `tax_amount`
-   * are already net of it (complete_order re-splits the discounted gross),
-   * so this is a record of what was given away, not a term to subtract:
-   * total_amount = subtotal + tax_amount + tip_amount.
-   */
-  discount_amount: number;
-  /** Required whenever discount_amount > 0 — enforced by complete_order. */
-  discount_reason: string | null;
-  tip_amount: number;
-  total_amount: number;
-  amount_tendered: number | null;
-  change_due: number | null;
   payment_method: PaymentMethod | null;
-  payment_reference: string | null;
-  customer_name: string | null;
-  customer_id: string | null;
-  customer_email: string | null;
-  created_at: string;
-  updated_at: string;
-  // Offline sync (supabase/migrations/00019_offline_sync.sql)
-  /** Idempotency key set by sync_offline_order/sync_offline_payment; null for an order created online. */
-  client_uuid?: string | null;
-  device_id?: string | null;
-  /** The "OFF-A7F3" printed on the provisional receipt, kept for matching after sync. */
-  offline_ref?: string | null;
-  /** When the sale actually happened, per the client's reported age — not when this row was written. */
-  occurred_at?: string | null;
-  synced_at?: string | null;
-  /** What server-authoritative pricing said the order should have totalled; total_amount holds what was actually charged. */
-  server_total_amount?: number | null;
   client_charge?: Record<string, unknown> | null;
-  sync_discrepancy?: number | null;
   sync_warnings?: unknown[] | null;
   // Joined data
   order_items?: OrderItem[];
   table?: { name: string } | null;
 };
 
-export type OrderItem = {
-  id: string;
-  order_id: string;
-  menu_item_id: string;
-  quantity: number;
-  unit_price: number;
-  total_price: number;
-  tax_amount: number;
-  notes: string | null;
-  created_at: string;
+export type OrderItem = Tables<"order_items"> & {
   // Joined data
   menu_item?: MenuItem;
   modifiers?: OrderItemModifier[];
 };
 
-export type OrderItemModifier = {
-  id: string;
-  order_item_id: string;
-  modifier_option_id: string;
-  name: string;
-  extra_price: number;
-  created_at: string;
-};
+export type OrderItemModifier = Tables<"order_item_modifiers">;
 
 // Client-side cart types (not stored in DB directly)
 export type CartItem = {

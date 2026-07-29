@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Label } from "@/components/ui/Label";
 import { Checkbox } from "@/components/ui/Checkbox";
+import { useToast } from "@/components/ui/Feedback";
 import type { UserProfile, LocationSettings } from "@/lib/types";
 import { useT } from "@/lib/i18n/LanguageContext";
 
@@ -27,6 +28,7 @@ function SettingsForm({
   onLogout: () => void;
 }) {
   const t = useT();
+  const toast = useToast();
   const updateProfileMut = useUpdateOwnProfile();
   const { data: bizSettings, isLoading: settingsLoading } = useLocationSettings();
   const [firstName, setFirstName] = useState(profile.first_name ?? "");
@@ -35,7 +37,7 @@ function SettingsForm({
   const handleSave = () => {
     updateProfileMut.mutate(
       { first_name: firstName.trim(), last_name: lastName.trim() },
-      { onSuccess: () => alert(t("settings.profileUpdated")) }
+      { onSuccess: () => toast(t("settings.profileUpdated"), "success") }
     );
   };
 
@@ -129,6 +131,7 @@ function SettingsForm({
 
 function BusinessSettingsForm({ settings }: { settings: LocationSettings | null }) {
   const t = useT();
+  const toast = useToast();
   const updateMut = useUpdateLocationSettings();
   const [legalName, setLegalName] = useState(settings?.business_legal_name ?? "");
   const [taxId, setTaxId] = useState(settings?.tax_id ?? "");
@@ -158,7 +161,7 @@ function BusinessSettingsForm({ settings }: { settings: LocationSettings | null 
         tip_enabled: tipEnabled,
         receipt_footer: receiptFooter.trim() || null,
       },
-      { onSuccess: () => alert(t("settings.businessSaved")) }
+      { onSuccess: () => toast(t("settings.businessSaved"), "success") }
     );
   };
 

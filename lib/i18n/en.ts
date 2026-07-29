@@ -2,6 +2,7 @@ export const en = {
   common: {
     save: "Save",
     cancel: "Cancel",
+    confirm: "Confirm",
     delete: "Delete",
     edit: "Edit",
     close: "Close",
@@ -116,6 +117,7 @@ export const en = {
     voidReasonPlaceholder: "e.g. customer walked away, order entry mistake",
     noShiftWarning: "No shift is open — open one to take cash payments.",
     openShiftCta: "Open Shift",
+    shiftOpeningQueued: "Shift opening is queued — it'll sync once you're back online. You can keep selling.",
     shiftExpectedCash: "Expected cash",
   },
   admin: {

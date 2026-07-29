@@ -11,16 +11,19 @@ import {
   useCreateModifierOption,
   useDeleteModifierOption,
 } from "@/lib/hooks";
-import { createClient } from "@/utils/supabase/client";
+import { getLocationId } from "@/lib/queries";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Label } from "@/components/ui/Label";
 import { Checkbox } from "@/components/ui/Checkbox";
+import { Modal } from "@/components/ui/Modal";
+import { useConfirm } from "@/components/ui/Feedback";
 import { formatMoney } from "@/lib/utils";
 import { useT } from "@/lib/i18n/LanguageContext";
 
 export default function ModifiersManagement() {
   const t = useT();
+  const confirmDialog = useConfirm();
   const { data: modifiers = [], isLoading } = useAllModifiers();
   const createModMut = useCreateModifier();
   const updateModMut = useUpdateModifier();
@@ -39,14 +42,6 @@ export default function ModifiersManagement() {
   const [addingOptionFor, setAddingOptionFor] = useState<string | null>(null);
   const [optName, setOptName] = useState("");
   const [optPrice, setOptPrice] = useState("0");
-
-  const getLocationId = async () => {
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("Not authenticated");
-    const { data: profile } = await supabase.from("user_profiles").select("location_id").eq("id", user.id).single();
-    return profile?.location_id;
-  };
 
   const openCreateMod = () => {
     setEditingModId(null);
@@ -80,8 +75,8 @@ export default function ModifiersManagement() {
     }
   };
 
-  const handleDeleteMod = (id: string) => {
-    if (!confirm(t("modifiers.deleteConfirm"))) return;
+  const handleDeleteMod = async (id: string) => {
+    if (!(await confirmDialog(t("modifiers.deleteConfirm")))) return;
     deleteModMut.mutate(id);
   };
 
@@ -116,13 +111,8 @@ export default function ModifiersManagement() {
       </div>
 
       {showModForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowModForm(false)} />
-          <div className="relative w-full max-w-md bg-card rounded-2xl border border-warm-roast/10 shadow-xl p-6 space-y-5">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-expresso">{editingModId ? t("modifiers.editModifier") : t("modifiers.newModifier")}</h3>
-              <button onClick={() => setShowModForm(false)} className="p-2 text-expresso/40 hover:text-expresso"><X className="w-5 h-5" /></button>
-            </div>
+        <Modal onClose={() => setShowModForm(false)} title={editingModId ? t("modifiers.editModifier") : t("modifiers.newModifier")} size="md">
+          <div className="space-y-5">
             <div className="space-y-4">
               <div>
                 <Label className="mb-1 block">{t("modifiers.name")}</Label>
@@ -143,7 +133,7 @@ export default function ModifiersManagement() {
               {editingModId ? t("modifiers.update") : t("modifiers.create")}
             </Button>
           </div>
-        </div>
+        </Modal>
       )}
 
       <div className="space-y-4">

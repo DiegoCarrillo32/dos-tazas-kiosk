@@ -7,6 +7,12 @@ import { useState } from "react";
 
 const ONE_DAY = 1000 * 60 * 60 * 24;
 
+// Named explicitly (rather than relying on the persister's own default)
+// so logout can remove exactly this key from localStorage — clearing the
+// in-memory QueryClient alone leaves the previous cashier's cached data
+// sitting in storage for the next login to rehydrate.
+export const PERSISTED_QUERY_CACHE_KEY = "dostazas.reactQueryCache";
+
 export default function QueryProvider({
   children,
 }: {
@@ -36,6 +42,7 @@ export default function QueryProvider({
   const [persister] = useState(() =>
     createSyncStoragePersister({
       storage: typeof window !== "undefined" ? window.localStorage : undefined,
+      key: PERSISTED_QUERY_CACHE_KEY,
     })
   );
 

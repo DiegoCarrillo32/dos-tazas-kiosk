@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { cookies } from "next/headers";
 import QueryProvider from "@/lib/QueryProvider";
 import { LanguageProvider, type Lang } from "@/lib/i18n/LanguageContext";
+import { FeedbackProvider } from "@/components/ui/Feedback";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -50,7 +51,9 @@ export default async function RootLayout({
       </head>
       <body>
         <LanguageProvider initialLang={lang}>
-          <QueryProvider>{children}</QueryProvider>
+          <QueryProvider>
+            <FeedbackProvider>{children}</FeedbackProvider>
+          </QueryProvider>
         </LanguageProvider>
       </body>
     </html>

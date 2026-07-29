@@ -4,6 +4,7 @@ import { Printer, X } from "lucide-react";
 import type { ShiftSummary } from "@/lib/types";
 import { formatMoney } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
+import { Sheet } from "@/components/ui/Modal";
 import { useT } from "@/lib/i18n/LanguageContext";
 
 /**
@@ -52,9 +53,7 @@ export function ZReport({
   const handlePrint = () => window.print();
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center no-print">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full sm:max-w-sm bg-card rounded-t-2xl sm:rounded-2xl border border-warm-roast/10 shadow-xl max-h-[90vh] flex flex-col">
+    <Sheet onClose={onClose} maxHeight="90vh" wrapperClassName="no-print">
         <div className="receipt-print-area overflow-y-auto p-6 font-mono text-[13px] leading-snug text-expresso">
           <div className="text-center space-y-0.5 mb-3">
             <div className="font-display text-xl tracking-wide" style={{ fontFamily: "'Titan One', cursive" }}>
@@ -183,8 +182,7 @@ export function ZReport({
             {t("cash.printReport")}
           </Button>
         </div>
-      </div>
-    </div>
+    </Sheet>
   );
 }
 

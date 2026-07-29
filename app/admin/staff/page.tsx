@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Shield, ShieldAlert, Trash2, X, Loader2, UserPlus, Users } from "lucide-react";
+import { Shield, ShieldAlert, Trash2, Loader2, UserPlus, Users } from "lucide-react";
 import type { UserProfile } from "@/lib/types";
 import {
   useStaffProfiles,
@@ -13,10 +13,14 @@ import {
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Label } from "@/components/ui/Label";
+import { Modal } from "@/components/ui/Modal";
+import { useToast, useConfirm } from "@/components/ui/Feedback";
 import { useT } from "@/lib/i18n/LanguageContext";
 
 export default function StaffManagement() {
   const t = useT();
+  const toast = useToast();
+  const confirmDialog = useConfirm();
   const { data: staff = [], isLoading } = useStaffProfiles();
   const { data: currentUser } = useCurrentProfile();
   const updateRoleMut = useUpdateStaffRole();
@@ -32,7 +36,7 @@ export default function StaffManagement() {
 
   const handleInvite = () => {
     if (!inviteEmail || !invitePassword || !inviteFirst) {
-      alert(t("staff.fieldsRequired"));
+      toast(t("staff.fieldsRequired"));
       return;
     }
     inviteMut.mutate(
@@ -52,23 +56,23 @@ export default function StaffManagement() {
           setInviteLast("");
           setInviteRole("staff");
         },
-        onError: (err) => alert(t("staff.failedToInvite", { msg: err.message })),
+        onError: (err) => toast(t("staff.failedToInvite", { msg: err.message })),
       }
     );
   };
 
-  const handleToggleRole = (member: UserProfile) => {
+  const handleToggleRole = async (member: UserProfile) => {
     const newRole = member.role === "admin" ? "staff" : "admin";
-    if (!confirm(t("staff.confirmRoleChange", { name: member.first_name ?? "", role: newRole }))) return;
+    if (!(await confirmDialog(t("staff.confirmRoleChange", { name: member.first_name ?? "", role: newRole })))) return;
     updateRoleMut.mutate({ userId: member.id, role: newRole });
   };
 
-  const handleRemove = (member: UserProfile) => {
+  const handleRemove = async (member: UserProfile) => {
     if (member.id === currentUser?.id) {
-      alert(t("staff.cannotRemoveSelf"));
+      toast(t("staff.cannotRemoveSelf"));
       return;
     }
-    if (!confirm(t("staff.confirmRemove", { name: `${member.first_name} ${member.last_name ?? ""}`.trim() }))) return;
+    if (!(await confirmDialog(t("staff.confirmRemove", { name: `${member.first_name} ${member.last_name ?? ""}`.trim() })))) return;
     removeMut.mutate(member.id);
   };
 
@@ -97,15 +101,8 @@ export default function StaffManagement() {
 
       {/* Invite Modal */}
       {showInvite && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowInvite(false)} />
-          <div className="relative w-full max-w-md bg-card rounded-2xl border border-warm-roast/10 shadow-xl p-6 space-y-5">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-expresso">{t("staff.inviteTitle")}</h3>
-              <button onClick={() => setShowInvite(false)} className="p-2 text-expresso/40 hover:text-expresso">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+        <Modal onClose={() => setShowInvite(false)} title={t("staff.inviteTitle")} size="md">
+          <div className="space-y-5">
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -143,7 +140,7 @@ export default function StaffManagement() {
               {t("staff.createAccount")}
             </Button>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* Staff Table */}

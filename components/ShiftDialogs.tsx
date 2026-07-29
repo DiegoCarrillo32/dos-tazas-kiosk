@@ -1,16 +1,21 @@
 "use client";
 
 import { useState } from "react";
-import { X, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2 } from "lucide-react";
 import { useOpenShift, useCloseShift } from "@/lib/hooks";
 import type { CountedBreakdown, ShiftSummary } from "@/lib/types";
 import { cn, formatMoney } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
+import { Modal } from "@/components/ui/Modal";
+import { useToast, useConfirm } from "@/components/ui/Feedback";
 import { DenominationCounter, denominationTotal } from "@/components/DenominationCounter";
 import { useT } from "@/lib/i18n/LanguageContext";
 import { useOutbox } from "@/lib/offline/useOutbox";
+import { useConnectionStatus } from "@/lib/offline/useConnectionStatus";
+import { enqueueOpenShift } from "@/lib/offline/outbox";
+import { isNetworkError } from "@/lib/offline/sync";
 import { SyncQueueDialog } from "@/components/SyncQueueDialog";
 
 /**
@@ -22,53 +27,58 @@ import { SyncQueueDialog } from "@/components/SyncQueueDialog";
  * so the audit trail stands on its own without a role gate.
  */
 
-export function ShiftModal({
-  title,
-  children,
-  onClose,
-  wide,
-}: {
-  title: string;
-  children: React.ReactNode;
-  onClose: () => void;
-  wide?: boolean;
-}) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div
-        className={cn(
-          "relative w-full bg-card rounded-2xl border border-warm-roast/10 shadow-xl p-6 max-h-[85vh] overflow-y-auto",
-          wide ? "max-w-lg" : "max-w-sm"
-        )}
-      >
-        <div className="flex items-center justify-between mb-5">
-          <h3 className="text-lg font-bold text-expresso">{title}</h3>
-          <button onClick={onClose} className="p-1.5 text-expresso/40 hover:text-expresso">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-        {children}
-      </div>
-    </div>
-  );
-}
-
 export function OpenShiftDialog({ onClose }: { onClose: () => void }) {
   const t = useT();
+  const toast = useToast();
   const openMut = useOpenShift();
   const [openingFloat, setOpeningFloat] = useState("");
+  const [isQueueing, setIsQueueing] = useState(false);
+  const conn = useConnectionStatus();
+
+  // One id per dialog open (not per tap) — a double-tap or a
+  // dropped-response retry on the SAME attempt reuses it, so open_shift's
+  // idempotency check (migration 00019) turns a retry into a clean no-op
+  // instead of "a shift is already open".
+  const [clientUuid] = useState(() => crypto.randomUUID());
+
+  const queueOffline = (value: number) => {
+    setIsQueueing(true);
+    // No matching idempotency key on the offline path — enqueueOpenShift
+    // mints its own outbox id (the client_uuid the RPC will see once this
+    // drains), independent of the one guarding the online attempt above.
+    enqueueOpenShift(value)
+      .then(() => onClose())
+      .finally(() => setIsQueueing(false));
+  };
 
   const handleOpenShift = () => {
     const value = Math.max(0, parseFloat(openingFloat) || 0);
-    openMut.mutate(value, {
-      onSuccess: onClose,
-      onError: () => alert(t("cash.errorGeneric")),
-    });
+
+    if (conn === "offline") {
+      queueOffline(value);
+      return;
+    }
+
+    openMut.mutate(
+      { openingFloat: value, clientUuid },
+      {
+        onSuccess: onClose,
+        onError: (err) => {
+          // navigator.onLine said "online" but the request itself
+          // couldn't reach Supabase — queue it rather than stranding the
+          // cashier with no way to open a drawer at all.
+          if (isNetworkError(err)) {
+            queueOffline(value);
+            return;
+          }
+          toast(t("cash.errorGeneric"));
+        },
+      }
+    );
   };
 
   return (
-    <ShiftModal onClose={onClose} title={t("cash.openShift")}>
+    <Modal onClose={onClose} title={t("cash.openShift")}>
       <div className="space-y-4">
         <div>
           <Label className="mb-1 block">{t("cash.openingFloat")}</Label>
@@ -86,13 +96,13 @@ export function OpenShiftDialog({ onClose }: { onClose: () => void }) {
         <Button
           size="lg"
           className="w-full bg-coffee-fruit hover:bg-fruit-light text-white border-transparent"
-          isLoading={openMut.isPending}
+          isLoading={openMut.isPending || isQueueing}
           onClick={handleOpenShift}
         >
           {t("cash.openShiftButton")}
         </Button>
       </div>
-    </ShiftModal>
+    </Modal>
   );
 }
 
@@ -104,6 +114,8 @@ export function CloseShiftDialog({
   onClose: () => void;
 }) {
   const t = useT();
+  const toast = useToast();
+  const confirmDialog = useConfirm();
   const closeMut = useCloseShift();
   const [breakdown, setBreakdown] = useState<CountedBreakdown>({});
   const [closingNote, setClosingNote] = useState("");
@@ -117,21 +129,25 @@ export function CloseShiftDialog({
   const blockedByOutbox = pendingCount + failedCount;
 
   const countedTotal = denominationTotal(breakdown);
-  const balanced = countedTotal === shift.expected_cash;
+  const variance = countedTotal - shift.expected_cash;
+  // A numeric(10,2) column can round-trip through JS as e.g.
+  // 1234.0000000002 — strict equality would paint a genuinely balanced
+  // drawer red over a floating-point artifact, not a real variance.
+  const balanced = Math.abs(variance) < 0.005;
 
-  const handleCloseShift = () => {
-    if (!confirm(t("cash.confirmClose"))) return;
+  const handleCloseShift = async () => {
+    if (!(await confirmDialog(t("cash.confirmClose")))) return;
     closeMut.mutate(
       { countedCash: countedTotal, countedBreakdown: breakdown, note: closingNote.trim() || null },
       {
         onSuccess: onClose,
-        onError: () => alert(t("cash.errorGeneric")),
+        onError: () => toast(t("cash.errorGeneric")),
       }
     );
   };
 
   return (
-    <ShiftModal onClose={onClose} title={t("cash.closeShiftTitle")} wide>
+    <Modal onClose={onClose} title={t("cash.closeShiftTitle")} size="lg">
       <div className="space-y-5">
         {blockedByOutbox > 0 && (
           <div className="p-4 rounded-xl border border-red-200 dark:border-red-900/40 bg-red-50 dark:bg-red-950/30 space-y-3">
@@ -175,8 +191,8 @@ export function CloseShiftDialog({
               balanced ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"
             )}
           >
-            {countedTotal - shift.expected_cash > 0 ? "+" : ""}
-            {formatMoney(countedTotal - shift.expected_cash, "CRC")}
+            {variance > 0 ? "+" : ""}
+            {formatMoney(variance, "CRC")}
           </span>
         </div>
 
@@ -200,6 +216,6 @@ export function CloseShiftDialog({
           {t("cash.closeShiftButton")}
         </Button>
       </div>
-    </ShiftModal>
+    </Modal>
   );
 }

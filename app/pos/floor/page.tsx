@@ -18,6 +18,8 @@ import {
 } from "@/lib/hooks";
 import { formatMoney } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
+import { Sheet } from "@/components/ui/Modal";
+import { useToast } from "@/components/ui/Feedback";
 import { useT } from "@/lib/i18n/LanguageContext";
 import { useConnectionStatus } from "@/lib/offline/useConnectionStatus";
 import { enqueuePark } from "@/lib/offline/outbox";
@@ -41,6 +43,7 @@ function ModifierDrawer({
   onClose: () => void;
 }) {
   const t = useT();
+  const toast = useToast();
   const [selected, setSelected] = useState<SelectedModifier[]>([]);
 
   const toggleOption = (mod: Modifier, option: ModifierOption) => {
@@ -64,7 +67,7 @@ function ModifierDrawer({
   const handleConfirm = () => {
     for (const mod of modifiers) {
       if (mod.is_required && !selected.some((s) => s.modifierId === mod.id)) {
-        alert(t("floor.selectOptionAlert", { name: mod.name }));
+        toast(t("floor.selectOptionAlert", { name: mod.name }));
         return;
       }
     }
@@ -77,9 +80,7 @@ function ModifierDrawer({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full sm:max-w-md bg-card rounded-t-2xl sm:rounded-2xl border border-warm-roast/10 shadow-xl max-h-[80vh] flex flex-col">
+    <Sheet onClose={onClose} maxWidth="md">
         <div className="p-5 border-b border-warm-roast/10 flex items-center justify-between shrink-0">
           <div>
             <h3 className="font-bold text-lg text-expresso">{menuItem.name}</h3>
@@ -133,8 +134,7 @@ function ModifierDrawer({
             {t("floor.addToOrder")} — {formatMoney(Number(menuItem.price) + totalExtra, currency)}
           </Button>
         </div>
-      </div>
-    </div>
+    </Sheet>
   );
 }
 
@@ -150,6 +150,7 @@ const areModifiersEqual = (a: SelectedModifier[], b: SelectedModifier[]) => {
 
 export default function FloorView() {
   const t = useT();
+  const toast = useToast();
   const { data: categories = [], isLoading: catsLoading } = useCategories();
   const { data: menuItems = [], isLoading: itemsLoading } = useMenuItems();
   const { data: tables = [] } = useTables();
@@ -288,7 +289,7 @@ export default function FloorView() {
       // sync RPCs only ever create a new order, never append to one — so
       // this stays online-only rather than silently dropping the add.
       if (conn === "offline") {
-        alert(t("floor.appendNeedsConnection"));
+        toast(t("floor.appendNeedsConnection"));
         return;
       }
       appendOrderMut.mutate(
@@ -298,7 +299,7 @@ export default function FloorView() {
             setOrderItems([]);
             setIsOrderExpanded(false);
           },
-          onError: () => alert(t("floor.failedToAddToTab")),
+          onError: () => toast(t("floor.failedToAddToTab")),
         }
       );
       return;
@@ -323,7 +324,7 @@ export default function FloorView() {
           if (isNetworkError(err)) {
             void queueCart();
           } else {
-            alert(t("floor.failedToSendOrder"));
+            toast(t("floor.failedToSendOrder"));
           }
         },
       }

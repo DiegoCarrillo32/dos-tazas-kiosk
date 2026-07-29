@@ -16,11 +16,13 @@ import {
   useMenuItemModifierLinks,
   useSetMenuItemModifiers,
 } from "@/lib/hooks";
-import { createClient } from "@/utils/supabase/client";
+import { getLocationId } from "@/lib/queries";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Label } from "@/components/ui/Label";
 import { Checkbox } from "@/components/ui/Checkbox";
+import { Modal } from "@/components/ui/Modal";
+import { useToast, useConfirm } from "@/components/ui/Feedback";
 import { formatMoney } from "@/lib/utils";
 import { useT } from "@/lib/i18n/LanguageContext";
 
@@ -50,6 +52,8 @@ const emptyForm: MenuItemForm = {
 
 export default function MenuManagement() {
   const t = useT();
+  const toast = useToast();
+  const confirmDialog = useConfirm();
   const { data: items = [], isLoading: itemsLoading } = useAllMenuItems();
   const { data: categories = [], isLoading: catsLoading } = useCategories();
   const createItemMut = useCreateMenuItem();
@@ -89,14 +93,6 @@ export default function MenuManagement() {
 
   const isLoading = itemsLoading || catsLoading;
 
-  const getLocationId = async () => {
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("Not authenticated");
-    const { data: profile } = await supabase.from("user_profiles").select("location_id").eq("id", user.id).single();
-    return profile?.location_id;
-  };
-
   const openCreateForm = () => {
     setEditingId(null);
     setForm(emptyForm);
@@ -123,7 +119,7 @@ export default function MenuManagement() {
 
   const handleSave = async () => {
     if (!form.name || !form.price) {
-      alert(t("menu.nameRequired"));
+      toast(t("menu.nameRequired"));
       return;
     }
     const saveModifiers = (itemId: string) =>
@@ -150,7 +146,7 @@ export default function MenuManagement() {
             await saveModifiers(editingId);
             setShowForm(false);
           },
-          onError: () => alert(t("menu.failedToSave")),
+          onError: () => toast(t("menu.failedToSave")),
         }
       );
     } else {
@@ -173,14 +169,14 @@ export default function MenuManagement() {
             if (newItem?.id) await saveModifiers(newItem.id);
             setShowForm(false);
           },
-          onError: () => alert(t("menu.failedToSave")),
+          onError: () => toast(t("menu.failedToSave")),
         }
       );
     }
   };
 
-  const handleDelete = (id: string) => {
-    if (!confirm(t("menu.deleteConfirm"))) return;
+  const handleDelete = async (id: string) => {
+    if (!(await confirmDialog(t("menu.deleteConfirm")))) return;
     deleteItemMut.mutate(id);
   };
 
@@ -195,7 +191,7 @@ export default function MenuManagement() {
       { location_id: locationId, name: newCatName.trim(), sort_order: categories.length },
       {
         onSuccess: () => setNewCatName(""),
-        onError: () => alert(t("menu.failedCategory")),
+        onError: () => toast(t("menu.failedCategory")),
       }
     );
   };
@@ -213,17 +209,17 @@ export default function MenuManagement() {
       { id: editingCatId, updates: { name } },
       {
         onSuccess: () => setEditingCatId(null),
-        onError: () => alert(t("menu.failedCategory")),
+        onError: () => toast(t("menu.failedCategory")),
       }
     );
   };
 
-  const handleDeleteCategory = (cat: Category) => {
-    if (!confirm(t("menu.deleteCategoryConfirm", { name: cat.name }))) return;
+  const handleDeleteCategory = async (cat: Category) => {
+    if (!(await confirmDialog(t("menu.deleteCategoryConfirm", { name: cat.name })))) return;
     deleteCatMut.mutate(cat.id, {
       onError: (err: unknown) => {
         const code = (err as { code?: string })?.code;
-        alert(code === "23503" ? t("menu.categoryInUse") : t("menu.failedToDeleteCategory"));
+        toast(code === "23503" ? t("menu.categoryInUse") : t("menu.failedToDeleteCategory"));
       },
     });
   };
@@ -312,13 +308,8 @@ export default function MenuManagement() {
       )}
 
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowForm(false)} />
-          <div className="relative w-full max-w-lg bg-card rounded-2xl border border-warm-roast/10 shadow-xl p-6 space-y-5">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-expresso">{editingId ? t("menu.editItem") : t("menu.newMenuItem")}</h3>
-              <button onClick={() => setShowForm(false)} className="p-2 text-expresso/40 hover:text-expresso"><X className="w-5 h-5" /></button>
-            </div>
+        <Modal onClose={() => setShowForm(false)} title={editingId ? t("menu.editItem") : t("menu.newMenuItem")} size="lg">
+          <div className="space-y-5">
             <div className="space-y-4">
               <div>
                 <Label className="mb-1 block">{t("menu.name")}</Label>
@@ -398,7 +389,7 @@ export default function MenuManagement() {
               {editingId ? t("menu.updateItem") : t("menu.createItem")}
             </Button>
           </div>
-        </div>
+        </Modal>
       )}
 
       <div className="bg-card rounded-2xl border border-warm-roast/10 overflow-hidden">

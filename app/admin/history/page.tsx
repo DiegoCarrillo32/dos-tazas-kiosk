@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { format, subDays } from "date-fns";
-import { Search, Eye, Loader2, X, Printer, RotateCcw } from "lucide-react";
+import { Search, Eye, Loader2, Printer, RotateCcw } from "lucide-react";
 import type { Order, OrderItem } from "@/lib/types";
 import {
   useCompletedOrders,
@@ -13,12 +13,17 @@ import {
 } from "@/lib/hooks";
 import { Button } from "@/components/ui/Button";
 import { DatePicker } from "@/components/ui/DatePicker";
+import { Input } from "@/components/ui/Input";
+import { Label } from "@/components/ui/Label";
+import { Modal } from "@/components/ui/Modal";
+import { useToast } from "@/components/ui/Feedback";
 import { Receipt } from "@/components/Receipt";
 import { formatMoney } from "@/lib/utils";
 import { useT } from "@/lib/i18n/LanguageContext";
 
 export default function TransactionHistory() {
   const t = useT();
+  const toast = useToast();
   const [startDate, setStartDate] = useState<Date | undefined>(subDays(new Date(), 30));
   const [endDate, setEndDate] = useState<Date | undefined>(new Date());
   const startStr = startDate ? format(startDate, "yyyy-MM-dd") : undefined;
@@ -34,6 +39,8 @@ export default function TransactionHistory() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [receiptOrder, setReceiptOrder] = useState<Order | null>(null);
+  const [refundingOrder, setRefundingOrder] = useState<Order | null>(null);
+  const [refundReason, setRefundReason] = useState("");
 
   const filtered = history.filter((o) => {
     const q = searchQuery.trim().toLowerCase();
@@ -48,13 +55,20 @@ export default function TransactionHistory() {
     });
 
   const handleRefund = (order: Order) => {
-    const reason = prompt(t("history.refundReason")) ?? "";
-    if (!confirm(t("history.confirmRefund", { id: String(order.order_number ?? order.id.slice(0, 8)) }))) return;
+    setRefundReason("");
+    setRefundingOrder(order);
+  };
+
+  const submitRefund = () => {
+    if (!refundingOrder) return;
     refundMut.mutate(
-      { orderId: order.id, reason: reason.trim() || null },
+      { orderId: refundingOrder.id, reason: refundReason.trim() || null },
       {
-        onSuccess: () => setSelectedOrder(null),
-        onError: () => alert(t("history.alertFailedRefund")),
+        onSuccess: () => {
+          setRefundingOrder(null);
+          setSelectedOrder(null);
+        },
+        onError: () => toast(t("history.alertFailedRefund")),
       }
     );
   };
@@ -120,15 +134,11 @@ export default function TransactionHistory() {
       </div>
 
       {selectedOrder && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setSelectedOrder(null)} />
-          <div className="relative w-full max-w-lg bg-card rounded-2xl border border-warm-roast/10 shadow-xl p-6 max-h-[80vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-expresso">
-                {t("history.orderDetail")}{selectedOrder.order_number ?? selectedOrder.id.slice(0, 8)}
-              </h3>
-              <button onClick={() => setSelectedOrder(null)} className="p-2 text-expresso/40 hover:text-expresso"><X className="w-5 h-5" /></button>
-            </div>
+        <Modal
+          onClose={() => setSelectedOrder(null)}
+          title={`${t("history.orderDetail")}${selectedOrder.order_number ?? selectedOrder.id.slice(0, 8)}`}
+          size="lg"
+        >
             <div className="space-y-3 text-sm">
               <div className="flex justify-between"><span className="text-expresso/60">{t("history.date")}</span><span className="font-medium text-expresso">{formatDate(selectedOrder.created_at)}</span></div>
               <div className="flex justify-between"><span className="text-expresso/60">{t("history.table")}</span><span className="text-expresso">{selectedOrder.table?.name ?? t("common.takeaway")}</span></div>
@@ -194,8 +204,35 @@ export default function TransactionHistory() {
                 </Button>
               )}
             </div>
+        </Modal>
+      )}
+
+      {refundingOrder && (
+        <Modal onClose={() => setRefundingOrder(null)} title={t("history.refund")}>
+          <div className="space-y-4">
+            <p className="text-sm text-expresso/70">
+              {t("history.confirmRefund", {
+                id: String(refundingOrder.order_number ?? refundingOrder.id.slice(0, 8)),
+              })}
+            </p>
+            <div>
+              <Label className="mb-1 block">{t("history.refundReason")}</Label>
+              <Input type="text" value={refundReason} onChange={(e) => setRefundReason(e.target.value)} autoFocus />
+            </div>
+            <div className="flex gap-3">
+              <Button variant="secondary" className="flex-1" onClick={() => setRefundingOrder(null)}>
+                {t("common.cancel")}
+              </Button>
+              <Button
+                className="flex-1 bg-coffee-fruit hover:bg-fruit-light text-white border-transparent"
+                onClick={submitRefund}
+                isLoading={refundMut.isPending}
+              >
+                {t("history.refund")}
+              </Button>
+            </div>
           </div>
-        </div>
+        </Modal>
       )}
 
       {receiptOrder && (

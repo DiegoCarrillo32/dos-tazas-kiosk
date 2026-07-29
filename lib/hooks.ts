@@ -1,12 +1,17 @@
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/utils/supabase/client";
 import { kick as kickOfflineSync } from "./offline/sync";
+import { useOutbox } from "./offline/useOutbox";
+import { clearOfflineShell } from "@/components/ServiceWorkerRegistrar";
+import { useT } from "./i18n/LanguageContext";
+import { useToast } from "@/components/ui/Feedback";
+import { PERSISTED_QUERY_CACHE_KEY } from "./QueryProvider";
 import {
   fetchCategories,
   fetchMenuItems,
   fetchAllMenuItems,
-  fetchModifiersForItem,
   fetchAllModifiers,
   fetchMenuItemModifierMap,
   fetchParkedOrders,
@@ -48,6 +53,7 @@ import {
   inviteStaffMember,
   updateOwnProfile,
   getCurrentProfile,
+  resetProfileCache,
   fetchLocationSettings,
   updateLocationSettings,
 } from "./queries";
@@ -66,8 +72,8 @@ export const queryKeys = {
   menuItems: ["menuItems"] as const,
   allMenuItems: ["allMenuItems"] as const,
   modifiers: ["modifiers"] as const,
-  modifiersForItem: (id: string) => ["modifiersForItem", id] as const,
   menuItemModifierMap: ["menuItemModifierMap"] as const,
+  menuItemModifierLinks: (id: string) => ["menuItemModifierLinks", id] as const,
   parkedOrders: ["parkedOrders"] as const,
   todayAnalytics: ["todayAnalytics"] as const,
   completedOrders: (start?: string, end?: string) =>
@@ -114,15 +120,6 @@ export function useAllMenuItems() {
 }
 
 // ─── Modifiers ─────────────────────────────────────────────────────
-
-export function useModifiersForItem(menuItemId: string | null) {
-  return useQuery({
-    queryKey: queryKeys.modifiersForItem(menuItemId ?? ""),
-    queryFn: () => fetchModifiersForItem(menuItemId!),
-    enabled: !!menuItemId,
-    staleTime: LONG_CACHE,
-  });
-}
 
 export function useAllModifiers() {
   return useQuery({
@@ -252,6 +249,11 @@ export function useCompleteOrder() {
       qc.invalidateQueries({ queryKey: queryKeys.parkedOrders });
       qc.invalidateQueries({ queryKey: queryKeys.todayAnalytics });
       qc.invalidateQueries({ queryKey: ["completedOrders"] });
+      // A cash sale changes the drawer's expected cash. Realtime usually
+      // covers this, but the whole point of this mutation path is
+      // working through exactly the flaky connection where realtime
+      // isn't reliable either — don't depend on it alone.
+      invalidateShift(qc);
     },
   });
 }
@@ -366,7 +368,11 @@ function invalidateShift(qc: ReturnType<typeof useQueryClient>) {
 export function useOpenShift() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (openingFloat: number) => openShift(openingFloat),
+    // clientUuid lets a double-tap or a dropped-response retry replay
+    // cleanly (open_shift treats it as an idempotency key — see
+    // migration 00019) instead of raising "a shift is already open".
+    mutationFn: (params: { openingFloat: number; clientUuid?: string | null }) =>
+      openShift(params.openingFloat, params.clientUuid ?? null),
     onSuccess: () => invalidateShift(qc),
   });
 }
@@ -519,7 +525,7 @@ export function useDeleteModifierOption() {
 
 export function useMenuItemModifierLinks(menuItemId: string | null) {
   return useQuery({
-    queryKey: ["menuItemModifierLinks", menuItemId ?? ""],
+    queryKey: queryKeys.menuItemModifierLinks(menuItemId ?? ""),
     queryFn: () => fetchMenuItemModifierLinks(menuItemId!),
     enabled: !!menuItemId,
     staleTime: LONG_CACHE,
@@ -532,8 +538,7 @@ export function useSetMenuItemModifiers() {
     mutationFn: ({ menuItemId, modifierIds }: { menuItemId: string; modifierIds: string[] }) =>
       setMenuItemModifiers(menuItemId, modifierIds),
     onSuccess: (_data, { menuItemId }) => {
-      qc.invalidateQueries({ queryKey: ["menuItemModifierLinks", menuItemId] });
-      qc.invalidateQueries({ queryKey: queryKeys.modifiersForItem(menuItemId) });
+      qc.invalidateQueries({ queryKey: queryKeys.menuItemModifierLinks(menuItemId) });
       qc.invalidateQueries({ queryKey: queryKeys.menuItemModifierMap });
     },
   });
@@ -665,4 +670,51 @@ export function useUpdateOwnProfile() {
       qc.invalidateQueries({ queryKey: queryKeys.staffProfiles });
     },
   });
+}
+
+// ─── Logout ──────────────────────────────────────────────────────────
+
+/**
+ * One shared logout for both POSNav and AdminShell — previously each
+ * reimplemented it, and only POSNav had the pending-outbox guard, so
+ * closing the admin tab was a way to sign out around a queued sale that
+ * still needs THIS session's JWT to sync. Also clears every trace of
+ * identity a shared kiosk's next cashier could otherwise inherit:
+ * `getCurrentProfile`'s in-memory + localStorage cache (see
+ * `resetProfileCache`), and the persisted TanStack Query cache — plain
+ * `qc.clear()` alone empties the in-memory cache but leaves the previous
+ * user's data sitting in localStorage for the next login to rehydrate
+ * before their own fetch returns.
+ */
+export function useLogout() {
+  const t = useT();
+  const router = useRouter();
+  const qc = useQueryClient();
+  const { pendingCount, failedCount } = useOutbox();
+  const toast = useToast();
+
+  return async () => {
+    const stillPending = pendingCount + failedCount;
+    if (stillPending > 0) {
+      toast(t("offline.cannotLogoutPending", { n: stillPending }));
+      return;
+    }
+
+    const supabase = createClient();
+    await supabase.auth.signOut();
+
+    resetProfileCache();
+    qc.clear();
+    try {
+      window.localStorage.removeItem(PERSISTED_QUERY_CACHE_KEY);
+    } catch {
+      // Storage unavailable — nothing to clear.
+    }
+    // /pos/floor and /pos/counter render THIS user's data server-side, so
+    // a shared kiosk's next cashier must not cold-start into the
+    // previous one's cached shell (see ServiceWorkerRegistrar.tsx).
+    clearOfflineShell();
+
+    router.push("/login");
+  };
 }

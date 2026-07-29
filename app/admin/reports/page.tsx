@@ -6,10 +6,12 @@ import { Download } from "lucide-react";
 import { exportOrdersCSV } from "@/lib/queries";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { Button } from "@/components/ui/Button";
+import { useToast } from "@/components/ui/Feedback";
 import { useT } from "@/lib/i18n/LanguageContext";
 
 export default function FinancialReports() {
   const t = useT();
+  const toast = useToast();
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
   const [endDate, setEndDate] = useState<Date | undefined>(undefined);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -33,7 +35,7 @@ export default function FinancialReports() {
       URL.revokeObjectURL(url);
     } catch (err) {
       console.error("Failed to export CSV:", err);
-      alert(t("reports.failed"));
+      toast(t("reports.failed"));
     } finally {
       setIsDownloading(false);
     }

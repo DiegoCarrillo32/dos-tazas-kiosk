@@ -2,17 +2,17 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { Coffee, MonitorPlay, LogOut, UserCircle } from "lucide-react";
-import { createClient } from "@/utils/supabase/client";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { LanguageToggle } from "@/components/ui/LanguageToggle";
 import { useT } from "@/lib/i18n/LanguageContext";
 import { initSyncEngine } from "@/lib/offline/sync";
+import { useLogout } from "@/lib/hooks";
 import { useOutbox } from "@/lib/offline/useOutbox";
 import { OfflineBanner } from "@/components/OfflineBanner";
-import ServiceWorkerRegistrar, { clearOfflineShell } from "@/components/ServiceWorkerRegistrar";
+import ServiceWorkerRegistrar from "@/components/ServiceWorkerRegistrar";
 
 export default function POSNav({
   children,
@@ -23,29 +23,13 @@ export default function POSNav({
 }) {
   const t = useT();
   const pathname = usePathname();
-  const router = useRouter();
-  const supabase = createClient();
   const qc = useQueryClient();
   const { pendingCount, failedCount } = useOutbox();
+  const handleLogout = useLogout();
 
   useEffect(() => {
     initSyncEngine(qc);
   }, [qc]);
-
-  const handleLogout = async () => {
-    // Signing out drops the session the queued RPC calls need to
-    // authenticate as — a queued sale would never be able to sync again.
-    // The outbox itself isn't cleared (IndexedDB survives signOut), so
-    // this is a hard block, not a warning: there's no safe way to proceed.
-    const stillPending = pendingCount + failedCount;
-    if (stillPending > 0) {
-      alert(t("offline.cannotLogoutPending", { n: stillPending }));
-      return;
-    }
-    await supabase.auth.signOut();
-    clearOfflineShell();
-    router.push("/login");
-  };
 
   const badgeCount = failedCount > 0 ? failedCount : pendingCount;
   const pendingBadge = badgeCount > 0 && (

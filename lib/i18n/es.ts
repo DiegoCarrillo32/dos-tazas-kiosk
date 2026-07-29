@@ -4,6 +4,7 @@ export const es: Translations = {
   common: {
     save: "Guardar",
     cancel: "Cancelar",
+    confirm: "Confirmar",
     delete: "Eliminar",
     edit: "Editar",
     close: "Cerrar",
@@ -118,6 +119,7 @@ export const es: Translations = {
     voidReasonPlaceholder: "ej. el cliente se retiró, error al ingresar la orden",
     noShiftWarning: "No hay un turno abierto — abre uno para cobrar en efectivo.",
     openShiftCta: "Abrir turno",
+    shiftOpeningQueued: "La apertura de turno está en cola — se sincronizará al reconectar. Puedes seguir vendiendo.",
     shiftExpectedCash: "Efectivo esperado",
   },
   admin: {

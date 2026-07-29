@@ -52,9 +52,12 @@ function backoffDelay(attempts: number): number {
 
 // ─── Error classification ───────────────────────────────────────────
 
-type ErrorClass = "immediate-retry" | "transient" | "permanent" | "auth";
+export type ErrorClass = "immediate-retry" | "transient" | "permanent" | "auth";
 
-function classifyError(err: unknown): { cls: ErrorClass; code: string | null; message: string } {
+// Exported for lib/offline/sync.test.ts — the drain loop's retry/give-up
+// behavior hinges entirely on this classification, so it's worth testing
+// directly rather than only through the much heavier drain loop.
+export function classifyError(err: unknown): { cls: ErrorClass; code: string | null; message: string } {
   const e = err as { code?: string; message?: string } | null;
   const code = e?.code ?? null;
   const message = e?.message ?? String(err);

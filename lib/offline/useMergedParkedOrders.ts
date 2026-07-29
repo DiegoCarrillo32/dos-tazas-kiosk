@@ -58,6 +58,18 @@ function projectEntryToOrder(e: OutboxEntry): QueueOrder {
     customer_email: null,
     created_at: e.occurredAtIso,
     updated_at: e.occurredAtIso,
+    // Mirrors what this entry will actually carry once sync_offline_order
+    // writes the real row — see lib/database.types.ts's Order derivation,
+    // where these became required-but-nullable rather than optional.
+    client_uuid: e.id,
+    device_id: e.deviceId,
+    offline_ref: e.offlineRef,
+    occurred_at: e.occurredAtIso,
+    synced_at: null,
+    server_total_amount: null,
+    client_charge: e.clientCharge ?? null,
+    sync_discrepancy: null,
+    sync_warnings: null,
     order_items,
     table: e.snapshot.tableName ? { name: e.snapshot.tableName } : null,
     __local: { entryId: e.id, offlineRef: e.offlineRef, status: e.status, attempts: e.attempts },

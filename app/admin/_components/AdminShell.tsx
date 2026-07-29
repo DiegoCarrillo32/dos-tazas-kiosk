@@ -2,12 +2,12 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { LayoutDashboard, Menu as MenuIcon, X, History, FileText, Store, LogOut, ArrowLeft, SlidersHorizontal, UsersRound, Settings, BarChart3, Armchair, Wallet } from "lucide-react";
-import { createClient } from "@/utils/supabase/client";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { LanguageToggle } from "@/components/ui/LanguageToggle";
 import { useT } from "@/lib/i18n/LanguageContext";
+import { useLogout } from "@/lib/hooks";
 
 type NavKey =
   | "admin.dashboard"
@@ -41,14 +41,12 @@ export default function AdminShell({
 }) {
   const t = useT();
   const pathname = usePathname();
-  const router = useRouter();
-  const supabase = createClient();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.push("/login");
-  };
+  // Shared with POSNav — enforces the same pending-outbox guard and
+  // identity cleanup, so closing the admin tab instead of the POS one is
+  // no longer a way to sign out around a sale still queued for THIS
+  // session to sync.
+  const handleLogout = useLogout();
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">

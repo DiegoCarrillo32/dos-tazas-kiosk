@@ -141,31 +141,6 @@ export async function enqueuePark(
   return entry;
 }
 
-/** A cart built AND paid offline in one go (a takeaway rung up with the till closed). */
-export async function enqueueCreateAndPay(
-  input: EnqueueCartInput,
-  payment: OfflinePaymentPayload,
-  clientCharge: ClientCharge,
-  expectedShiftId: string | null
-): Promise<OutboxEntry> {
-  const base = await baseEntry("create_and_pay");
-  const snapshot = buildSnapshot(input);
-  snapshot.offlineRef = base.offlineRef;
-  snapshot.totalAmount = clientCharge.totalAmount;
-  const entry: OutboxEntry = {
-    ...base,
-    expectedShiftId,
-    items: cartItemsToRpcItems(input.cartItems),
-    tableId: input.tableId,
-    payment,
-    clientCharge,
-    snapshot,
-  };
-  await putOutboxEntry(entry);
-  announce();
-  return entry;
-}
-
 /**
  * Promote a still-pending `create_order` entry to `create_and_pay` in
  * place — same `id`, therefore the same `client_uuid`, therefore still

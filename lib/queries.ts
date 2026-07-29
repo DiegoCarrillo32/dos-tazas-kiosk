@@ -1,4 +1,4 @@
-import { createClient } from "@/utils/supabase/client";
+import { createClient, createEphemeralClient } from "@/utils/supabase/client";
 import type {
   Category,
   MenuItem,
@@ -17,6 +17,7 @@ import type {
   ShiftListItem,
   ShiftSummary,
 } from "./types";
+import type { Json } from "./database.types";
 
 // ─── Helpers ───────────────────────────────────────────────────────
 
@@ -99,6 +100,24 @@ export async function getCurrentProfile(): Promise<UserProfile | null> {
   }
 
   return null;
+}
+
+/**
+ * Clear the in-memory and localStorage profile cache. Call on logout —
+ * without this, `getCurrentProfile`'s offline fallback can hand the NEXT
+ * cashier on a shared kiosk the PREVIOUS one's cached profile (and so
+ * their location_id/role) for as long as `profileMemo` survives, which is
+ * until a hard reload — a client-side `router.push` to /login doesn't
+ * reset module state.
+ */
+export function resetProfileCache(): void {
+  profileMemo = null;
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(PROFILE_CACHE_KEY);
+  } catch {
+    // Storage unavailable — nothing to clear.
+  }
 }
 
 export async function getLocationId(): Promise<string> {
@@ -218,29 +237,6 @@ export async function deleteCategory(id: string): Promise<void> {
 
 // ─── Modifiers ─────────────────────────────────────────────────────
 
-export async function fetchModifiersForItem(
-  menuItemId: string
-): Promise<Modifier[]> {
-  // Get modifier IDs linked to this menu item
-  const { data: links, error: linkError } = await supabase()
-    .from("menu_item_modifiers")
-    .select("modifier_id")
-    .eq("menu_item_id", menuItemId);
-
-  if (linkError) throw linkError;
-  if (!links || links.length === 0) return [];
-
-  const modifierIds = links.map((l: { modifier_id: string }) => l.modifier_id);
-
-  const { data, error } = await supabase()
-    .from("modifiers")
-    .select("*, options:modifier_options(*)")
-    .in("id", modifierIds);
-
-  if (error) throw error;
-  return (data ?? []) as Modifier[];
-}
-
 /**
  * Fetch every menu-item → modifier link for the location in a single query and
  * return it as a `menuItemId → modifierId[]` map. Combined with
@@ -325,17 +321,6 @@ export async function createModifierOption(opt: {
   return data as ModifierOption;
 }
 
-export async function updateModifierOption(
-  id: string,
-  updates: { name?: string; extra_price?: number }
-): Promise<void> {
-  const { error } = await supabase()
-    .from("modifier_options")
-    .update(updates)
-    .eq("id", id);
-  if (error) throw error;
-}
-
 export async function deleteModifierOption(id: string): Promise<void> {
   const { error } = await supabase()
     .from("modifier_options")
@@ -399,7 +384,11 @@ export async function createOrder(
 ): Promise<string> {
   const { data, error } = await supabase().rpc("create_order", {
     items: cartItemsToRpcItems(cartItems),
-    p_table_id: tableId ?? null,
+    // The generated RPC arg types model a `default null` SQL parameter as
+    // optional (`T | undefined`), not `T | null` — omitting the key here
+    // has PostgREST send no value at all, which the SQL default resolves
+    // to null anyway, so this is behaviorally identical to passing null.
+    p_table_id: tableId ?? undefined,
   });
   if (error) throw error;
   return data as string;
@@ -453,15 +442,18 @@ export async function completeOrder(params: {
   const { error } = await supabase().rpc("complete_order", {
     p_order_id: params.orderId,
     p_payment_method: params.paymentMethod,
-    p_payment_reference: params.paymentReference,
+    // See createOrder's comment above — these RPC args are `default null`
+    // in SQL but typed `| undefined` (not `| null`) by the generator, so
+    // `?? undefined` here is a type-level formality, not a behavior change.
+    p_payment_reference: params.paymentReference ?? undefined,
     p_tip_amount: params.tipAmount ?? 0,
-    p_amount_tendered: params.amountTendered ?? null,
-    p_customer_name: params.customerName,
-    p_customer_id: params.customerId,
-    p_customer_email: params.customerEmail,
-    p_discount_type: params.discountType ?? null,
+    p_amount_tendered: params.amountTendered ?? undefined,
+    p_customer_name: params.customerName ?? undefined,
+    p_customer_id: params.customerId ?? undefined,
+    p_customer_email: params.customerEmail ?? undefined,
+    p_discount_type: params.discountType ?? undefined,
     p_discount_value: params.discountValue ?? 0,
-    p_discount_reason: params.discountReason ?? null,
+    p_discount_reason: params.discountReason ?? undefined,
   });
   if (error) throw error;
 }
@@ -477,7 +469,7 @@ export async function voidOrder(
 ): Promise<void> {
   const { error } = await supabase().rpc("void_order", {
     p_order_id: orderId,
-    p_reason: reason ?? null,
+    p_reason: reason ?? undefined,
   });
   if (error) throw error;
 }
@@ -492,7 +484,7 @@ export async function refundOrder(
 ): Promise<void> {
   const { error } = await supabase().rpc("reverse_completed_order", {
     p_order_id: orderId,
-    p_reason: reason ?? null,
+    p_reason: reason ?? undefined,
   });
   if (error) throw error;
 }
@@ -519,13 +511,17 @@ export async function syncOfflineOrder(params: {
   const { data, error } = await supabase().rpc("sync_offline_order", {
     p_client_uuid: params.clientUuid,
     p_items: params.items,
-    p_offline_ref: params.offlineRef,
+    // `?? undefined` on the `default null` args — see createOrder's
+    // comment. `clientCharge` is `unknown` (forensics payload, never
+    // parsed back) rather than `null`-able, so it needs a cast to the
+    // RPC's jsonb `Json` param type instead.
+    p_offline_ref: params.offlineRef ?? undefined,
     p_device_id: params.deviceId,
-    p_table_id: params.tableId,
+    p_table_id: params.tableId ?? undefined,
     p_client_age_seconds: params.clientAgeSeconds,
-    p_expected_shift_id: params.expectedShiftId,
+    p_expected_shift_id: params.expectedShiftId ?? undefined,
     p_payment: params.payment,
-    p_client_charge: params.clientCharge,
+    p_client_charge: params.clientCharge as Json,
   });
   if (error) throw error;
   return data as SyncRpcResult;
@@ -551,9 +547,9 @@ export async function syncOfflinePayment(params: {
     p_order_id: params.orderId,
     p_client_uuid: params.clientUuid,
     p_client_age_seconds: params.clientAgeSeconds,
-    p_expected_shift_id: params.expectedShiftId,
+    p_expected_shift_id: params.expectedShiftId ?? undefined,
     p_payment: params.payment,
-    p_client_charge: params.clientCharge,
+    p_client_charge: params.clientCharge as Json,
   });
   if (error) throw error;
   return data as SyncRpcResult | SyncRpcConflict;
@@ -637,8 +633,11 @@ export async function currentBusinessDate(): Promise<string> {
  * UTC-6, so a one-day report silently dropped that evening's sales (they are
  * already "tomorrow" in UTC) and pulled in the previous evening's instead.
  * Building the bounds from the local timezone fixes the window.
+ *
+ * Exported for lib/queries.test.ts — this is exactly the UTC-6 boundary
+ * bug described above, worth pinning down directly.
  */
-function localDayRangeToUtc(
+export function localDayRangeToUtc(
   startDate: string,
   endDate: string,
   timeZone: string
@@ -742,7 +741,8 @@ export async function fetchOfflineSyncFlags(limit = 200): Promise<Order[]> {
 // Escape a value for safe inclusion in a CSV cell.
 // Wraps in quotes when needed and neutralizes spreadsheet formula injection
 // (values beginning with = + - @ tab or CR are treated as formulas by Excel/Sheets).
-function csvCell(value: unknown): string {
+// Exported for lib/queries.test.ts.
+export function csvCell(value: unknown): string {
   let s = value === null || value === undefined ? "" : String(value);
   if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
   if (/[",\n\r]/.test(s)) s = '"' + s.replace(/"/g, '""') + '"';
@@ -1006,8 +1006,11 @@ export async function inviteStaffMember(
 ): Promise<void> {
   const locationId = await getLocationId();
 
-  // Create auth user via Supabase admin API (edge function) or sign up
-  const { data, error: signUpError } = await supabase().auth.signUp({
+  // auth.signUp on the admin's own client would replace their session
+  // with the brand-new staff account the moment it succeeds — a
+  // throwaway client with no persisted session (see createEphemeralClient)
+  // keeps this call from ever touching what the admin is logged in as.
+  const { data, error: signUpError } = await createEphemeralClient().auth.signUp({
     email,
     password,
   });
@@ -1015,10 +1018,12 @@ export async function inviteStaffMember(
   if (signUpError) throw signUpError;
   if (!data.user) throw new Error("Failed to create auth user");
 
-  // Create user profile
+  // Upsert, not insert: if this step fails after the auth user above was
+  // created (network blip, RLS hiccup), re-running the invite with the
+  // same email must recover rather than fail forever on a duplicate key.
   const { error: profileError } = await supabase()
     .from("user_profiles")
-    .insert({
+    .upsert({
       id: data.user.id,
       location_id: locationId,
       role,
@@ -1026,7 +1031,14 @@ export async function inviteStaffMember(
       last_name: lastName,
     });
 
-  if (profileError) throw profileError;
+  if (profileError) {
+    // The auth user now exists with no profile row — say so plainly.
+    // Re-running the invite with the same email is the fix, and the
+    // upsert above makes that safe.
+    throw new Error(
+      `Auth account created but the staff profile failed to save (${profileError.message}). Invite this email again to finish setup.`
+    );
+  }
 }
 
 // ─── Shifts & cash drawer ──────────────────────────────────────────
@@ -1036,7 +1048,7 @@ export async function fetchShiftSummary(
   shiftId?: string | null
 ): Promise<ShiftSummary | null> {
   const { data, error } = await supabase().rpc("shift_summary", {
-    p_shift_id: shiftId ?? null,
+    p_shift_id: shiftId ?? undefined,
   });
   if (error) throw error;
   return (data as ShiftSummary | null) ?? null;
@@ -1056,7 +1068,7 @@ export async function openShift(
 ): Promise<string> {
   const { data, error } = await supabase().rpc("open_shift", {
     p_opening_float: openingFloat,
-    p_client_uuid: clientUuid ?? null,
+    p_client_uuid: clientUuid ?? undefined,
   });
   if (error) throw error;
   return data as string;
@@ -1070,7 +1082,7 @@ export async function closeShift(params: {
   const { data, error } = await supabase().rpc("close_shift", {
     p_counted_cash: params.countedCash,
     p_counted_breakdown: params.countedBreakdown ?? null,
-    p_note: params.note ?? null,
+    p_note: params.note ?? undefined,
   });
   if (error) throw error;
   return data as ShiftSummary;

@@ -6,10 +6,13 @@ import type { Table } from "@/lib/types";
 import { useTables, useCreateTable, useUpdateTable, useDeleteTable } from "@/lib/hooks";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { useToast, useConfirm } from "@/components/ui/Feedback";
 import { useT } from "@/lib/i18n/LanguageContext";
 
 export default function TablesManagement() {
   const t = useT();
+  const toast = useToast();
+  const confirmDialog = useConfirm();
   const { data: tables = [], isLoading } = useTables();
   const createMut = useCreateTable();
   const updateMut = useUpdateTable();
@@ -40,9 +43,9 @@ export default function TablesManagement() {
     );
   };
 
-  const handleDelete = (tbl: Table) => {
-    if (!confirm(t("tables.deleteConfirm", { name: tbl.name }))) return;
-    deleteMut.mutate(tbl.id, { onError: () => alert(t("tables.failedToDelete")) });
+  const handleDelete = async (tbl: Table) => {
+    if (!(await confirmDialog(t("tables.deleteConfirm", { name: tbl.name })))) return;
+    deleteMut.mutate(tbl.id, { onError: () => toast(t("tables.failedToDelete")) });
   };
 
   if (isLoading) {

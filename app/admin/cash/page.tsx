@@ -23,12 +23,15 @@ import { formatMoney } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
-import { ShiftModal, OpenShiftDialog, CloseShiftDialog } from "@/components/ShiftDialogs";
+import { OpenShiftDialog, CloseShiftDialog } from "@/components/ShiftDialogs";
+import { Modal } from "@/components/ui/Modal";
+import { useToast } from "@/components/ui/Feedback";
 import { ZReport } from "@/components/ZReport";
 import { useT } from "@/lib/i18n/LanguageContext";
 
 export default function CashDrawerPage() {
   const t = useT();
+  const toast = useToast();
   const { data: shift, isLoading } = useCurrentShift();
   const { data: settings } = useLocationSettings();
   const { data: history = [], isLoading: historyLoading } = useRecentShifts();
@@ -55,7 +58,7 @@ export default function CashDrawerPage() {
     const amount = parseFloat(movementAmount) || 0;
     if (amount <= 0) return;
     if (!movementReason.trim()) {
-      alert(t("cash.reasonRequired"));
+      toast(t("cash.reasonRequired"));
       return;
     }
     movementMut.mutate(
@@ -66,7 +69,7 @@ export default function CashDrawerPage() {
           setMovementAmount("");
           setMovementReason("");
         },
-        onError: () => alert(t("cash.errorGeneric")),
+        onError: () => toast(t("cash.errorGeneric")),
       }
     );
   };
@@ -281,7 +284,7 @@ export default function CashDrawerPage() {
 
       {/* Cash movement modal */}
       {movementType && (
-        <ShiftModal
+        <Modal
           onClose={() => setMovementType(null)}
           title={movementType === "paid_in" ? t("cash.recordPaidIn") : t("cash.recordPaidOut")}
         >
@@ -317,7 +320,7 @@ export default function CashDrawerPage() {
               {movementType === "paid_in" ? t("cash.recordPaidIn") : t("cash.recordPaidOut")}
             </Button>
           </div>
-        </ShiftModal>
+        </Modal>
       )}
 
       {/* Close shift modal */}

@@ -9,6 +9,7 @@ import {
   useUpdateModifier,
   useDeleteModifier,
   useCreateModifierOption,
+  useUpdateModifierOption,
   useDeleteModifierOption,
 } from "@/lib/hooks";
 import { getLocationId } from "@/lib/queries";
@@ -29,6 +30,7 @@ export default function ModifiersManagement() {
   const updateModMut = useUpdateModifier();
   const deleteModMut = useDeleteModifier();
   const createOptMut = useCreateModifierOption();
+  const updateOptMut = useUpdateModifierOption();
   const deleteOptMut = useDeleteModifierOption();
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -42,6 +44,10 @@ export default function ModifiersManagement() {
   const [addingOptionFor, setAddingOptionFor] = useState<string | null>(null);
   const [optName, setOptName] = useState("");
   const [optPrice, setOptPrice] = useState("0");
+
+  const [editingOptId, setEditingOptId] = useState<string | null>(null);
+  const [editOptName, setEditOptName] = useState("");
+  const [editOptPrice, setEditOptPrice] = useState("0");
 
   const openCreateMod = () => {
     setEditingModId(null);
@@ -85,6 +91,26 @@ export default function ModifiersManagement() {
     createOptMut.mutate(
       { modifier_id: modifierId, name: optName.trim(), extra_price: parseFloat(optPrice) || 0 },
       { onSuccess: () => { setAddingOptionFor(null); setOptName(""); setOptPrice("0"); } }
+    );
+  };
+
+  const openEditOption = (opt: ModifierOption) => {
+    setEditingOptId(opt.id);
+    setEditOptName(opt.name);
+    setEditOptPrice(String(opt.extra_price));
+  };
+
+  const cancelEditOption = () => {
+    setEditingOptId(null);
+    setEditOptName("");
+    setEditOptPrice("0");
+  };
+
+  const handleSaveOption = (id: string) => {
+    if (!editOptName.trim()) return;
+    updateOptMut.mutate(
+      { id, updates: { name: editOptName.trim(), extra_price: parseFloat(editOptPrice) || 0 } },
+      { onSuccess: cancelEditOption }
     );
   };
 
@@ -167,15 +193,31 @@ export default function ModifiersManagement() {
                 </div>
                 {isExpanded && (
                   <div className="border-t border-warm-roast/10 p-4 bg-muted/40 space-y-3">
-                    {options.map((opt: ModifierOption) => (
-                      <div key={opt.id} className="flex items-center justify-between bg-card p-3 rounded-lg border border-warm-roast/10">
-                        <div>
-                          <span className="font-medium text-sm text-expresso">{opt.name}</span>
-                          {Number(opt.extra_price) > 0 && <span className="ml-2 text-xs text-expresso/60">+{formatMoney(opt.extra_price, "CRC")}</span>}
+                    {options.map((opt: ModifierOption) =>
+                      editingOptId === opt.id ? (
+                        <div key={opt.id} className="flex gap-2 items-end bg-card p-3 rounded-lg border border-warm-roast/10">
+                          <div className="flex-1">
+                            <Input type="text" value={editOptName} onChange={(e) => setEditOptName(e.target.value)} placeholder={t("modifiers.optionName")} />
+                          </div>
+                          <div className="w-28">
+                            <Input type="number" inputMode="numeric" step={1} min={0} value={editOptPrice} onChange={(e) => setEditOptPrice(e.target.value)} placeholder={t("modifiers.extraPrice")} />
+                          </div>
+                          <Button onClick={() => handleSaveOption(opt.id)} disabled={!editOptName.trim()} isLoading={updateOptMut.isPending}>{t("common.save")}</Button>
+                          <button onClick={cancelEditOption} className="p-2 text-expresso/40 hover:text-expresso"><X className="w-4 h-4" /></button>
                         </div>
-                        <button onClick={() => deleteOptMut.mutate(opt.id)} className="p-1.5 text-expresso/40 hover:text-destructive transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
-                      </div>
-                    ))}
+                      ) : (
+                        <div key={opt.id} className="flex items-center justify-between bg-card p-3 rounded-lg border border-warm-roast/10">
+                          <div>
+                            <span className="font-medium text-sm text-expresso">{opt.name}</span>
+                            {Number(opt.extra_price) > 0 && <span className="ml-2 text-xs text-expresso/60">+{formatMoney(opt.extra_price, "CRC")}</span>}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <button onClick={() => openEditOption(opt)} className="p-1.5 text-expresso/40 hover:text-coffee-fruit transition-colors"><Edit2 className="w-3.5 h-3.5" /></button>
+                            <button onClick={() => deleteOptMut.mutate(opt.id)} className="p-1.5 text-expresso/40 hover:text-destructive transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
+                          </div>
+                        </div>
+                      )
+                    )}
                     {addingOptionFor === mod.id ? (
                       <div className="flex gap-2 items-end">
                         <div className="flex-1">

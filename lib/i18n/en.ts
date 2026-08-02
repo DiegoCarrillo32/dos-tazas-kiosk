@@ -324,6 +324,7 @@ export const en = {
     option: "option",
     options: "options",
     addOption: "Add Option",
+    editOption: "Edit Option",
     optionName: "Option name",
     extraPrice: "Extra ₡",
     add: "Add",

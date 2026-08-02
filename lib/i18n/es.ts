@@ -326,6 +326,7 @@ export const es: Translations = {
     option: "opción",
     options: "opciones",
     addOption: "Agregar opción",
+    editOption: "Editar opción",
     optionName: "Nombre de opción",
     extraPrice: "Extra ₡",
     add: "Agregar",

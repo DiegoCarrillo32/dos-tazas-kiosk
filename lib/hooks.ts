@@ -44,6 +44,7 @@ import {
   updateModifier,
   deleteModifier,
   createModifierOption,
+  updateModifierOption,
   deleteModifierOption,
   fetchMenuItemModifierLinks,
   setMenuItemModifiers,
@@ -507,6 +508,17 @@ export function useCreateModifierOption() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: createModifierOption,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.modifiers });
+    },
+  });
+}
+
+export function useUpdateModifierOption() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, updates }: { id: string; updates: Parameters<typeof updateModifierOption>[1] }) =>
+      updateModifierOption(id, updates),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.modifiers });
     },

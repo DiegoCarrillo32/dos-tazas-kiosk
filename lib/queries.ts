@@ -321,6 +321,17 @@ export async function createModifierOption(opt: {
   return data as ModifierOption;
 }
 
+export async function updateModifierOption(
+  id: string,
+  updates: { name?: string; extra_price?: number }
+): Promise<void> {
+  const { error } = await supabase()
+    .from("modifier_options")
+    .update(updates)
+    .eq("id", id);
+  if (error) throw error;
+}
+
 export async function deleteModifierOption(id: string): Promise<void> {
   const { error } = await supabase()
     .from("modifier_options")

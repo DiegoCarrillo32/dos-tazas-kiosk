@@ -11,6 +11,8 @@ import type {
   LocationSettings,
   Table,
   UserProfile,
+  StaffMember,
+  SessionContext,
   CashMovementType,
   CountedBreakdown,
   SalesSummary,
@@ -120,10 +122,19 @@ export function resetProfileCache(): void {
   }
 }
 
+/**
+ * The location every client read/write filters by. Prefers
+ * `active_location_id` (supabase/migrations/00023) — the location a user
+ * has switched to (Phase 3) — falling back to `location_id` for a cached
+ * profile from before that column existed. Mirrors, on the client, what
+ * `get_current_location_id()` resolves server-side for RLS; this value is
+ * a UX filter only; RLS is the real security boundary and isn't affected
+ * by what this returns.
+ */
 export async function getLocationId(): Promise<string> {
   const profile = await getCurrentProfile();
   if (!profile) throw new Error("Not authenticated");
-  return profile.location_id;
+  return profile.active_location_id ?? profile.location_id;
 }
 
 // ─── Categories ────────────────────────────────────────────────────
@@ -518,6 +529,14 @@ export async function syncOfflineOrder(params: {
   expectedShiftId: string | null;
   payment: SyncPaymentPayload | null;
   clientCharge: unknown;
+  /**
+   * The location this entry was queued at (lib/offline/outbox.ts). The
+   * server-side belt to lib/offline/sync.ts's own mismatch check —
+   * supabase/migrations/00028 raises P0001 if this doesn't match the
+   * caller's current location. `null` (a pre-Phase-4 entry) is a
+   * wildcard, matched by no RPC-side check at all.
+   */
+  locationId: string | null;
 }): Promise<SyncRpcResult> {
   const { data, error } = await supabase().rpc("sync_offline_order", {
     p_client_uuid: params.clientUuid,
@@ -533,6 +552,7 @@ export async function syncOfflineOrder(params: {
     p_expected_shift_id: params.expectedShiftId ?? undefined,
     p_payment: params.payment,
     p_client_charge: params.clientCharge as Json,
+    p_location_id: params.locationId ?? undefined,
   });
   if (error) throw error;
   return data as SyncRpcResult;
@@ -553,6 +573,8 @@ export async function syncOfflinePayment(params: {
   expectedShiftId: string | null;
   payment: SyncPaymentPayload;
   clientCharge: unknown;
+  /** See syncOfflineOrder's `locationId` doc. */
+  locationId: string | null;
 }): Promise<SyncRpcResult | SyncRpcConflict> {
   const { data, error } = await supabase().rpc("sync_offline_payment", {
     p_order_id: params.orderId,
@@ -561,6 +583,7 @@ export async function syncOfflinePayment(params: {
     p_expected_shift_id: params.expectedShiftId ?? undefined,
     p_payment: params.payment,
     p_client_charge: params.clientCharge as Json,
+    p_location_id: params.locationId ?? undefined,
   });
   if (error) throw error;
   return data as SyncRpcResult | SyncRpcConflict;
@@ -935,6 +958,79 @@ export async function deleteTable(id: string): Promise<void> {
   if (error) throw error;
 }
 
+// ─── Locations & Session ────────────────────────────────────────────
+//
+// All writes go through SECURITY DEFINER RPCs (supabase/migrations/00026)
+// rather than table access — `locations` and `location_members` have no
+// INSERT/UPDATE/DELETE RLS policies at all, matching the orders
+// write-lockdown pattern (00013). There is deliberately no delete path:
+// a location is archived, never deleted, from this app.
+
+/**
+ * Current role/location + every location the caller belongs to. Powers
+ * the location switcher; the login landing hub and layout role gates
+ * still read `user_profiles` directly for now (see app/page.tsx,
+ * app/admin/layout.tsx) — both are equivalent for a single-location
+ * account, and switch over once an area-manager scenario needs it.
+ */
+export async function fetchSessionContext(): Promise<SessionContext | null> {
+  const { data, error } = await supabase().rpc("session_context");
+  if (error) throw error;
+  return (data as SessionContext | null) ?? null;
+}
+
+/**
+ * Switches the active location and returns the fresh session context.
+ * This is a low-level RPC call only — `useSwitchLocation` (lib/hooks.ts)
+ * is the real entry point and handles the full teardown (profile cache,
+ * query cache, offline shell) a switch requires; don't call this directly
+ * from a component.
+ */
+export async function switchLocation(locationId: string): Promise<SessionContext> {
+  const { data, error } = await supabase().rpc("switch_location", {
+    p_location_id: locationId,
+  });
+  if (error) throw error;
+  return data as SessionContext;
+}
+
+export async function createLocation(params: {
+  name: string;
+  address?: string | null;
+  copyMenuFrom?: string | null;
+}): Promise<string> {
+  const { data, error } = await supabase().rpc("create_location", {
+    p_name: params.name,
+    p_address: params.address ?? undefined,
+    p_copy_menu_from: params.copyMenuFrom ?? undefined,
+  });
+  if (error) throw error;
+  return data as string;
+}
+
+export async function updateLocation(
+  id: string,
+  name: string,
+  address?: string | null
+): Promise<void> {
+  const { error } = await supabase().rpc("update_location", {
+    p_location_id: id,
+    p_name: name,
+    p_address: address ?? undefined,
+  });
+  if (error) throw error;
+}
+
+export async function archiveLocation(id: string): Promise<void> {
+  const { error } = await supabase().rpc("archive_location", { p_location_id: id });
+  if (error) throw error;
+}
+
+export async function restoreLocation(id: string): Promise<void> {
+  const { error } = await supabase().rpc("restore_location", { p_location_id: id });
+  if (error) throw error;
+}
+
 // ─── Location Settings ─────────────────────────────────────────────
 
 export async function fetchLocationSettings(): Promise<LocationSettings | null> {
@@ -963,35 +1059,72 @@ export async function updateLocationSettings(
 }
 
 // ─── Staff Management ──────────────────────────────────────────────
+//
+// Sourced from `location_members` (supabase/migrations/00023), not
+// `user_profiles` directly — the roster is "who belongs to THIS
+// location", and role/membership date are per-location facts. Writes go
+// through the membership RPCs (00026) rather than table writes, matching
+// the write-lockdown pattern used everywhere else with a SECURITY
+// DEFINER boundary (00013).
 
-export async function fetchStaffProfiles(): Promise<UserProfile[]> {
+type StaffRow = {
+  role: string;
+  created_at: string;
+  user_profiles: { id: string; first_name: string | null; last_name: string | null } | null;
+};
+
+export async function fetchStaffProfiles(): Promise<StaffMember[]> {
   const locationId = await getLocationId();
   const { data, error } = await supabase()
-    .from("user_profiles")
-    .select("*")
+    .from("location_members")
+    .select("role, created_at, user_profiles(id, first_name, last_name)")
     .eq("location_id", locationId)
     .order("created_at");
 
   if (error) throw error;
-  return (data ?? []) as UserProfile[];
+  return ((data ?? []) as unknown as StaffRow[])
+    .filter((row) => row.user_profiles)
+    .map((row) => ({
+      id: row.user_profiles!.id,
+      role: row.role as "admin" | "staff",
+      first_name: row.user_profiles!.first_name,
+      last_name: row.user_profiles!.last_name,
+      created_at: row.created_at,
+    }));
 }
 
 export async function updateStaffRole(
   userId: string,
   role: "admin" | "staff"
 ): Promise<void> {
-  const { error } = await supabase()
-    .from("user_profiles")
-    .update({ role })
-    .eq("id", userId);
+  const locationId = await getLocationId();
+  const { error } = await supabase().rpc("set_location_membership", {
+    p_user_id: userId,
+    p_location_id: locationId,
+    p_role: role,
+  });
   if (error) throw error;
 }
 
-export async function removeStaffProfile(userId: string): Promise<void> {
-  const { error } = await supabase()
-    .from("user_profiles")
-    .delete()
-    .eq("id", userId);
+/** Revokes access to the active location only — other memberships (if any) are untouched. */
+export async function removeStaffMember(userId: string): Promise<void> {
+  const locationId = await getLocationId();
+  const { error } = await supabase().rpc("remove_location_membership", {
+    p_user_id: userId,
+    p_location_id: locationId,
+  });
+  if (error) throw error;
+}
+
+/** Grants an existing account (one with a profile already, elsewhere) access to the active location. */
+export async function addStaffMemberByEmail(
+  email: string,
+  role: "admin" | "staff"
+): Promise<void> {
+  const { error } = await supabase().rpc("add_member_by_email", {
+    p_email: email,
+    p_role: role,
+  });
   if (error) throw error;
 }
 
@@ -1015,8 +1148,6 @@ export async function inviteStaffMember(
   lastName: string,
   role: "admin" | "staff"
 ): Promise<void> {
-  const locationId = await getLocationId();
-
   // auth.signUp on the admin's own client would replace their session
   // with the brand-new staff account the moment it succeeds — a
   // throwaway client with no persisted session (see createEphemeralClient)
@@ -1029,23 +1160,25 @@ export async function inviteStaffMember(
   if (signUpError) throw signUpError;
   if (!data.user) throw new Error("Failed to create auth user");
 
-  // Upsert, not insert: if this step fails after the auth user above was
-  // created (network blip, RLS hiccup), re-running the invite with the
-  // same email must recover rather than fail forever on a duplicate key.
-  const { error: profileError } = await supabase()
-    .from("user_profiles")
-    .upsert({
-      id: data.user.id,
-      location_id: locationId,
-      role,
-      first_name: firstName,
-      last_name: lastName,
-    });
+  // provision_staff_member (00026) creates the profile + membership in
+  // one transaction, and — unlike the old direct upsert — refuses to
+  // touch an id that already has a profile, so a duplicate email can't
+  // repoint an existing account at this location.
+  const { error: profileError } = await supabase().rpc("provision_staff_member", {
+    p_user_id: data.user.id,
+    p_first_name: firstName,
+    // No SQL default on p_last_name (see 00026) — pass "" rather than
+    // undefined; the RPC's `nullif(p_last_name, '')` turns that into
+    // null, same as an omitted last name always meant here.
+    p_last_name: lastName || "",
+    p_role: role,
+  });
 
   if (profileError) {
     // The auth user now exists with no profile row — say so plainly.
-    // Re-running the invite with the same email is the fix, and the
-    // upsert above makes that safe.
+    // Re-running the invite with the same email is the fix: signUp on an
+    // existing (unconfirmed) email is idempotent, and this RPC recovers
+    // cleanly as long as the profile still doesn't exist.
     throw new Error(
       `Auth account created but the staff profile failed to save (${profileError.message}). Invite this email again to finish setup.`
     );

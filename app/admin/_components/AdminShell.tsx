@@ -3,11 +3,13 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Menu as MenuIcon, X, History, FileText, Store, LogOut, ArrowLeft, SlidersHorizontal, UsersRound, Settings, BarChart3, Armchair, Wallet } from "lucide-react";
+import { LayoutDashboard, Menu as MenuIcon, X, History, FileText, Store, LogOut, ArrowLeft, SlidersHorizontal, UsersRound, Settings, BarChart3, Armchair, Wallet, Building2, ChevronDown, Check } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { LanguageToggle } from "@/components/ui/LanguageToggle";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/Popover";
+import { Sheet } from "@/components/ui/Modal";
 import { useT } from "@/lib/i18n/LanguageContext";
-import { useLogout } from "@/lib/hooks";
+import { useLogout, useSessionContext, useSwitchLocation, useLocationSwitchListener } from "@/lib/hooks";
 
 type NavKey =
   | "admin.dashboard"
@@ -19,6 +21,7 @@ type NavKey =
   | "admin.cash"
   | "admin.transactionHistory"
   | "admin.financialReports"
+  | "admin.locations"
   | "admin.settings";
 
 const NAV_ITEMS: { href: string; labelKey: NavKey; icon: React.ElementType }[] = [
@@ -31,8 +34,149 @@ const NAV_ITEMS: { href: string; labelKey: NavKey; icon: React.ElementType }[] =
   { href: "/admin/cash", labelKey: "admin.cash", icon: Wallet },
   { href: "/admin/history", labelKey: "admin.transactionHistory", icon: History },
   { href: "/admin/reports", labelKey: "admin.financialReports", icon: FileText },
+  { href: "/admin/locations", labelKey: "admin.locations", icon: Building2 },
   { href: "/admin/settings", labelKey: "admin.settings", icon: Settings },
 ];
+
+/**
+ * Locations the switcher offers: only ones the caller ADMINISTERS.
+ * Switching to a location where they're staff-only would immediately
+ * eject them back to /pos/floor via app/admin/layout.tsx's RBAC redirect
+ * — better not to build that trap into the switcher itself.
+ */
+function useSwitchableLocations() {
+  const { data: session } = useSessionContext();
+  const active = session?.locations.find((l) => l.id === session.active_location_id) ?? null;
+  const options = (session?.locations ?? []).filter((l) => l.role === "admin" && !l.archived);
+  return { active, options };
+}
+
+function LocationSwitcher() {
+  const t = useT();
+  const { active, options } = useSwitchableLocations();
+  const doSwitch = useSwitchLocation();
+  const [open, setOpen] = useState(false);
+  const [switching, setSwitching] = useState(false);
+
+  // One location (the 100% case today) ⇒ plain text, no affordance.
+  if (options.length <= 1) {
+    return <p className="text-xs text-expresso/60 truncate">{active?.name ?? t("admin.adminPortal")}</p>;
+  }
+
+  const handlePick = async (locationId: string) => {
+    if (locationId === active?.id) {
+      setOpen(false);
+      return;
+    }
+    setSwitching(true);
+    await doSwitch(locationId);
+    // On success this tab navigates away (useSwitchLocation ends in
+    // window.location.assign) — only reachable here if it declined or errored.
+    setSwitching(false);
+    setOpen(false);
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="flex items-center gap-1 text-xs text-expresso/60 hover:text-expresso transition-colors truncate max-w-full"
+        >
+          <span className="truncate">{switching ? t("locations.switching") : (active?.name ?? t("admin.adminPortal"))}</span>
+          <ChevronDown className="w-3 h-3 shrink-0" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-64 p-2">
+        <p className="px-2 py-1 text-xs font-semibold text-expresso/40 uppercase tracking-wide">
+          {t("locations.switchTo")}
+        </p>
+        <div className="space-y-0.5 mt-1">
+          {options.map((loc) => (
+            <button
+              key={loc.id}
+              type="button"
+              onClick={() => handlePick(loc.id)}
+              disabled={switching}
+              className={`w-full text-left px-2 py-2 rounded-lg text-sm flex items-center justify-between transition-colors disabled:opacity-50 ${
+                loc.id === active?.id
+                  ? "bg-warm-roast/10 text-expresso font-medium"
+                  : "text-expresso/70 hover:bg-warm-roast/5"
+              }`}
+            >
+              {loc.name}
+              {loc.id === active?.id && <Check className="w-4 h-4 shrink-0" />}
+            </button>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function LocationSwitcherSheet() {
+  const t = useT();
+  const { active, options } = useSwitchableLocations();
+  const doSwitch = useSwitchLocation();
+  const [open, setOpen] = useState(false);
+  const [switching, setSwitching] = useState(false);
+
+  if (options.length <= 1) {
+    return <h1 className="font-bold tracking-tight text-expresso truncate">{active?.name ?? t("admin.adminPortal")}</h1>;
+  }
+
+  const handlePick = async (locationId: string) => {
+    if (locationId === active?.id) {
+      setOpen(false);
+      return;
+    }
+    setSwitching(true);
+    await doSwitch(locationId);
+    setSwitching(false);
+    setOpen(false);
+  };
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="flex items-center gap-1 font-bold tracking-tight text-expresso min-w-0"
+      >
+        <span className="truncate">{switching ? t("locations.switching") : (active?.name ?? t("admin.adminPortal"))}</span>
+        <ChevronDown className="w-4 h-4 text-expresso/40 shrink-0" />
+      </button>
+      {open && (
+        <Sheet onClose={() => setOpen(false)}>
+          <div className="p-4 border-b border-warm-roast/10 flex items-center justify-between shrink-0">
+            <h3 className="font-bold text-expresso">{t("locations.switchTo")}</h3>
+            <button onClick={() => setOpen(false)} className="p-1.5 text-expresso/40 hover:text-expresso">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-2">
+            {options.map((loc) => (
+              <button
+                key={loc.id}
+                type="button"
+                onClick={() => handlePick(loc.id)}
+                disabled={switching}
+                className={`w-full text-left px-4 py-3.5 rounded-lg text-base flex items-center justify-between transition-colors disabled:opacity-50 ${
+                  loc.id === active?.id
+                    ? "bg-warm-roast/10 text-expresso font-medium"
+                    : "text-expresso/80 hover:bg-warm-roast/5"
+                }`}
+              >
+                {loc.name}
+                {loc.id === active?.id && <Check className="w-5 h-5 shrink-0" />}
+              </button>
+            ))}
+          </div>
+        </Sheet>
+      )}
+    </>
+  );
+}
 
 export default function AdminShell({
   children,
@@ -47,6 +191,9 @@ export default function AdminShell({
   // no longer a way to sign out around a sale still queued for THIS
   // session to sync.
   const handleLogout = useLogout();
+  // Reloads this tab if another tab switches location — see step 6 of
+  // useSwitchLocation (lib/hooks.ts).
+  useLocationSwitchListener();
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
@@ -63,9 +210,9 @@ export default function AdminShell({
                 <div className="bg-coffee-fruit p-2 rounded-md">
                   <Store className="w-5 h-5 text-white" />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <h1 className="font-bold tracking-tight text-expresso">Dos Tazas</h1>
-                  <p className="text-xs text-expresso/60">{t("admin.adminPortal")}</p>
+                  <LocationSwitcher />
                 </div>
               </div>
               <button
@@ -187,7 +334,7 @@ export default function AdminShell({
             >
               <MenuIcon className="w-5 h-5" />
             </button>
-            <h1 className="font-bold tracking-tight text-expresso">{t("admin.adminPortal")}</h1>
+            <LocationSwitcherSheet />
           </div>
           <div className="flex items-center gap-3">
             <LanguageToggle />

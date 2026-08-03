@@ -13,6 +13,8 @@ export type Json =
   | Json[]
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
@@ -105,6 +107,45 @@ export type Database = {
           },
         ]
       }
+      location_members: {
+        Row: {
+          created_at: string
+          location_id: string
+          role: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          location_id: string
+          role?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          location_id?: string
+          role?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "location_members_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "location_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       location_settings: {
         Row: {
           address: string | null
@@ -164,26 +205,40 @@ export type Database = {
       locations: {
         Row: {
           address: string | null
+          archived_at: string | null
           created_at: string
+          created_by: string | null
           id: string
           name: string
           updated_at: string
         }
         Insert: {
           address?: string | null
+          archived_at?: string | null
           created_at?: string
+          created_by?: string | null
           id?: string
           name: string
           updated_at?: string
         }
         Update: {
           address?: string | null
+          archived_at?: string | null
           created_at?: string
+          created_by?: string | null
           id?: string
           name?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "locations_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       menu_item_modifiers: {
         Row: {
@@ -769,6 +824,7 @@ export type Database = {
       }
       user_profiles: {
         Row: {
+          active_location_id: string | null
           created_at: string
           first_name: string | null
           id: string
@@ -778,6 +834,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          active_location_id?: string | null
           created_at?: string
           first_name?: string | null
           id: string
@@ -787,6 +844,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          active_location_id?: string | null
           created_at?: string
           first_name?: string | null
           id?: string
@@ -796,6 +854,20 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "user_profiles_active_location_id_fkey"
+            columns: ["active_location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_profiles_active_location_is_membership"
+            columns: ["id", "active_location_id"]
+            isOneToOne: false
+            referencedRelation: "location_members"
+            referencedColumns: ["user_id", "location_id"]
+          },
           {
             foreignKeyName: "user_profiles_location_id_fkey"
             columns: ["location_id"]
@@ -836,10 +908,15 @@ export type Database = {
         Args: { p_order_id: string }
         Returns: undefined
       }
+      add_member_by_email: {
+        Args: { p_email: string; p_role: string }
+        Returns: undefined
+      }
       append_to_order: {
         Args: { items: Json; p_order_id: string }
         Returns: undefined
       }
+      archive_location: { Args: { p_location_id: string }; Returns: undefined }
       close_shift: {
         Args: {
           p_counted_breakdown?: Json
@@ -864,6 +941,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      create_location: {
+        Args: { p_address?: string; p_copy_menu_from?: string; p_name: string }
+        Returns: string
+      }
       create_order: {
         Args: { items: Json; p_table_id?: string }
         Returns: string
@@ -871,6 +952,8 @@ export type Database = {
       current_shift_id: { Args: never; Returns: string }
       get_current_location_id: { Args: never; Returns: string }
       is_admin: { Args: never; Returns: boolean }
+      is_admin_at: { Args: { p_location_id: string }; Returns: boolean }
+      is_member_of: { Args: { p_location_id: string }; Returns: boolean }
       next_order_number: {
         Args: { p_at?: string; p_location_id: string }
         Returns: number
@@ -904,17 +987,38 @@ export type Database = {
           total_amount: number
         }[]
       }
+      provision_staff_member: {
+        Args: {
+          p_first_name: string
+          p_last_name: string
+          p_role: string
+          p_user_id: string
+        }
+        Returns: undefined
+      }
       recent_shifts: { Args: { p_limit?: number }; Returns: Json }
       record_cash_movement: {
         Args: { p_amount: number; p_reason: string; p_type: string }
         Returns: string
       }
+      remove_location_membership: {
+        Args: { p_location_id: string; p_user_id: string }
+        Returns: undefined
+      }
+      restore_location: { Args: { p_location_id: string }; Returns: undefined }
       reverse_completed_order: {
         Args: { p_order_id: string; p_reason?: string }
         Returns: undefined
       }
       sales_summary: { Args: { p_end: string; p_start: string }; Returns: Json }
+      session_context: { Args: never; Returns: Json }
+      set_location_membership: {
+        Args: { p_location_id: string; p_role: string; p_user_id: string }
+        Returns: undefined
+      }
+      shares_location_with: { Args: { p_user_id: string }; Returns: boolean }
       shift_summary: { Args: { p_shift_id?: string }; Returns: Json }
+      switch_location: { Args: { p_location_id: string }; Returns: Json }
       sync_offline_order: {
         Args: {
           p_client_age_seconds?: number
@@ -939,6 +1043,10 @@ export type Database = {
           p_payment?: Json
         }
         Returns: Json
+      }
+      update_location: {
+        Args: { p_address?: string; p_location_id: string; p_name: string }
+        Returns: undefined
       }
       void_order: {
         Args: { p_order_id: string; p_reason?: string }
@@ -1070,9 +1178,3 @@ export type CompositeTypes<
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
     ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
-
-export const Constants = {
-  public: {
-    Enums: {},
-  },
-} as const

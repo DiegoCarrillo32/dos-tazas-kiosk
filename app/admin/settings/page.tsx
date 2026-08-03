@@ -17,6 +17,8 @@ import { Checkbox } from "@/components/ui/Checkbox";
 import { useToast } from "@/components/ui/Feedback";
 import type { UserProfile, LocationSettings } from "@/lib/types";
 import { useT } from "@/lib/i18n/LanguageContext";
+import { LANDING_COOKIE, LANDING_COOKIE_MAX_AGE } from "@/lib/landing";
+import { cn } from "@/lib/utils";
 
 function SettingsForm({
   profile,
@@ -108,6 +110,9 @@ function SettingsForm({
         </Button>
       </div>
 
+      {/* Landing preference (admins only — staff always land on the floor) */}
+      {profile.role === "admin" && <LandingPreferenceForm />}
+
       {/* Business & Tax (admins only) */}
       {profile.role === "admin" && !settingsLoading && (
         <BusinessSettingsForm settings={bizSettings ?? null} />
@@ -124,6 +129,54 @@ function SettingsForm({
         >
           {t("settings.signOut")}
         </Button>
+      </div>
+    </div>
+  );
+}
+
+function readLandingCookie(): "admin" | "pos" {
+  if (typeof document === "undefined") return "admin";
+  const match = document.cookie.match(new RegExp(`(?:^|; )${LANDING_COOKIE}=([^;]*)`));
+  return match?.[1] === "pos" ? "pos" : "admin";
+}
+
+/**
+ * Sticky "where do I land after login" preference for admins, read by
+ * app/page.tsx on every "/" visit. Takes effect immediately (no Save
+ * button), same pattern as LanguageToggle — it's a device preference, not
+ * a record that needs confirming. A cookie rather than localStorage
+ * because app/page.tsx renders this decision on the server.
+ */
+function LandingPreferenceForm() {
+  const t = useT();
+  const [landing, setLanding] = useState<"admin" | "pos">(readLandingCookie);
+
+  useEffect(() => {
+    document.cookie = `${LANDING_COOKIE}=${landing}; path=/; max-age=${LANDING_COOKIE_MAX_AGE}; samesite=lax`;
+  }, [landing]);
+
+  return (
+    <div className="bg-card rounded-2xl border border-warm-roast/10 shadow-sm p-6 space-y-3">
+      <div>
+        <h2 className="font-semibold text-expresso">{t("settings.landingTitle")}</h2>
+        <p className="text-sm text-expresso/60">{t("settings.landingSubtitle")}</p>
+      </div>
+      <div className="inline-flex rounded-lg border border-warm-roast/10 p-1 bg-muted/40">
+        {(["admin", "pos"] as const).map((value) => (
+          <button
+            key={value}
+            type="button"
+            onClick={() => setLanding(value)}
+            className={cn(
+              "px-4 py-2 rounded-md text-sm font-medium transition-colors",
+              landing === value
+                ? "bg-coffee-fruit text-white"
+                : "text-expresso/70 hover:text-expresso"
+            )}
+          >
+            {value === "admin" ? t("settings.landingAdmin") : t("settings.landingPos")}
+          </button>
+        ))}
       </div>
     </div>
   );

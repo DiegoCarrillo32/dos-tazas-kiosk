@@ -62,6 +62,21 @@ export type OutboxEntry = {
   /** "OFF-A7F3" — deterministic from `id`, printed on the provisional receipt. */
   offlineRef: string;
   deviceId: string;
+  /**
+   * The location this entry was queued AT (supabase/migrations 00023,
+   * 00028) — stamped once at enqueue time by outbox.ts's
+   * getActiveLocationId(), never updated afterward. Draining into a
+   * DIFFERENT location than this is refused, both client-side
+   * (lib/offline/sync.ts) and server-side (sync_offline_order /
+   * sync_offline_payment's p_location_id check) — the idempotency key is
+   * (location_id, client_uuid), so a mis-drain would produce a second
+   * order rather than a clean replay. `null` for an entry queued before
+   * this column existed, or if location resolution failed entirely at
+   * enqueue time — treated as a wildcard (always allowed to drain), since
+   * losing a paid sale is worse than a theoretical mis-location on what
+   * was, for that device, always a single-location install.
+   */
+  locationId: string | null;
   /** Set on a pay_order entry once we know which server order it targets. */
   serverOrderId: string | null;
   expectedShiftId: string | null;

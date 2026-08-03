@@ -61,8 +61,15 @@ function QueueRow({
   const t = useT();
   const { snapshot } = entry;
 
-  const stateLabel =
-    entry.status === "failed"
+  // A location mismatch (Phase 4) isn't a real failure needing
+  // investigation — it's "you're not at the shop this was queued for
+  // right now," resolved by switching back, so it gets its own label and
+  // a neutral color instead of the red "something's wrong" treatment.
+  const isLocationMismatch = entry.status === "failed" && entry.lastErrorCode === "location_mismatch";
+
+  const stateLabel = isLocationMismatch
+    ? t("offline.stateLocationMismatch")
+    : entry.status === "failed"
       ? t("offline.stateFailed")
       : entry.status === "done"
         ? entry.result?.orderNumber != null
@@ -72,8 +79,9 @@ function QueueRow({
           ? t("offline.stateSending")
           : t("offline.statePending");
 
-  const stateClass =
-    entry.status === "failed"
+  const stateClass = isLocationMismatch
+    ? "bg-warm-roast/10 text-expresso/70"
+    : entry.status === "failed"
       ? "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300"
       : entry.status === "done"
         ? "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300"
@@ -108,10 +116,14 @@ function QueueRow({
       )}
       {entry.status === "failed" && (
         <div className="space-y-2 pt-1">
-          {entry.lastError && (
-            <p className="text-xs text-red-700 dark:text-red-400">
-              {t("offline.lastError")}: {entry.lastError}
-            </p>
+          {isLocationMismatch ? (
+            <p className="text-xs text-expresso/60">{t("offline.switchToSend")}</p>
+          ) : (
+            entry.lastError && (
+              <p className="text-xs text-red-700 dark:text-red-400">
+                {t("offline.lastError")}: {entry.lastError}
+              </p>
+            )
           )}
           <Button size="sm" variant="secondary" onClick={() => onRetry(entry.id)}>
             {t("offline.retry")}

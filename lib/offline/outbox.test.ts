@@ -27,6 +27,7 @@ function makeEntry(overrides: Partial<OutboxEntry> = {}): OutboxEntry {
     occurredAtIso: new Date().toISOString(),
     offlineRef: "OFF-AAAA",
     deviceId: "device-1",
+    locationId: "location-1",
     serverOrderId: null,
     expectedShiftId: null,
     snapshot: {

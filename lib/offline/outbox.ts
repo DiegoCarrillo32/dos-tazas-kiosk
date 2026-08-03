@@ -1,4 +1,4 @@
-import { cartItemsToRpcItems } from "@/lib/queries";
+import { cartItemsToRpcItems, getLocationId } from "@/lib/queries";
 import type { ClientCharge } from "@/lib/pricing";
 import {
   deleteOutboxEntry,
@@ -7,7 +7,9 @@ import {
   getOutboxEntry,
   nextSeq,
   putOutboxEntry,
+  readMeta,
   updateOutboxEntry,
+  writeMeta,
 } from "./db";
 import type {
   EnqueueCartInput,
@@ -57,6 +59,33 @@ export function offlineRefFor(id: string): string {
   return "OFF-" + id.replace(/-/g, "").slice(0, 4).toUpperCase();
 }
 
+/**
+ * The location to stamp a NEW outbox entry with, and what
+ * lib/offline/sync.ts checks a queued entry against before draining it.
+ * IndexedDB's `meta` store is the source (not a React Query cache read)
+ * because this must work with no network at all — `writeMeta` is called
+ * by `useSwitchLocation` (lib/hooks.ts) on every switch, so the cache is
+ * kept warm without this function ever needing to be network-dependent
+ * itself. Falls back to a live profile read (and backfills the cache)
+ * only for a device that has never switched locations since Phase 3
+ * shipped — the common case today.
+ */
+export async function getActiveLocationId(): Promise<string | null> {
+  try {
+    const cached = await readMeta<string>("activeLocationId");
+    if (cached) return cached;
+  } catch {
+    // IndexedDB unavailable — fall through to the network path.
+  }
+  try {
+    const loc = await getLocationId();
+    await writeMeta("activeLocationId", loc).catch(() => {});
+    return loc;
+  } catch {
+    return null;
+  }
+}
+
 function buildSnapshot(input: EnqueueCartInput): OfflineOrderSnapshot {
   const lines = input.cartItems.map((item) => ({
     name: item.menuItem.name,
@@ -90,6 +119,7 @@ async function baseEntry(kind: OutboxEntry["kind"]): Promise<
     | "occurredAtIso"
     | "offlineRef"
     | "deviceId"
+    | "locationId"
     | "serverOrderId"
     | "expectedShiftId"
     | "lastError"
@@ -98,7 +128,11 @@ async function baseEntry(kind: OutboxEntry["kind"]): Promise<
   >
 > {
   const id = crypto.randomUUID();
-  const [seq, deviceId] = await Promise.all([nextSeq(), getDeviceId()]);
+  const [seq, deviceId, locationId] = await Promise.all([
+    nextSeq(),
+    getDeviceId(),
+    getActiveLocationId(),
+  ]);
   const now = Date.now();
   return {
     id,
@@ -111,6 +145,7 @@ async function baseEntry(kind: OutboxEntry["kind"]): Promise<
     occurredAtIso: new Date(now).toISOString(),
     offlineRef: offlineRefFor(id),
     deviceId,
+    locationId,
     serverOrderId: null,
     expectedShiftId: null,
     lastError: null,

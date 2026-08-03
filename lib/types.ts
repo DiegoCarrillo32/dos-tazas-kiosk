@@ -16,6 +16,51 @@ export type UserProfile = Omit<Tables<"user_profiles">, "role"> & {
 };
 
 /**
+ * A user's membership + role at one location (supabase/migrations/00023).
+ * Authoritative for role as of 00024 — `UserProfile.role` above is kept in
+ * sync for a single-location caller by the 00021 trigger but is scoped to
+ * a user's whole account, not one location; prefer this once a user can
+ * belong to more than one location (Phase 3).
+ */
+export type LocationMember = Tables<"location_members">;
+
+/**
+ * A row in the active location's staff roster (app/admin/staff/page.tsx),
+ * sourced from `location_members` joined to `user_profiles` — not
+ * `UserProfile` directly, since `role` and `created_at` here are specific
+ * to THIS location's membership, not the account as a whole.
+ */
+export type StaffMember = {
+  id: string;
+  role: "admin" | "staff";
+  first_name: string | null;
+  last_name: string | null;
+  /** When this membership was created, not when the account was. */
+  created_at: string;
+};
+
+/**
+ * Return shape of the `session_context()` RPC (00026) — the one call
+ * behind the login landing hub, the admin/POS layout role gates, and the
+ * (Phase 3) location switcher. `role` is the caller's role at
+ * `active_location_id` specifically, not a global account role.
+ */
+export type SessionContext = {
+  user_id: string;
+  active_location_id: string | null;
+  role: "admin" | "staff";
+  first_name: string | null;
+  last_name: string | null;
+  locations: {
+    id: string;
+    name: string;
+    address: string | null;
+    role: "admin" | "staff";
+    archived: boolean;
+  }[];
+};
+
+/**
  * `sort_order` is nullable in the schema (a bare column default, not a
  * NOT NULL constraint) but every write path here always supplies a
  * number — narrowed back to `number` so callers don't need to guard a

@@ -4,9 +4,10 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/utils/supabase/client";
 import { kick as kickOfflineSync } from "./offline/sync";
 import { useOutbox } from "./offline/useOutbox";
+import { writeMeta } from "./offline/db";
 import { clearOfflineShell } from "@/components/ServiceWorkerRegistrar";
 import { useT } from "./i18n/LanguageContext";
-import { useToast } from "@/components/ui/Feedback";
+import { useToast, useConfirm } from "@/components/ui/Feedback";
 import { PERSISTED_QUERY_CACHE_KEY } from "./QueryProvider";
 import {
   fetchCategories,
@@ -50,13 +51,20 @@ import {
   setMenuItemModifiers,
   fetchStaffProfiles,
   updateStaffRole,
-  removeStaffProfile,
+  removeStaffMember,
+  addStaffMemberByEmail,
   inviteStaffMember,
   updateOwnProfile,
   getCurrentProfile,
   resetProfileCache,
   fetchLocationSettings,
   updateLocationSettings,
+  fetchSessionContext,
+  switchLocation,
+  createLocation,
+  updateLocation,
+  archiveLocation,
+  restoreLocation,
 } from "./queries";
 import type { CartItem, CashMovementType, CountedBreakdown, DiscountType, PaymentMethod } from "./types";
 
@@ -83,6 +91,7 @@ export const queryKeys = {
     ["analytics", start, end] as const,
   staffProfiles: ["staffProfiles"] as const,
   currentProfile: ["currentProfile"] as const,
+  sessionContext: ["sessionContext"] as const,
   locationSettings: ["locationSettings"] as const,
   tables: ["tables"] as const,
   currentShift: ["currentShift"] as const,
@@ -585,10 +594,23 @@ export function useUpdateStaffRole() {
   });
 }
 
+/** Revokes access to the ACTIVE location only — see removeStaffMember. */
 export function useRemoveStaff() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: removeStaffProfile,
+    mutationFn: removeStaffMember,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.staffProfiles });
+    },
+  });
+}
+
+/** Grants an existing account access to the active location. */
+export function useAddStaffMemberByEmail() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ email, role }: { email: string; role: "admin" | "staff" }) =>
+      addStaffMemberByEmail(email, role),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.staffProfiles });
     },
@@ -616,6 +638,157 @@ export function useInviteStaff() {
       qc.invalidateQueries({ queryKey: queryKeys.staffProfiles });
     },
   });
+}
+
+// ─── Locations & Session ───────────────────────────────────────────
+
+export function useSessionContext() {
+  return useQuery({
+    queryKey: queryKeys.sessionContext,
+    queryFn: fetchSessionContext,
+    staleTime: LONG_CACHE,
+  });
+}
+
+export function useCreateLocation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (params: { name: string; address?: string | null; copyMenuFrom?: string | null }) =>
+      createLocation(params),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.sessionContext });
+    },
+  });
+}
+
+export function useUpdateLocation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, name, address }: { id: string; name: string; address?: string | null }) =>
+      updateLocation(id, name, address),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.sessionContext });
+    },
+  });
+}
+
+export function useArchiveLocation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: archiveLocation,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.sessionContext });
+    },
+  });
+}
+
+export function useRestoreLocation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: restoreLocation,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.sessionContext });
+    },
+  });
+}
+
+/**
+ * Switching locations is not a normal mutation — it changes what
+ * `get_current_location_id()` resolves server-side, which every RLS
+ * policy and every query key in this file implicitly depends on. Modeled
+ * directly on `useLogout` below, which already does most of this
+ * teardown for the same reason (a shared kiosk must not serve the next
+ * session cached data scoped to the wrong identity):
+ *
+ *  1. Block while the offline outbox has pending/failed entries — a
+ *     queued sale is stamped for the CURRENT location (Phase 4) and a
+ *     switch mid-drain risks it landing in the wrong one.
+ *  2. Warn (don't block) if the current location has an open shift —
+ *     shifts are per-location (one open per location at a time), so the
+ *     till stays open and unaffected; just make sure that's understood.
+ *  3. Call the RPC, which is the only thing actually guarded server-side
+ *     (membership + not-archived) — everything else here is UX.
+ *  4. Reset the profile cache, clear the in-memory AND persisted query
+ *     cache (every key above is location-implicit), and clear the
+ *     offline shell — otherwise `/admin/menu` would rehydrate the old
+ *     location's data under the new one for a moment.
+ *  5. Stamp the new active location into the offline meta store so a
+ *     device that goes offline immediately after switching still tags
+ *     new outbox entries correctly (Phase 4).
+ *  6. Tell other tabs to reload via BroadcastChannel — a second tab
+ *     sitting on /pos/counter with a cart built from the old location's
+ *     menu would otherwise silently keep operating on stale data.
+ *  7. `window.location.assign`, never `router.push` — a client-side
+ *     navigation doesn't reset module state (profileMemo in
+ *     lib/queries.ts survives it), and a full document reload is what
+ *     re-runs the server layouts' role gate for the new location.
+ */
+export function useSwitchLocation() {
+  const t = useT();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const confirmDialog = useConfirm();
+  const { pendingCount, failedCount } = useOutbox();
+
+  return async (locationId: string) => {
+    const stillPending = pendingCount + failedCount;
+    if (stillPending > 0) {
+      toast(t("locations.cannotSwitchPending", { n: stillPending }));
+      return;
+    }
+
+    const shift = await fetchShiftSummary(null).catch(() => null);
+    if (shift?.status === "open") {
+      if (!(await confirmDialog(t("locations.switchConfirmOpenShift")))) return;
+    }
+
+    try {
+      await switchLocation(locationId);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : String(err));
+      return;
+    }
+
+    resetProfileCache();
+    qc.clear();
+    try {
+      window.localStorage.removeItem(PERSISTED_QUERY_CACHE_KEY);
+    } catch {
+      // Storage unavailable — nothing to clear.
+    }
+    clearOfflineShell();
+    try {
+      await writeMeta("activeLocationId", locationId);
+    } catch {
+      // IndexedDB unavailable — offline stamping degrades to "unstamped",
+      // handled as a wildcard rather than a hard failure (Phase 4).
+    }
+    try {
+      new BroadcastChannel("dostazas-session").postMessage({ type: "location-switch" });
+    } catch {
+      // BroadcastChannel unsupported — other tabs simply won't auto-reload.
+    }
+
+    window.location.assign(window.location.pathname);
+  };
+}
+
+/**
+ * Reloads this tab when another tab in the same browser switches
+ * location — see step 6 of useSwitchLocation. Mount once per app shell
+ * (AdminShell); harmless to mount from more than one place.
+ */
+export function useLocationSwitchListener() {
+  useEffect(() => {
+    if (typeof BroadcastChannel === "undefined") return;
+    const channel = new BroadcastChannel("dostazas-session");
+    channel.onmessage = (event) => {
+      if (event.data?.type === "location-switch") {
+        window.location.reload();
+      }
+    };
+    return () => channel.close();
+  }, []);
 }
 
 // ─── Location Settings ─────────────────────────────────────────────

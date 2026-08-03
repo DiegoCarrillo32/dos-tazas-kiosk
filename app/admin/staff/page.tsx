@@ -1,14 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { Shield, ShieldAlert, Trash2, Loader2, UserPlus, Users } from "lucide-react";
-import type { UserProfile } from "@/lib/types";
+import { Shield, ShieldAlert, Trash2, Loader2, UserPlus, UserCog, Users } from "lucide-react";
+import type { StaffMember } from "@/lib/types";
 import {
   useStaffProfiles,
   useCurrentProfile,
+  useSessionContext,
   useUpdateStaffRole,
   useRemoveStaff,
   useInviteStaff,
+  useAddStaffMemberByEmail,
 } from "@/lib/hooks";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
@@ -23,9 +25,14 @@ export default function StaffManagement() {
   const confirmDialog = useConfirm();
   const { data: staff = [], isLoading } = useStaffProfiles();
   const { data: currentUser } = useCurrentProfile();
+  const { data: session } = useSessionContext();
   const updateRoleMut = useUpdateStaffRole();
   const removeMut = useRemoveStaff();
   const inviteMut = useInviteStaff();
+  const addByEmailMut = useAddStaffMemberByEmail();
+
+  const activeLocationName =
+    session?.locations.find((l) => l.id === session.active_location_id)?.name ?? "";
 
   const [showInvite, setShowInvite] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
@@ -33,6 +40,10 @@ export default function StaffManagement() {
   const [inviteFirst, setInviteFirst] = useState("");
   const [inviteLast, setInviteLast] = useState("");
   const [inviteRole, setInviteRole] = useState<"admin" | "staff">("staff");
+
+  const [showAddByEmail, setShowAddByEmail] = useState(false);
+  const [addEmail, setAddEmail] = useState("");
+  const [addRole, setAddRole] = useState<"admin" | "staff">("staff");
 
   const handleInvite = () => {
     if (!inviteEmail || !invitePassword || !inviteFirst) {
@@ -61,19 +72,48 @@ export default function StaffManagement() {
     );
   };
 
-  const handleToggleRole = async (member: UserProfile) => {
-    const newRole = member.role === "admin" ? "staff" : "admin";
-    if (!(await confirmDialog(t("staff.confirmRoleChange", { name: member.first_name ?? "", role: newRole })))) return;
-    updateRoleMut.mutate({ userId: member.id, role: newRole });
+  const handleAddByEmail = () => {
+    if (!addEmail.trim()) {
+      toast(t("staff.emailRequired"));
+      return;
+    }
+    addByEmailMut.mutate(
+      { email: addEmail.trim(), role: addRole },
+      {
+        onSuccess: () => {
+          setShowAddByEmail(false);
+          setAddEmail("");
+          setAddRole("staff");
+        },
+        onError: (err) => toast(t("staff.failedToAdd", { msg: err.message })),
+      }
+    );
   };
 
-  const handleRemove = async (member: UserProfile) => {
+  const handleToggleRole = async (member: StaffMember) => {
+    const newRole = member.role === "admin" ? "staff" : "admin";
+    if (!(await confirmDialog(t("staff.confirmRoleChange", { name: member.first_name ?? "", role: newRole })))) return;
+    updateRoleMut.mutate(
+      { userId: member.id, role: newRole },
+      { onError: (err) => toast(err.message) }
+    );
+  };
+
+  const handleRemove = async (member: StaffMember) => {
     if (member.id === currentUser?.id) {
       toast(t("staff.cannotRemoveSelf"));
       return;
     }
-    if (!(await confirmDialog(t("staff.confirmRemove", { name: `${member.first_name} ${member.last_name ?? ""}`.trim() })))) return;
-    removeMut.mutate(member.id);
+    if (
+      !(await confirmDialog(
+        t("staff.confirmRemove", {
+          name: `${member.first_name} ${member.last_name ?? ""}`.trim(),
+          location: activeLocationName,
+        })
+      ))
+    )
+      return;
+    removeMut.mutate(member.id, { onError: (err) => toast(err.message) });
   };
 
   if (isLoading) {
@@ -91,13 +131,61 @@ export default function StaffManagement() {
           <h1 className="text-2xl font-bold text-expresso">{t("staff.title")}</h1>
           <p className="text-expresso/60 mt-1">{t("staff.subtitle")}</p>
         </div>
-        <Button
-          onClick={() => setShowInvite(true)}
-          leftIcon={<UserPlus className="w-4 h-4" />}
-        >
-          {t("staff.invite")}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="secondary"
+            onClick={() => setShowAddByEmail(true)}
+            leftIcon={<UserCog className="w-4 h-4" />}
+          >
+            {t("staff.addByEmail")}
+          </Button>
+          <Button
+            onClick={() => setShowInvite(true)}
+            leftIcon={<UserPlus className="w-4 h-4" />}
+          >
+            {t("staff.invite")}
+          </Button>
+        </div>
       </div>
+
+      {/* Add Existing User Modal */}
+      {showAddByEmail && (
+        <Modal onClose={() => setShowAddByEmail(false)} title={t("staff.addByEmailTitle")} size="sm">
+          <div className="space-y-5">
+            <div className="space-y-4">
+              <div>
+                <Label className="mb-1 block">{t("staff.emailToAdd")}</Label>
+                <Input
+                  type="email"
+                  value={addEmail}
+                  onChange={(e) => setAddEmail(e.target.value)}
+                  placeholder="staff@dostazas.com"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-expresso/80 mb-1">{t("staff.role")}</label>
+                <select
+                  value={addRole}
+                  onChange={(e) => setAddRole(e.target.value as "admin" | "staff")}
+                  className="w-full px-3 py-2 bg-background border border-warm-roast/10 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-coffee-fruit"
+                >
+                  <option value="staff">{t("settings.roleStaff")}</option>
+                  <option value="admin">{t("settings.roleAdmin")}</option>
+                </select>
+              </div>
+            </div>
+            <Button
+              onClick={handleAddByEmail}
+              disabled={!addEmail.trim()}
+              isLoading={addByEmailMut.isPending}
+              leftIcon={<UserCog className="w-4 h-4" />}
+              className="w-full"
+            >
+              {t("staff.addAccountButton")}
+            </Button>
+          </div>
+        </Modal>
+      )}
 
       {/* Invite Modal */}
       {showInvite && (

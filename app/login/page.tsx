@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { Eye, EyeOff } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
@@ -20,7 +19,6 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const router = useRouter();
   const supabase = createClient();
 
   const {
@@ -42,8 +40,13 @@ export default function LoginPage() {
       setError(signInError.message);
       setLoading(false);
     } else {
-      router.push("/pos/floor");
-      router.refresh();
+      // A full document navigation, not router.push: "/" resolves the
+      // landing role-aware (admin -> /admin, staff -> /pos/floor), and a
+      // hard navigation guarantees the fresh session cookie reaches that
+      // server render and resets profileMemo (lib/queries.ts) — important
+      // on a shared kiosk so the next cashier's profile lookup can't be
+      // served from a client-side module that survived the login.
+      window.location.assign("/");
     }
   };
 

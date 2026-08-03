@@ -1,7 +1,7 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { openShift, syncOfflineOrder, syncOfflinePayment } from "@/lib/queries";
 import { getAllOutboxEntries, updateOutboxEntry } from "./db";
-import { announceOutboxChange } from "./outbox";
+import { announceOutboxChange, getActiveLocationId } from "./outbox";
 import type { OutboxEntry } from "./types";
 
 /**
@@ -124,6 +124,26 @@ async function runEntry(entry: OutboxEntry): Promise<
     };
   }
 
+  // Phase 4: an entry stamped for a location (lib/offline/outbox.ts)
+  // other than the one this device is CURRENTLY at is refused before
+  // ever reaching the network — the fast path to the same outcome
+  // sync_offline_order/sync_offline_payment's p_location_id check
+  // (supabase/migrations/00028) enforces server-side. `null` is a
+  // wildcard (a pre-Phase-4 entry, or resolution failed at enqueue
+  // time) — never blocked, since losing a paid sale outright is worse
+  // than a theoretical mis-location.
+  if (entry.locationId) {
+    const active = await getActiveLocationId();
+    if (active && active !== entry.locationId) {
+      return {
+        ok: false,
+        terminal: true,
+        code: "location_mismatch",
+        message: "This sale is queued for a different location — switch back to it to send.",
+      };
+    }
+  }
+
   if (entry.kind === "pay_order") {
     if (!entry.serverOrderId || !entry.payment) {
       return { ok: false, terminal: true, code: "malformed_entry", message: "pay_order entry missing order id or payment" };
@@ -135,6 +155,7 @@ async function runEntry(entry: OutboxEntry): Promise<
       expectedShiftId: entry.expectedShiftId,
       payment: entry.payment,
       clientCharge: entry.clientCharge ?? null,
+      locationId: entry.locationId,
     });
     if ("conflict" in res) {
       // Money was genuinely taken twice in the real world (two devices
@@ -167,6 +188,7 @@ async function runEntry(entry: OutboxEntry): Promise<
     expectedShiftId: entry.expectedShiftId,
     payment: entry.kind === "create_and_pay" ? entry.payment ?? null : null,
     clientCharge: entry.clientCharge ?? null,
+    locationId: entry.locationId,
   });
   return {
     ok: true,

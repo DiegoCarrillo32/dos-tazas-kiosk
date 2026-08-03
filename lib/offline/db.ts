@@ -13,9 +13,30 @@ import type { OutboxEntry } from "./types";
  */
 
 const DB_NAME = "dostazas-offline";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const OUTBOX_STORE = "outbox";
 const META_STORE = "meta";
+
+/**
+ * Best-effort read of the cached profile's location, written by
+ * lib/queries.ts's `writeCachedProfile` to localStorage — a plain
+ * synchronous read (localStorage, not IndexedDB), safe to do inside
+ * `onupgradeneeded` which itself runs synchronously within the
+ * versionchange transaction. Used only to backfill v1 outbox entries
+ * that predate the `locationId` column (see the v2 upgrade step below);
+ * NOT used elsewhere in this module, which otherwise knows nothing about
+ * app-level concepts like "profile".
+ */
+function readCachedProfileLocationId(): string | null {
+  try {
+    const raw = window.localStorage.getItem("dostazas.cachedProfile");
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { active_location_id?: string | null; location_id?: string | null };
+    return parsed.active_location_id ?? parsed.location_id ?? null;
+  } catch {
+    return null;
+  }
+}
 
 let dbPromise: Promise<IDBDatabase> | null = null;
 
@@ -28,7 +49,7 @@ function openDb(): Promise<IDBDatabase> {
   dbPromise = new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
 
-    req.onupgradeneeded = () => {
+    req.onupgradeneeded = (event) => {
       const db = req.result;
       if (!db.objectStoreNames.contains(OUTBOX_STORE)) {
         const store = db.createObjectStore(OUTBOX_STORE, { keyPath: "id" });
@@ -39,6 +60,28 @@ function openDb(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains(META_STORE)) {
         db.createObjectStore(META_STORE, { keyPath: "key" });
+      }
+
+      // v1 -> v2: stamp existing entries with a best-effort location so
+      // Phase 4's location-mismatch guard (lib/offline/sync.ts) doesn't
+      // treat every pre-upgrade entry as mismatched. Best effort only —
+      // a queued sale still drains even if this can't determine a
+      // location (see the `locationId: null` = wildcard note on
+      // OutboxEntry) — losing a paid sale is worse than a theoretical
+      // mis-location on a device that, before this upgrade, only ever
+      // knew one location anyway.
+      if (event.oldVersion < 2) {
+        const fallbackLocationId = readCachedProfileLocationId();
+        const store = req.transaction!.objectStore(OUTBOX_STORE);
+        store.openCursor().onsuccess = (cursorEvent) => {
+          const cursor = (cursorEvent.target as IDBRequest<IDBCursorWithValue | null>).result;
+          if (!cursor) return;
+          const entry = cursor.value as Record<string, unknown>;
+          if (entry.locationId === undefined) {
+            cursor.update({ ...entry, locationId: fallbackLocationId });
+          }
+          cursor.continue();
+        };
       }
     };
 

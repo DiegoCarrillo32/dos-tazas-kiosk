@@ -57,14 +57,14 @@ export default function TablesManagement() {
   }
 
   return (
-    <div className="p-6 lg:p-8 space-y-6 max-w-3xl">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-3xl">
       <div>
         <h1 className="text-2xl font-bold text-expresso">{t("tables.title")}</h1>
         <p className="text-expresso/60 mt-1">{t("tables.subtitle")}</p>
       </div>
 
       {/* Add */}
-      <div className="bg-card p-4 rounded-xl border border-warm-roast/10 flex gap-3">
+      <div className="bg-card p-4 rounded-xl border border-warm-roast/10 flex flex-col sm:flex-row gap-3">
         <Input
           type="text"
           value={newName}
@@ -73,7 +73,7 @@ export default function TablesManagement() {
           placeholder={t("tables.placeholder")}
           className="flex-1"
         />
-        <Button onClick={handleCreate} disabled={!newName.trim()} isLoading={createMut.isPending} leftIcon={<Plus className="w-4 h-4" />}>
+        <Button onClick={handleCreate} disabled={!newName.trim()} isLoading={createMut.isPending} leftIcon={<Plus className="w-4 h-4" />} className="w-full sm:w-auto">
           {t("tables.addTable")}
         </Button>
       </div>
@@ -104,20 +104,20 @@ export default function TablesManagement() {
                       className="flex-1"
                       autoFocus
                     />
-                    <button onClick={saveEdit} className="p-2 text-green-600 hover:text-green-700" title={t("common.save")}>
+                    <button onClick={saveEdit} className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-green-600 hover:text-green-700" title={t("common.save")}>
                       <Check className="w-4 h-4" />
                     </button>
-                    <button onClick={() => setEditingId(null)} className="p-2 text-expresso/40 hover:text-expresso" title={t("common.cancel")}>
+                    <button onClick={() => setEditingId(null)} className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-expresso/40 hover:text-expresso" title={t("common.cancel")}>
                       <X className="w-4 h-4" />
                     </button>
                   </>
                 ) : (
                   <>
                     <span className="flex-1 font-medium text-expresso">{tbl.name}</span>
-                    <button onClick={() => startEdit(tbl)} className="p-2 text-expresso/40 hover:text-coffee-fruit transition-colors" title={t("tables.rename")}>
+                    <button onClick={() => startEdit(tbl)} className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-expresso/40 hover:text-coffee-fruit transition-colors" title={t("tables.rename")}>
                       <Pencil className="w-4 h-4" />
                     </button>
-                    <button onClick={() => handleDelete(tbl)} className="p-2 text-expresso/40 hover:text-destructive transition-colors" title={t("tables.delete")}>
+                    <button onClick={() => handleDelete(tbl)} className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-expresso/40 hover:text-destructive transition-colors" title={t("tables.delete")}>
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </>

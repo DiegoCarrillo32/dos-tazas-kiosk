@@ -44,16 +44,16 @@ export default function AnalyticsPage() {
   const money = (n: number) => formatMoney(n, "CRC");
 
   return (
-    <div className="p-6 lg:p-8 space-y-6">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-expresso">{t("analytics.title")}</h1>
           <p className="text-expresso/60 mt-1">{t("analytics.subtitle")}</p>
         </div>
-        <div className="flex items-center gap-3">
-          <DatePicker date={startDate} setDate={setStartDate} placeholder={t("analytics.startDate")} className="w-40" />
-          <span className="text-expresso/40">{t("common.to")}</span>
-          <DatePicker date={endDate} setDate={setEndDate} placeholder={t("analytics.endDate")} className="w-40" />
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+          <DatePicker date={startDate} setDate={setStartDate} placeholder={t("analytics.startDate")} className="w-full sm:w-40" />
+          <span className="hidden sm:inline text-expresso/40">{t("common.to")}</span>
+          <DatePicker date={endDate} setDate={setEndDate} placeholder={t("analytics.endDate")} className="w-full sm:w-40" />
         </div>
       </div>
 
@@ -98,7 +98,7 @@ export default function AnalyticsPage() {
 
           {/* Gross / IVA / discounts / refunds strip — the reconciliation view */}
           <div className="bg-card p-6 rounded-2xl border border-warm-roast/10 shadow-sm">
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-5 gap-4 text-sm">
               <MiniStat label={t("analytics.grossSales")} value={money(data.gross_sales)} />
               <MiniStat label={t("analytics.netSales")} value={money(data.net_sales)} />
               <MiniStat label="IVA" value={money(data.tax_amount)} />
@@ -111,7 +111,7 @@ export default function AnalyticsPage() {
             {/* Revenue Chart */}
             <div className="bg-card p-6 rounded-2xl border border-warm-roast/10 shadow-sm">
               <h3 className="text-lg font-bold text-expresso mb-6">{t("analytics.revenueTrend")}</h3>
-              <div className="h-[300px] w-full">
+              <div className="h-[240px] sm:h-[300px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={data.by_day}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={COLOR_GRID} />
@@ -128,7 +128,7 @@ export default function AnalyticsPage() {
                       tick={{ fill: COLOR_AXIS, fontSize: 12 }}
                       tickFormatter={(value) => formatMoney(value, "CRC")}
                       dx={-10}
-                      width={70}
+                      width={56}
                     />
                     <Tooltip
                       contentStyle={{ backgroundColor: COLOR_TOOLTIP_BG, borderColor: COLOR_TOOLTIP_BORDER, borderRadius: "8px" }}
@@ -151,7 +151,7 @@ export default function AnalyticsPage() {
             {/* Orders by Hour */}
             <div className="bg-card p-6 rounded-2xl border border-warm-roast/10 shadow-sm">
               <h3 className="text-lg font-bold text-expresso mb-6">{t("analytics.productiveHours")}</h3>
-              <div className="h-[300px] w-full">
+              <div className="h-[240px] sm:h-[300px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={data.by_hour}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={COLOR_GRID} />
@@ -183,12 +183,12 @@ export default function AnalyticsPage() {
 
           {/* Payment mix — the number cash reconciliation needs */}
           <div className="bg-card rounded-2xl border border-warm-roast/10 shadow-sm overflow-hidden">
-            <div className="p-6 border-b border-warm-roast/10">
+            <div className="p-4 sm:p-6 border-b border-warm-roast/10">
               <h3 className="text-lg font-bold text-expresso">{t("analytics.paymentMix")}</h3>
             </div>
-            <div className="p-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="p-4 sm:p-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
               {data.by_payment_method.length === 0 ? (
-                <p className="text-sm text-expresso/60 col-span-3">{t("analytics.noData")}</p>
+                <p className="text-sm text-expresso/60 col-span-full">{t("analytics.noData")}</p>
               ) : (
                 data.by_payment_method.map((pm) => (
                   <div key={pm.method} className="p-4 rounded-xl bg-warm-roast/5 border border-warm-roast/10">
@@ -204,7 +204,7 @@ export default function AnalyticsPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* By category */}
             <div className="bg-card rounded-2xl border border-warm-roast/10 shadow-sm overflow-hidden">
-              <div className="p-6 border-b border-warm-roast/10">
+              <div className="p-4 sm:p-6 border-b border-warm-roast/10">
                 <h3 className="text-lg font-bold text-expresso">{t("analytics.salesByCategory")}</h3>
               </div>
               <div className="divide-y divide-warm-roast/10">
@@ -212,9 +212,9 @@ export default function AnalyticsPage() {
                   <p className="p-6 text-sm text-expresso/60">{t("analytics.noData")}</p>
                 ) : (
                   data.by_category.map((c) => (
-                    <div key={c.name} className="px-6 py-3 flex justify-between text-sm">
-                      <span className="text-expresso font-medium">{c.name}</span>
-                      <span className="text-expresso/70">{money(c.revenue)} · {c.quantity} {t("analytics.units")}</span>
+                    <div key={c.name} className="px-4 sm:px-6 py-3 flex justify-between gap-3 text-sm">
+                      <span className="text-expresso font-medium truncate">{c.name}</span>
+                      <span className="text-expresso/70 shrink-0 text-right">{money(c.revenue)} · {c.quantity} {t("analytics.units")}</span>
                     </div>
                   ))
                 )}
@@ -223,7 +223,7 @@ export default function AnalyticsPage() {
 
             {/* By staff */}
             <div className="bg-card rounded-2xl border border-warm-roast/10 shadow-sm overflow-hidden">
-              <div className="p-6 border-b border-warm-roast/10">
+              <div className="p-4 sm:p-6 border-b border-warm-roast/10">
                 <h3 className="text-lg font-bold text-expresso">{t("analytics.salesByStaff")}</h3>
               </div>
               <div className="divide-y divide-warm-roast/10">
@@ -231,9 +231,9 @@ export default function AnalyticsPage() {
                   <p className="p-6 text-sm text-expresso/60">{t("analytics.noData")}</p>
                 ) : (
                   data.by_staff.map((s) => (
-                    <div key={s.name} className="px-6 py-3 flex justify-between text-sm">
-                      <span className="text-expresso font-medium">{s.name}</span>
-                      <span className="text-expresso/70">{money(s.gross)} · {s.orders} {t("analytics.orders")}</span>
+                    <div key={s.name} className="px-4 sm:px-6 py-3 flex justify-between gap-3 text-sm">
+                      <span className="text-expresso font-medium truncate">{s.name}</span>
+                      <span className="text-expresso/70 shrink-0 text-right">{money(s.gross)} · {s.orders} {t("analytics.orders")}</span>
                     </div>
                   ))
                 )}
@@ -243,29 +243,29 @@ export default function AnalyticsPage() {
 
           {/* Top Selling Items */}
           <div className="bg-card rounded-2xl border border-warm-roast/10 shadow-sm overflow-hidden">
-            <div className="p-6 border-b border-warm-roast/10">
+            <div className="p-4 sm:p-6 border-b border-warm-roast/10">
               <h3 className="text-lg font-bold text-expresso">{t("analytics.topSellingItems")}</h3>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
+            <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+              <table className="w-full min-w-max whitespace-nowrap text-left text-sm">
                 <thead className="bg-muted/40 text-expresso/60">
                   <tr>
-                    <th className="px-6 py-4 font-medium">{t("analytics.itemName")}</th>
-                    <th className="px-6 py-4 font-medium">{t("analytics.quantitySold")}</th>
-                    <th className="px-6 py-4 font-medium">{t("analytics.revenueGenerated")}</th>
+                    <th className="px-4 sm:px-6 py-3 sm:py-4 font-medium">{t("analytics.itemName")}</th>
+                    <th className="px-4 sm:px-6 py-3 sm:py-4 font-medium">{t("analytics.quantitySold")}</th>
+                    <th className="px-4 sm:px-6 py-3 sm:py-4 font-medium">{t("analytics.revenueGenerated")}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-warm-roast/10">
                   {data.top_items.map((item, i) => (
                     <tr key={i} className="hover:bg-warm-roast/5 transition-colors">
-                      <td className="px-6 py-4 font-medium text-expresso">{item.name}</td>
-                      <td className="px-6 py-4 text-expresso/60">{item.quantity} {t("analytics.units")}</td>
-                      <td className="px-6 py-4 text-expresso/60">{money(item.revenue)}</td>
+                      <td className="px-4 sm:px-6 py-3 sm:py-4 font-medium text-expresso">{item.name}</td>
+                      <td className="px-4 sm:px-6 py-3 sm:py-4 text-expresso/60">{item.quantity} {t("analytics.units")}</td>
+                      <td className="px-4 sm:px-6 py-3 sm:py-4 text-expresso/60">{money(item.revenue)}</td>
                     </tr>
                   ))}
                   {data.top_items.length === 0 && (
                     <tr>
-                      <td colSpan={3} className="px-6 py-8 text-center text-expresso/60">{t("analytics.noItems")}</td>
+                      <td colSpan={3} className="px-6 py-8 text-center whitespace-normal text-expresso/60">{t("analytics.noItems")}</td>
                     </tr>
                   )}
                 </tbody>

@@ -78,21 +78,10 @@ export function OpenShiftDialog({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <Modal onClose={onClose} title={t("cash.openShift")}>
-      <div className="space-y-4">
-        <div>
-          <Label className="mb-1 block">{t("cash.openingFloat")}</Label>
-          <Input
-            type="number"
-            inputMode="numeric"
-            step={1}
-            min={0}
-            autoFocus
-            value={openingFloat}
-            onChange={(e) => setOpeningFloat(e.target.value)}
-            placeholder="0"
-          />
-        </div>
+    <Modal
+      onClose={onClose}
+      title={t("cash.openShift")}
+      footer={
         <Button
           size="lg"
           className="w-full bg-coffee-fruit hover:bg-fruit-light text-white border-transparent"
@@ -101,6 +90,20 @@ export function OpenShiftDialog({ onClose }: { onClose: () => void }) {
         >
           {t("cash.openShiftButton")}
         </Button>
+      }
+    >
+      <div>
+        <Label className="mb-1 block">{t("cash.openingFloat")}</Label>
+        <Input
+          type="number"
+          inputMode="numeric"
+          step={1}
+          min={0}
+          autoFocus
+          value={openingFloat}
+          onChange={(e) => setOpeningFloat(e.target.value)}
+          placeholder="0"
+        />
       </div>
     </Modal>
   );
@@ -147,7 +150,22 @@ export function CloseShiftDialog({
   };
 
   return (
-    <Modal onClose={onClose} title={t("cash.closeShiftTitle")} size="lg">
+    <Modal
+      onClose={onClose}
+      title={t("cash.closeShiftTitle")}
+      size="xl"
+      footer={
+        <Button
+          size="lg"
+          className="w-full bg-coffee-fruit hover:bg-fruit-light text-white border-transparent"
+          isLoading={closeMut.isPending}
+          disabled={blockedByOutbox > 0}
+          onClick={handleCloseShift}
+        >
+          {t("cash.closeShiftButton")}
+        </Button>
+      }
+    >
       <div className="space-y-5">
         {blockedByOutbox > 0 && (
           <div className="p-4 rounded-xl border border-red-200 dark:border-red-900/40 bg-red-50 dark:bg-red-950/30 space-y-3">
@@ -205,16 +223,6 @@ export function CloseShiftDialog({
             placeholder={t("cash.closingNotePlaceholder")}
           />
         </div>
-
-        <Button
-          size="lg"
-          className="w-full bg-coffee-fruit hover:bg-fruit-light text-white border-transparent"
-          isLoading={closeMut.isPending}
-          disabled={blockedByOutbox > 0}
-          onClick={handleCloseShift}
-        >
-          {t("cash.closeShiftButton")}
-        </Button>
       </div>
     </Modal>
   );

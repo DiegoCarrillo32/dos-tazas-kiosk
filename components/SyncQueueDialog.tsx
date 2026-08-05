@@ -23,29 +23,35 @@ export function SyncQueueDialog({ onClose }: { onClose: () => void }) {
   const sorted = [...entries].sort((a, b) => b.seq - a.seq);
 
   return (
-    <Modal onClose={onClose} title={t("offline.queueTitle")} size="lg">
+    <Modal
+      onClose={onClose}
+      title={t("offline.queueTitle")}
+      size="lg"
+      footer={
+        <div className="flex gap-3">
+          <Button
+            variant="secondary"
+            className="flex-1"
+            onClick={() => kick()}
+            leftIcon={<RefreshCw className="w-4 h-4" />}
+          >
+            {t("offline.refresh")}
+          </Button>
+          <Button
+            className="flex-1 bg-coffee-fruit hover:bg-fruit-light text-white border-transparent"
+            onClick={() => retryAll()}
+          >
+            {t("offline.retryAll")}
+          </Button>
+        </div>
+      }
+    >
       <div className="space-y-3">
         {sorted.length === 0 ? (
           <p className="text-sm text-expresso/60 text-center py-6">{t("offline.queueEmpty")}</p>
         ) : (
           sorted.map((entry) => <QueueRow key={entry.id} entry={entry} onRetry={retryEntry} />)
         )}
-      </div>
-      <div className="flex gap-3 mt-5 pt-4 border-t border-warm-roast/10">
-        <Button
-          variant="secondary"
-          className="flex-1"
-          onClick={() => kick()}
-          leftIcon={<RefreshCw className="w-4 h-4" />}
-        >
-          {t("offline.refresh")}
-        </Button>
-        <Button
-          className="flex-1 bg-coffee-fruit hover:bg-fruit-light text-white border-transparent"
-          onClick={() => retryAll()}
-        >
-          {t("offline.retryAll")}
-        </Button>
       </div>
     </Modal>
   );
@@ -94,7 +100,7 @@ function QueueRow({
     <div className="p-3 rounded-xl border border-warm-roast/10 bg-warm-roast/5 space-y-1.5">
       <div className="flex justify-between items-center">
         <span className="font-mono font-semibold text-sm text-expresso">{entry.offlineRef}</span>
-        <span className={cn("px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide", stateClass)}>
+        <span className={cn("px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide", stateClass)}>
           {stateLabel}
         </span>
       </div>

@@ -13,6 +13,7 @@ import { useLogout } from "@/lib/hooks";
 import { useOutbox } from "@/lib/offline/useOutbox";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import ServiceWorkerRegistrar from "@/components/ServiceWorkerRegistrar";
+import { useScrollIntoViewOnFocus } from "@/lib/useScrollIntoViewOnFocus";
 
 export default function POSNav({
   children,
@@ -31,10 +32,12 @@ export default function POSNav({
     initSyncEngine(qc);
   }, [qc]);
 
+  useScrollIntoViewOnFocus();
+
   const badgeCount = failedCount > 0 ? failedCount : pendingCount;
   const pendingBadge = badgeCount > 0 && (
     <span
-      className={`inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full text-[10px] font-bold ${
+      className={`inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full text-xs font-bold ${
         failedCount > 0
           ? "bg-red-500 text-white"
           : "bg-amber-500 text-white"
@@ -45,7 +48,7 @@ export default function POSNav({
   );
 
   return (
-    <div className="flex flex-col h-screen bg-background overflow-hidden">
+    <div className="flex flex-col h-app bg-background overflow-hidden pl-safe pr-safe">
       <ServiceWorkerRegistrar />
       {/* Top Navigation Bar */}
       <header className="h-16 flex items-center justify-between px-4 sm:px-6 bg-card border-b border-warm-roast/10 shrink-0 shadow-sm z-10">
@@ -62,7 +65,7 @@ export default function POSNav({
         <div className="hidden sm:flex bg-warm-roast/10 p-1 rounded-lg">
           <Link
             href="/pos/floor"
-            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            className={`flex items-center gap-2 px-4 min-h-[44px] rounded-md text-sm font-medium transition-colors ${
               pathname === "/pos/floor"
                 ? "bg-card shadow-sm text-expresso"
                 : "text-expresso/60 hover:text-expresso"
@@ -73,7 +76,7 @@ export default function POSNav({
           </Link>
           <Link
             href="/pos/counter"
-            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            className={`flex items-center gap-2 px-4 min-h-[44px] rounded-md text-sm font-medium transition-colors ${
               pathname === "/pos/counter"
                 ? "bg-card shadow-sm text-expresso"
                 : "text-expresso/60 hover:text-expresso"
@@ -89,7 +92,7 @@ export default function POSNav({
           {isAdmin && (
             <Link
               href="/admin"
-              className="text-sm font-medium text-expresso/60 hover:text-expresso dark:text-expresso/40 hover:text-expresso hidden sm:block"
+              className="hidden sm:flex items-center min-h-[44px] text-sm font-medium text-expresso/60 hover:text-expresso"
             >
               {t("nav.admin")}
             </Link>
@@ -101,7 +104,7 @@ export default function POSNav({
           <ThemeToggle />
           <button
             onClick={handleLogout}
-            className="flex items-center gap-2 text-expresso/60 hover:text-red-600 dark:text-expresso/40 dark:hover:text-red-400 transition-colors"
+            className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg text-expresso/60 hover:text-red-600 hover:bg-warm-roast/10 transition-colors"
             title={t("nav.logOut")}
           >
             <LogOut className="w-5 h-5" />
@@ -137,7 +140,7 @@ export default function POSNav({
             <MonitorPlay className="w-5 h-5" />
             {badgeCount > 0 && (
               <span
-                className={`absolute -top-1 -right-1.5 inline-flex items-center justify-center min-w-[14px] h-3.5 px-0.5 rounded-full text-[9px] font-bold ${
+                className={`absolute -top-1.5 -right-2 inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full text-[10px] font-bold ${
                   failedCount > 0 ? "bg-red-500 text-white" : "bg-amber-500 text-white"
                 }`}
               >

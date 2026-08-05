@@ -17,14 +17,14 @@ export function TipSection({
 
   return (
     <div className="space-y-3">
-      <h3 className="text-sm font-semibold text-expresso/60 uppercase tracking-wider">{t("counter.tip")}</h3>
+      <h3 className="text-sm font-semibold text-expresso/70 uppercase tracking-wider">{t("counter.tip")}</h3>
       <div className="flex flex-wrap items-center gap-2">
         {[10, 15, 20].map((pct) => (
           <button
             key={pct}
             type="button"
             onClick={() => onChange(String(Math.round(preTipTotal * (pct / 100))))}
-            className="px-4 py-2 text-sm rounded-lg bg-warm-roast/10 text-expresso/70 hover:bg-warm-roast/20 transition-colors"
+            className="px-4 min-h-[44px] text-sm rounded-lg bg-warm-roast/10 text-expresso/70 hover:bg-warm-roast/20 transition-colors"
           >
             {pct}%
           </button>
@@ -32,7 +32,7 @@ export function TipSection({
         <button
           type="button"
           onClick={() => onChange("")}
-          className="px-4 py-2 text-sm rounded-lg bg-warm-roast/10 text-expresso/70 hover:bg-warm-roast/20 transition-colors"
+          className="px-4 min-h-[44px] text-sm rounded-lg bg-warm-roast/10 text-expresso/70 hover:bg-warm-roast/20 transition-colors"
         >
           {t("counter.tipNone")}
         </button>

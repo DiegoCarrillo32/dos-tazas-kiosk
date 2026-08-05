@@ -32,8 +32,8 @@ export function PaymentSection({
 
   return (
     <div className="space-y-4">
-      <h3 className="text-sm font-semibold text-expresso/60 uppercase tracking-wider">{t("counter.paymentMethod")}</h3>
-      <div className="grid grid-cols-3 gap-4">
+      <h3 className="text-sm font-semibold text-expresso/70 uppercase tracking-wider">{t("counter.paymentMethod")}</h3>
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
         {(["card", "cash", "sinpe"] as PaymentMethod[]).map((method) => {
           const Icon = method === "card" ? CreditCard : method === "cash" ? Banknote : Smartphone;
           const label =
@@ -78,7 +78,7 @@ export function PaymentSection({
             <button
               type="button"
               onClick={() => onTenderedChange(String(Math.round(totalDue)))}
-              className="px-3 py-1.5 text-sm rounded-lg bg-warm-roast/10 text-expresso/70 hover:bg-warm-roast/20 transition-colors"
+              className="px-4 min-h-[44px] text-sm rounded-lg bg-warm-roast/10 text-expresso/70 hover:bg-warm-roast/20 transition-colors"
             >
               {t("counter.exact")}
             </button>
@@ -90,7 +90,7 @@ export function PaymentSection({
                   key={amt}
                   type="button"
                   onClick={() => onTenderedChange(String(amt))}
-                  className="px-3 py-1.5 text-sm rounded-lg bg-warm-roast/10 text-expresso/70 hover:bg-warm-roast/20 transition-colors"
+                  className="px-4 min-h-[44px] text-sm rounded-lg bg-warm-roast/10 text-expresso/70 hover:bg-warm-roast/20 transition-colors"
                 >
                   {formatMoney(amt, currency)}
                 </button>

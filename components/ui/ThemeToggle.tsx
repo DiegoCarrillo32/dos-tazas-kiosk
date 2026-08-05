@@ -28,13 +28,13 @@ export function ThemeToggle() {
 
   if (theme === null) {
     // Avoid layout shifts or flash before mounting hydration
-    return <div className="w-9 h-9" />;
+    return <div className="min-h-[44px] min-w-[44px]" />;
   }
 
   return (
     <button
       onClick={toggleTheme}
-      className="p-2 rounded-lg text-expresso/60 hover:bg-warm-roast/10 hover:text-expresso transition-all active:scale-95 duration-200"
+      className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg text-expresso/60 hover:bg-warm-roast/10 hover:text-expresso transition-all active:scale-95 duration-200"
       aria-label="Toggle theme"
     >
       {theme === "light" ? (

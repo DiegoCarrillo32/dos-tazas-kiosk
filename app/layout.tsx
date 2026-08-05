@@ -17,6 +17,11 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  // Let the app draw under the display cutout/home-indicator area on
+  // notched phones/tablets so `env(safe-area-inset-*)` (see .pb-safe /
+  // .pt-safe / .pl-safe / .pr-safe in globals.css) actually resolves to a
+  // non-zero value instead of being silently inert.
+  viewportFit: "cover",
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#ffffff" },
     { media: "(prefers-color-scheme: dark)", color: "#09090b" },

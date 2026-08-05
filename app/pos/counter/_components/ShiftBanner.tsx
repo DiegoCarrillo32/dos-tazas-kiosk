@@ -43,7 +43,7 @@ export function ShiftBanner({
         </span>
         <button
           onClick={onOpenShift}
-          className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg bg-coffee-fruit text-white hover:bg-fruit-light transition-colors"
+          className="shrink-0 inline-flex items-center gap-1.5 px-3 min-h-[44px] text-sm font-medium rounded-lg bg-coffee-fruit text-white hover:bg-fruit-light transition-colors"
         >
           <Wallet className="w-4 h-4" />
           {t("counter.openShiftCta")}
@@ -53,14 +53,14 @@ export function ShiftBanner({
   }
 
   return (
-    <div className="shrink-0 px-4 py-1.5 bg-warm-roast/5 border-b border-warm-roast/10 flex items-center justify-between gap-3 text-xs text-expresso/60">
+    <div className="shrink-0 px-4 py-1.5 bg-warm-roast/5 border-b border-warm-roast/10 flex items-center justify-between gap-3 text-sm text-expresso/70">
       <span className="flex items-center gap-1.5">
         <Wallet className="w-3.5 h-3.5" />
         {t("counter.shiftExpectedCash")}: <span className="font-semibold text-expresso">{formatMoney(shift.expected_cash, "CRC")}</span>
       </span>
       <button
         onClick={onCloseShift}
-        className="shrink-0 inline-flex items-center gap-1.5 px-2 py-1.5 font-medium rounded-lg hover:bg-warm-roast/10 hover:text-expresso transition-colors"
+        className="shrink-0 inline-flex items-center gap-1.5 px-3 min-h-[44px] text-sm font-medium rounded-lg hover:bg-warm-roast/10 hover:text-expresso transition-colors"
       >
         <Lock className="w-3.5 h-3.5" />
         {t("cash.closeShift")}

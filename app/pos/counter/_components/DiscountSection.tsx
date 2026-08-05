@@ -42,7 +42,7 @@ export function DiscountSection({
 
   return (
     <div className="space-y-3">
-      <h3 className="text-sm font-semibold text-expresso/60 uppercase tracking-wider">
+      <h3 className="text-sm font-semibold text-expresso/70 uppercase tracking-wider">
         {t("counter.discount")}
       </h3>
       <div className="flex flex-wrap items-center gap-2">
@@ -57,7 +57,7 @@ export function DiscountSection({
                 onValueChange(String(pct));
               }}
               className={cn(
-                "px-4 py-2.5 text-sm rounded-lg transition-colors",
+                "px-4 min-h-[44px] text-sm rounded-lg transition-colors",
                 active
                   ? "bg-coffee-fruit text-white"
                   : "bg-warm-roast/10 text-expresso/70 hover:bg-warm-roast/20"
@@ -70,7 +70,7 @@ export function DiscountSection({
         <button
           type="button"
           onClick={onClear}
-          className="px-4 py-2.5 text-sm rounded-lg bg-warm-roast/10 text-expresso/70 hover:bg-warm-roast/20 transition-colors"
+          className="px-4 min-h-[44px] text-sm rounded-lg bg-warm-roast/10 text-expresso/70 hover:bg-warm-roast/20 transition-colors"
         >
           {t("counter.discountNone")}
         </button>
@@ -82,7 +82,7 @@ export function DiscountSection({
               onClick={() => onTypeChange(type)}
               title={type === "percent" ? t("counter.discountPercent") : t("counter.discountCustom")}
               className={cn(
-                "px-4 py-2.5 text-sm font-medium transition-colors",
+                "px-4 min-h-[44px] text-sm font-medium transition-colors",
                 discountType === type
                   ? "bg-warm-roast text-white"
                   : "bg-card text-expresso/70 hover:bg-warm-roast/10"
@@ -125,7 +125,7 @@ export function DiscountSection({
                   type="button"
                   onClick={() => onReasonChange(label)}
                   className={cn(
-                    "px-3 py-2.5 text-sm rounded-lg transition-colors",
+                    "px-3 min-h-[44px] text-sm rounded-lg transition-colors",
                     discountReason.trim() === label
                       ? "bg-coffee-fruit text-white"
                       : "bg-warm-roast/10 text-expresso/70 hover:bg-warm-roast/20"

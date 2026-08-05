@@ -74,7 +74,7 @@ export default function TransactionHistory() {
   };
 
   return (
-    <div className="p-6 lg:p-8 space-y-6">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-expresso">{t("history.title")}</h1>
         <p className="text-expresso/60 mt-1">{t("history.subtitle")}</p>
@@ -82,7 +82,7 @@ export default function TransactionHistory() {
 
       {syncFlags.length > 0 && (
         <div className="bg-card rounded-2xl border border-amber-200 dark:border-amber-900/40 overflow-hidden shadow-sm">
-          <div className="px-6 py-4 border-b border-amber-200 dark:border-amber-900/40 bg-amber-50 dark:bg-amber-950/30">
+          <div className="px-4 sm:px-6 py-4 border-b border-amber-200 dark:border-amber-900/40 bg-amber-50 dark:bg-amber-950/30">
             <h2 className="font-bold text-expresso">{t("history.offlineSyncTitle")}</h2>
             <p className="text-sm text-expresso/60 mt-0.5">{t("history.offlineSyncSubtitle")}</p>
           </div>
@@ -94,7 +94,7 @@ export default function TransactionHistory() {
                 <button
                   key={order.id}
                   onClick={() => setSelectedOrder(order)}
-                  className="w-full text-left px-6 py-3 flex items-center justify-between gap-4 hover:bg-warm-roast/5 transition-colors"
+                  className="w-full text-left px-4 sm:px-6 min-h-[44px] py-3 flex items-center justify-between gap-4 hover:bg-warm-roast/5 transition-colors"
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <span className="font-mono font-semibold text-sm text-expresso shrink-0">
@@ -126,7 +126,7 @@ export default function TransactionHistory() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={t("history.searchByOrderNumber")}
-            className="w-full pl-9 pr-4 py-2 bg-card border border-warm-roast/10 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-coffee-fruit shadow-sm"
+            className="w-full h-11 pl-9 pr-4 bg-card border border-warm-roast/10 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-coffee-fruit shadow-sm"
           />
         </div>
         <DatePicker date={startDate} setDate={setStartDate} placeholder={t("history.startDate")} className="w-full sm:w-44" />
@@ -161,15 +161,15 @@ export default function TransactionHistory() {
                   </span>
                 </div>
               )}
-              <div className="flex justify-between"><span className="text-expresso/60">{t("history.total")}</span><span className="font-bold text-expresso">{formatMoney(selectedOrder.total_amount, "CRC")}</span></div>
-              <div className="flex justify-between"><span className="text-expresso/60">{t("history.payment")}</span><span className="text-expresso">{selectedOrder.payment_method?.toUpperCase() ?? "—"}</span></div>
-              {selectedOrder.payment_reference && (<div className="flex justify-between"><span className="text-expresso/60">{t("history.reference")}</span><span className="text-expresso">{selectedOrder.payment_reference}</span></div>)}
+              <div className="flex justify-between gap-3"><span className="text-expresso/60">{t("history.total")}</span><span className="font-bold text-expresso">{formatMoney(selectedOrder.total_amount, "CRC")}</span></div>
+              <div className="flex justify-between gap-3"><span className="text-expresso/60">{t("history.payment")}</span><span className="text-expresso">{selectedOrder.payment_method?.toUpperCase() ?? "—"}</span></div>
+              {selectedOrder.payment_reference && (<div className="flex justify-between gap-3"><span className="text-expresso/60 shrink-0">{t("history.reference")}</span><span className="text-expresso text-right break-all">{selectedOrder.payment_reference}</span></div>)}
               {selectedOrder.customer_name && (
                 <>
                   <div className="border-t border-warm-roast/10 pt-3 mt-3"><h4 className="font-semibold text-expresso/60 uppercase tracking-wider text-xs mb-2">{t("history.invoiceInfo")}</h4></div>
-                  <div className="flex justify-between"><span className="text-expresso/60">{t("history.name")}</span><span>{selectedOrder.customer_name}</span></div>
-                  <div className="flex justify-between"><span className="text-expresso/60">{t("history.cedula")}</span><span>{selectedOrder.customer_id}</span></div>
-                  <div className="flex justify-between"><span className="text-expresso/60">{t("history.email")}</span><span>{selectedOrder.customer_email}</span></div>
+                  <div className="flex justify-between gap-3"><span className="text-expresso/60 shrink-0">{t("history.name")}</span><span className="text-right">{selectedOrder.customer_name}</span></div>
+                  <div className="flex justify-between gap-3"><span className="text-expresso/60 shrink-0">{t("history.cedula")}</span><span className="text-right">{selectedOrder.customer_id}</span></div>
+                  <div className="flex justify-between gap-3"><span className="text-expresso/60 shrink-0">{t("history.email")}</span><span className="text-right break-all">{selectedOrder.customer_email}</span></div>
                 </>
               )}
               <div className="border-t border-warm-roast/10 pt-3 mt-3">
@@ -244,45 +244,45 @@ export default function TransactionHistory() {
       )}
 
       <div className="bg-card rounded-2xl border border-warm-roast/10 overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+        <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+          <table className="w-full min-w-max whitespace-nowrap text-left border-collapse">
             <thead>
               <tr className="border-b border-warm-roast/10 bg-muted/40">
-                <th className="px-6 py-4 text-sm font-semibold text-expresso">{t("history.colOrderId")}</th>
-                <th className="px-6 py-4 text-sm font-semibold text-expresso">{t("history.colDateTime")}</th>
-                <th className="px-6 py-4 text-sm font-semibold text-expresso">{t("history.colItems")}</th>
-                <th className="px-6 py-4 text-sm font-semibold text-expresso">{t("history.colTotal")}</th>
-                <th className="px-6 py-4 text-sm font-semibold text-expresso">{t("history.colPayment")}</th>
-                <th className="px-6 py-4 text-sm font-semibold text-expresso">{t("history.colStatus")}</th>
-                <th className="px-6 py-4 text-sm font-semibold text-expresso text-right">{t("history.colActions")}</th>
+                <th className="px-4 sm:px-6 py-3 sm:py-4 text-sm font-semibold text-expresso">{t("history.colOrderId")}</th>
+                <th className="px-4 sm:px-6 py-3 sm:py-4 text-sm font-semibold text-expresso">{t("history.colDateTime")}</th>
+                <th className="px-4 sm:px-6 py-3 sm:py-4 text-sm font-semibold text-expresso">{t("history.colItems")}</th>
+                <th className="px-4 sm:px-6 py-3 sm:py-4 text-sm font-semibold text-expresso">{t("history.colTotal")}</th>
+                <th className="px-4 sm:px-6 py-3 sm:py-4 text-sm font-semibold text-expresso">{t("history.colPayment")}</th>
+                <th className="px-4 sm:px-6 py-3 sm:py-4 text-sm font-semibold text-expresso">{t("history.colStatus")}</th>
+                <th className="px-4 sm:px-6 py-3 sm:py-4 text-sm font-semibold text-expresso text-right">{t("history.colActions")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-warm-roast/10">
               {isLoading ? (
-                <tr><td colSpan={7} className="px-6 py-12 text-center"><Loader2 className="w-6 h-6 animate-spin text-expresso/40 mx-auto" /></td></tr>
+                <tr><td colSpan={7} className="px-6 py-12 text-center whitespace-normal"><Loader2 className="w-6 h-6 animate-spin text-expresso/40 mx-auto" /></td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={7} className="px-6 py-12 text-center text-expresso/40 text-sm">{searchQuery ? t("history.noMatching") : t("history.noOrders")}</td></tr>
+                <tr><td colSpan={7} className="px-6 py-12 text-center whitespace-normal text-expresso/40 text-sm">{searchQuery ? t("history.noMatching") : t("history.noOrders")}</td></tr>
               ) : (
                 filtered.map((order) => {
                   const itemCount = (order.order_items ?? []).reduce((s: number, i: OrderItem) => s + i.quantity, 0);
                   return (
                     <tr key={order.id} className="hover:bg-warm-roast/5 transition-colors">
-                      <td className="px-6 py-4 text-sm font-mono font-medium text-expresso">
+                      <td className="px-4 sm:px-6 py-3 sm:py-4 text-sm font-mono font-medium text-expresso">
                         {order.order_number ? `#${order.order_number}` : `${order.id.slice(0, 8)}…`}
                       </td>
-                      <td className="px-6 py-4 text-sm text-expresso/60">{formatDate(order.created_at)}</td>
-                      <td className="px-6 py-4 text-sm text-expresso/60">{itemCount}</td>
-                      <td className="px-6 py-4 text-sm font-medium text-expresso">{formatMoney(order.total_amount, "CRC")}</td>
-                      <td className="px-6 py-4 text-sm text-expresso/60">{order.payment_method?.toUpperCase() ?? "—"}</td>
-                      <td className="px-6 py-4 text-sm">
+                      <td className="px-4 sm:px-6 py-3 sm:py-4 text-sm text-expresso/60">{formatDate(order.created_at)}</td>
+                      <td className="px-4 sm:px-6 py-3 sm:py-4 text-sm text-expresso/60">{itemCount}</td>
+                      <td className="px-4 sm:px-6 py-3 sm:py-4 text-sm font-medium text-expresso">{formatMoney(order.total_amount, "CRC")}</td>
+                      <td className="px-4 sm:px-6 py-3 sm:py-4 text-sm text-expresso/60">{order.payment_method?.toUpperCase() ?? "—"}</td>
+                      <td className="px-4 sm:px-6 py-3 sm:py-4 text-sm">
                         {order.status === "refunded" ? (
                           <span className="text-red-600 dark:text-red-400 font-medium">{t("history.statusRefunded")}</span>
                         ) : (
                           <span className="text-expresso/60">{t("history.statusCompleted")}</span>
                         )}
                       </td>
-                      <td className="px-6 py-4 text-right">
-                        <button onClick={() => setSelectedOrder(order)} className="p-2 text-expresso/40 hover:text-expresso transition-colors"><Eye className="w-4 h-4" /></button>
+                      <td className="px-4 sm:px-6 py-3 sm:py-4 text-right">
+                        <button onClick={() => setSelectedOrder(order)} className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-expresso/40 hover:text-expresso transition-colors"><Eye className="w-4 h-4" /></button>
                       </td>
                     </tr>
                   );

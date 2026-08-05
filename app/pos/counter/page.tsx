@@ -346,7 +346,7 @@ export default function CounterView() {
         onCloseShift={() => setShowCloseShift(true)}
       />
 
-      <div className="flex flex-col lg:flex-row flex-1 min-h-0">
+      <div className="flex flex-col md:flex-row flex-1 min-h-0">
         {receiptOrder && (
           <ReceiptView
             order={receiptOrder}
@@ -384,15 +384,15 @@ export default function CounterView() {
         />
 
         {/* Right: Checkout */}
-        <div className="flex-1 flex flex-col bg-background h-[60vh] lg:h-full overflow-hidden">
+        <div className="flex-1 min-w-0 min-h-0 flex flex-col bg-background overflow-hidden">
           {!currentSelected ? (
             <div className="flex-1 flex flex-col items-center justify-center text-expresso/40">
               <Receipt className="w-16 h-16 mb-4 opacity-20" />
               <h3 className="text-lg font-medium text-expresso/70">{t("counter.selectOrder")}</h3>
             </div>
           ) : (
-            <div className="flex-1 flex flex-col h-full overflow-hidden">
-              <div className="flex-1 overflow-y-auto p-6 lg:p-8 space-y-8">
+            <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+              <div className="flex-1 overflow-y-auto p-4 md:p-5 lg:p-8 space-y-5 md:space-y-6 lg:space-y-8">
                 <CheckoutSummary
                   order={currentSelected}
                   totalDue={totalDue}
@@ -454,7 +454,7 @@ export default function CounterView() {
               </div>
 
               {/* Complete */}
-              <div className="p-6 lg:p-8 pt-4 border-t border-warm-roast/10 bg-card shrink-0 space-y-3">
+              <div className="p-4 md:p-5 lg:p-8 pt-3 lg:pt-4 border-t border-warm-roast/10 bg-card shrink-0 space-y-3">
                 <Input
                   type="text"
                   value={checkout.voidReason}

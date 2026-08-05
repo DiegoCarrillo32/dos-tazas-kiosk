@@ -25,7 +25,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
             type={type}
             className={cn(
               // Base
-              "w-full rounded-lg border px-3 py-2.5 text-sm transition-all",
+              "w-full h-11 rounded-lg border px-3 py-2 text-sm transition-all",
               // Colors – brand tokens (dark-mode aware)
               "bg-card text-expresso placeholder:text-expresso/40",
               // Border

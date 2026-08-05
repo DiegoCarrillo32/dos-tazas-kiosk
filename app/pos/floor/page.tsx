@@ -80,13 +80,13 @@ function ModifierDrawer({
   };
 
   return (
-    <Sheet onClose={onClose} maxWidth="md">
+    <Sheet onClose={onClose} maxWidth="lg">
         <div className="p-5 border-b border-warm-roast/10 flex items-center justify-between shrink-0">
           <div>
             <h3 className="font-bold text-lg text-expresso">{menuItem.name}</h3>
             <p className="text-sm text-expresso/60">{formatMoney(menuItem.price, currency)}</p>
           </div>
-          <button onClick={onClose} className="p-2 text-expresso/40 hover:text-expresso rounded-md transition-colors">
+          <button onClick={onClose} className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-expresso/40 hover:text-expresso rounded-md transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -342,7 +342,7 @@ export default function FloorView() {
   const itemLabel = (count: number) => count === 1 ? t("common.item") : t("common.items");
 
   return (
-    <div className="flex flex-col lg:flex-row h-full pb-[140px] sm:pb-[76px] lg:pb-0 relative overflow-hidden">
+    <div className="flex flex-col md:flex-row h-full min-h-0 relative overflow-hidden">
       {drawerItem && (
         <ModifierDrawer
           menuItem={drawerItem}
@@ -354,64 +354,72 @@ export default function FloorView() {
       )}
 
       {/* Left: Categories & Products */}
-      <div className="flex-1 flex flex-col h-full border-r border-warm-roast/10 bg-card overflow-hidden">
+      <div className="flex-1 min-w-0 flex flex-col h-full md:border-r border-warm-roast/10 bg-card overflow-hidden">
         {/* Table selector */}
-        <div className="flex items-center gap-2 overflow-x-auto px-4 py-2.5 border-b border-warm-roast/10 hide-scrollbar shrink-0 bg-muted/30">
-          <span className="text-xs font-semibold text-expresso/50 uppercase tracking-wider shrink-0 pr-1">{t("floor.table")}</span>
-          <button
-            onClick={() => setSelectedTableId(null)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
-              selectedTableId === null
-                ? "bg-coffee-fruit text-white shadow-sm"
-                : "bg-warm-roast/10 text-expresso/70 hover:bg-warm-roast/20"
-            }`}
-          >
-            <ShoppingBag className="w-3.5 h-3.5" />
-            {t("common.takeaway")}
-          </button>
-          {tables.map((tbl) => {
-            const occupied = occupiedTableIds.has(tbl.id);
-            const active = selectedTableId === tbl.id;
-            return (
-              <button
-                key={tbl.id}
-                onClick={() => setSelectedTableId(tbl.id)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
-                  active
-                    ? "bg-coffee-fruit text-white shadow-sm"
-                    : occupied
-                      ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 hover:bg-amber-200"
-                      : "bg-warm-roast/10 text-expresso/70 hover:bg-warm-roast/20"
-                }`}
-              >
-                <Armchair className="w-3.5 h-3.5" />
-                {tbl.name}
-                {occupied && <span className={`w-1.5 h-1.5 rounded-full ${active ? "bg-white" : "bg-amber-500"}`} />}
-              </button>
-            );
-          })}
-          {tables.length === 0 && (
-            <span className="text-xs text-expresso/40">{t("floor.noTables")}</span>
-          )}
-        </div>
-
-        <div className="flex overflow-x-auto p-4 gap-2 border-b border-warm-roast/10 hide-scrollbar shrink-0">
-          {categories.map((cat) => (
+        <div className="relative shrink-0 border-b border-warm-roast/10 bg-muted/30">
+          <div className="flex items-center gap-2 overflow-x-auto px-4 py-1.5 hide-scrollbar">
+            <span className="text-xs font-semibold text-expresso/50 uppercase tracking-wider shrink-0 pr-1">{t("floor.table")}</span>
             <button
-              key={cat.id}
-              onClick={() => setActiveCategory(cat.id)}
-              className={`px-6 py-3 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
-                effectiveCategory === cat.id
+              onClick={() => setSelectedTableId(null)}
+              className={`flex items-center gap-1.5 px-3.5 min-h-[44px] rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
+                selectedTableId === null
                   ? "bg-coffee-fruit text-white shadow-sm"
                   : "bg-warm-roast/10 text-expresso/70 hover:bg-warm-roast/20"
               }`}
             >
-              {cat.name}
+              <ShoppingBag className="w-3.5 h-3.5" />
+              {t("common.takeaway")}
             </button>
-          ))}
-          {categories.length === 0 && (
-            <p className="text-sm text-expresso/40 p-2">{t("floor.noCategories")}</p>
-          )}
+            {tables.map((tbl) => {
+              const occupied = occupiedTableIds.has(tbl.id);
+              const active = selectedTableId === tbl.id;
+              return (
+                <button
+                  key={tbl.id}
+                  onClick={() => setSelectedTableId(tbl.id)}
+                  className={`flex items-center gap-1.5 px-3.5 min-h-[44px] rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
+                    active
+                      ? "bg-coffee-fruit text-white shadow-sm"
+                      : occupied
+                        ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 hover:bg-amber-200"
+                        : "bg-warm-roast/10 text-expresso/70 hover:bg-warm-roast/20"
+                  }`}
+                >
+                  <Armchair className="w-3.5 h-3.5" />
+                  {tbl.name}
+                  {occupied && <span className={`w-1.5 h-1.5 rounded-full ${active ? "bg-white" : "bg-amber-500"}`} />}
+                </button>
+              );
+            })}
+            {tables.length === 0 && (
+              <span className="text-xs text-expresso/40">{t("floor.noTables")}</span>
+            )}
+          </div>
+          {/* Right-edge fade so a strip that overflows doesn't look complete
+              when it isn't — hide-scrollbar removes the only other cue. */}
+          <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-muted to-transparent" />
+        </div>
+
+        <div className="relative shrink-0 border-b border-warm-roast/10">
+          <div className="flex overflow-x-auto p-4 gap-2 hide-scrollbar">
+            {categories.map((cat) => (
+              <button
+                key={cat.id}
+                onClick={() => setActiveCategory(cat.id)}
+                className={`px-6 py-3 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
+                  effectiveCategory === cat.id
+                    ? "bg-coffee-fruit text-white shadow-sm"
+                    : "bg-warm-roast/10 text-expresso/70 hover:bg-warm-roast/20"
+                }`}
+              >
+                {cat.name}
+              </button>
+            ))}
+            {categories.length === 0 && (
+              <p className="text-sm text-expresso/40 p-2">{t("floor.noCategories")}</p>
+            )}
+          </div>
+          <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-card to-transparent" />
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 bg-background">
@@ -421,7 +429,7 @@ export default function FloorView() {
               <p className="text-sm">{t("floor.noProducts")}</p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
               {filteredProducts.map((product) => {
                 const soldOut =
                   product.is_available === false ||
@@ -442,12 +450,12 @@ export default function FloorView() {
                     }`}
                   >
                     {soldOut && (
-                      <span className="absolute top-2 right-2 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-400">
+                      <span className="absolute top-2 right-2 px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-400">
                         {t("floor.soldOut")}
                       </span>
                     )}
                     {!soldOut && lowStock && (
-                      <span className="absolute top-2 right-2 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-400">
+                      <span className="absolute top-2 right-2 px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-400">
                         {t("floor.stockLeft", { n: product.available_quantity })}
                       </span>
                     )}
@@ -466,8 +474,9 @@ export default function FloorView() {
         </div>
       </div>
 
-      {/* Mobile Bottom Bar */}
-      <div className="lg:hidden fixed bottom-16 sm:bottom-0 left-0 right-0 bg-card border-t border-warm-roast/10 p-4 flex justify-between items-center z-30 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
+      {/* Mobile/Phone Bottom Bar — in-flow shrink-0, not fixed, so it never
+          needs hand-computed offsets against the shell's tab nav. */}
+      <div className="md:hidden shrink-0 bg-card border-t border-warm-roast/10 p-4 flex justify-between items-center gap-3 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
         <div>
           <span className="font-semibold text-expresso">
             {totalQuantity} {itemLabel(totalQuantity)}
@@ -478,8 +487,9 @@ export default function FloorView() {
         <Button onClick={() => setIsOrderExpanded(true)} disabled={orderItems.length === 0}>{t("floor.viewOrder")}</Button>
       </div>
 
-      {/* Right: Current Order */}
-      <div className={`fixed inset-0 z-50 lg:static lg:z-auto w-full lg:w-[400px] flex flex-col bg-card h-full shrink-0 transition-transform duration-300 ${isOrderExpanded ? "translate-y-0" : "translate-y-full lg:translate-y-0"}`}>
+      {/* Right: Current Order — a full-screen slide-up sheet below `md`
+          (tablet portrait and phones), a persistent side panel from `md` up. */}
+      <div className={`fixed inset-0 z-50 md:static md:z-auto w-full md:w-[320px] lg:w-[380px] xl:w-[440px] flex flex-col bg-card h-full min-h-0 shrink-0 transition-transform duration-300 md:translate-y-0 ${isOrderExpanded ? "translate-y-0" : "translate-y-full"}`}>
         <div className="p-4 border-b border-warm-roast/10 shrink-0 flex justify-between items-center bg-card">
           <div className="flex items-center gap-2">
             {selectedTableId === null ? (
@@ -494,7 +504,7 @@ export default function FloorView() {
               </span>
             )}
           </div>
-          <button className="lg:hidden p-2 text-expresso/60 hover:text-expresso" onClick={() => setIsOrderExpanded(false)}>
+          <button className="md:hidden p-2.5 text-expresso/60 hover:text-expresso" onClick={() => setIsOrderExpanded(false)}>
             <X className="w-5 h-5" />
           </button>
         </div>

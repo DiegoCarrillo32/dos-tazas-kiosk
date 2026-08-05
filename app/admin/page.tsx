@@ -28,7 +28,7 @@ export default function AdminDashboard() {
   ];
 
   return (
-    <div className="p-6 lg:p-8 space-y-8">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-6 sm:space-y-8">
       <div>
         <h1 className="text-2xl font-bold text-expresso">{t("dashboard.title")}</h1>
         <p className="text-expresso/60 mt-1">{t("dashboard.subtitle")}</p>

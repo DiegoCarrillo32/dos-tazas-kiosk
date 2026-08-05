@@ -25,6 +25,7 @@ import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Label } from "@/components/ui/Label";
 import { Modal } from "@/components/ui/Modal";
+import { Checkbox } from "@/components/ui/Checkbox";
 import { useToast, useConfirm } from "@/components/ui/Feedback";
 import { useT } from "@/lib/i18n/LanguageContext";
 
@@ -120,7 +121,7 @@ export default function LocationsManagement() {
   }
 
   return (
-    <div className="p-6 lg:p-8 space-y-6 max-w-3xl">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-3xl">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-expresso">{t("locations.title")}</h1>
@@ -132,12 +133,10 @@ export default function LocationsManagement() {
       </div>
 
       {archivedCount > 0 && (
-        <label className="flex items-center gap-2 text-sm text-expresso/60 cursor-pointer w-fit">
-          <input
-            type="checkbox"
+        <label className="flex items-center gap-2 min-h-[44px] py-2 text-sm text-expresso/60 cursor-pointer w-fit">
+          <Checkbox
             checked={showArchived}
             onChange={(e) => setShowArchived(e.target.checked)}
-            className="accent-coffee-fruit"
           />
           {t("locations.showArchived")}
         </label>
@@ -175,7 +174,7 @@ export default function LocationsManagement() {
                   <select
                     value={copyFrom}
                     onChange={(e) => setCopyFrom(e.target.value)}
-                    className="w-full px-3 py-2 bg-background border border-warm-roast/10 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-coffee-fruit"
+                    className="w-full h-11 px-3 bg-background border border-warm-roast/10 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-coffee-fruit"
                   >
                     <option value="">{t("locations.copyMenuNone")}</option>
                     {adminLocations.map((l) => (
@@ -232,10 +231,10 @@ export default function LocationsManagement() {
                       className="flex-1"
                     />
                     <div className="flex gap-1 shrink-0">
-                      <button onClick={saveEdit} className="p-2 text-green-600 hover:text-green-700" title={t("common.save")}>
+                      <button onClick={saveEdit} className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-green-600 hover:text-green-700" title={t("common.save")}>
                         <Check className="w-4 h-4" />
                       </button>
-                      <button onClick={() => setEditingId(null)} className="p-2 text-expresso/40 hover:text-expresso" title={t("common.cancel")}>
+                      <button onClick={() => setEditingId(null)} className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-expresso/40 hover:text-expresso" title={t("common.cancel")}>
                         <X className="w-4 h-4" />
                       </button>
                     </div>
@@ -279,7 +278,7 @@ export default function LocationsManagement() {
                       <div className="flex items-center gap-1 shrink-0">
                         <button
                           onClick={() => startEdit(loc)}
-                          className="p-2 text-expresso/40 hover:text-coffee-fruit transition-colors"
+                          className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-expresso/40 hover:text-coffee-fruit transition-colors"
                           title={t("locations.editTitle")}
                         >
                           <Pencil className="w-4 h-4" />
@@ -287,7 +286,7 @@ export default function LocationsManagement() {
                         {loc.archived ? (
                           <button
                             onClick={() => handleRestore(loc)}
-                            className="p-2 text-expresso/40 hover:text-coffee-fruit transition-colors"
+                            className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-expresso/40 hover:text-coffee-fruit transition-colors"
                             title={t("locations.restore")}
                           >
                             <ArchiveRestore className="w-4 h-4" />
@@ -295,7 +294,7 @@ export default function LocationsManagement() {
                         ) : (
                           <button
                             onClick={() => handleArchive(loc)}
-                            className="p-2 text-expresso/40 hover:text-destructive transition-colors"
+                            className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-expresso/40 hover:text-destructive transition-colors"
                             title={t("locations.archive")}
                           >
                             <Archive className="w-4 h-4" />

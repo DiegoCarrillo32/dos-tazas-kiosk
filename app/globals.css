@@ -96,10 +96,26 @@
     /* Default subtle warm border for any unspecified border (brand-aware). */
     border-color: rgb(var(--border) / 0.12);
   }
+  html {
+    /* Prevent iOS Safari from bumping the base font size on rotation,
+       which would throw off every rem-based size in a locked-zoom kiosk. */
+    -webkit-text-size-adjust: 100%;
+  }
   body {
     background-color: rgb(var(--background));
     color: rgb(var(--foreground));
     font-family: "Gotham", system-ui, sans-serif;
+    /* This is a fixed kiosk surface, not a page — don't let overscroll
+       rubber-band/refresh reveal the browser chrome mid-order. */
+    overscroll-behavior-y: none;
+  }
+  /* Kill the ~300ms tap delay and the double-tap-to-zoom gesture on
+     interactive elements, without touching the global touch-action (which
+     would also block scroll gestures on non-interactive content). */
+  button,
+  a,
+  [role="button"] {
+    touch-action: manipulation;
   }
 }
 
@@ -114,9 +130,36 @@
     display: none;
   }
 
-  /* Pad for the device safe area (e.g. iOS home indicator) on the mobile nav. */
+  /* Pad for the device safe area (notch/home-indicator/rounded corners).
+     Requires `viewport-fit=cover` (set in app/layout.tsx) to be non-zero. */
   .pb-safe {
     padding-bottom: env(safe-area-inset-bottom);
+  }
+  .pt-safe {
+    padding-top: env(safe-area-inset-top);
+  }
+  .pl-safe {
+    padding-left: env(safe-area-inset-left);
+  }
+  .pr-safe {
+    padding-right: env(safe-area-inset-right);
+  }
+
+  /* Full-height shell, with a `dvh` upgrade so mobile Safari/Chrome's
+     collapsing toolbar doesn't clip the bottom of the app. Declared as a
+     plain CSS utility (not two Tailwind classes) because a single rule's
+     cascade — last *valid* declaration wins, and browsers without `dvh`
+     support simply drop that whole declaration — is the only way to get a
+     deterministic fallback; Tailwind's own class-emission order doesn't
+     reliably put `vh` before `dvh`. */
+  .h-app {
+    height: 100vh;
+    height: 100dvh;
+  }
+  /* Same pattern for the centered Modal's max-height. */
+  .max-h-modal {
+    max-height: 85vh;
+    max-height: 85dvh;
   }
 }
 

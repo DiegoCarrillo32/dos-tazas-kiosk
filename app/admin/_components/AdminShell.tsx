@@ -10,6 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/Popover
 import { Sheet } from "@/components/ui/Modal";
 import { useT } from "@/lib/i18n/LanguageContext";
 import { useLogout, useSessionContext, useSwitchLocation, useLocationSwitchListener } from "@/lib/hooks";
+import { useScrollIntoViewOnFocus } from "@/lib/useScrollIntoViewOnFocus";
 
 type NavKey =
   | "admin.dashboard"
@@ -150,7 +151,7 @@ function LocationSwitcherSheet() {
         <Sheet onClose={() => setOpen(false)}>
           <div className="p-4 border-b border-warm-roast/10 flex items-center justify-between shrink-0">
             <h3 className="font-bold text-expresso">{t("locations.switchTo")}</h3>
-            <button onClick={() => setOpen(false)} className="p-1.5 text-expresso/40 hover:text-expresso">
+            <button onClick={() => setOpen(false)} className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-expresso/40 hover:text-expresso">
               <X className="w-5 h-5" />
             </button>
           </div>
@@ -194,9 +195,10 @@ export default function AdminShell({
   // Reloads this tab if another tab switches location — see step 6 of
   // useSwitchLocation (lib/hooks.ts).
   useLocationSwitchListener();
+  useScrollIntoViewOnFocus();
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden">
+    <div className="flex h-app bg-background overflow-hidden pl-safe pr-safe">
       {/* Mobile Sidebar Navigation Drawer */}
       {isMobileMenuOpen && (
         <div className="md:hidden fixed inset-0 z-50 flex">
@@ -205,9 +207,9 @@ export default function AdminShell({
             onClick={() => setIsMobileMenuOpen(false)}
           />
           <aside className="relative w-64 max-w-xs bg-card border-r border-warm-roast/10 flex flex-col z-50 h-full">
-            <div className="p-6 flex items-center justify-between border-b border-warm-roast/10">
-              <div className="flex items-center gap-3">
-                <div className="bg-coffee-fruit p-2 rounded-md">
+            <div className="p-6 flex items-center justify-between gap-2 border-b border-warm-roast/10">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="bg-coffee-fruit p-2 rounded-md shrink-0">
                   <Store className="w-5 h-5 text-white" />
                 </div>
                 <div className="min-w-0">
@@ -217,7 +219,7 @@ export default function AdminShell({
               </div>
               <button
                 onClick={() => setIsMobileMenuOpen(false)}
-                className="p-1.5 rounded-md text-expresso/40 hover:text-expresso hover:bg-warm-roast/10"
+                className="shrink-0 min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-md text-expresso/40 hover:text-expresso hover:bg-warm-roast/10"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -232,7 +234,7 @@ export default function AdminShell({
                     key={item.href}
                     href={item.href}
                     onClick={() => setIsMobileMenuOpen(false)}
-                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                    className={`flex items-center gap-3 px-3 min-h-[44px] rounded-lg text-sm font-medium transition-colors ${
                       isActive
                         ? "bg-warm-roast/10 text-expresso"
                         : "text-expresso/70 hover:bg-warm-roast/5 hover:text-expresso"
@@ -245,18 +247,18 @@ export default function AdminShell({
               })}
             </nav>
 
-            <div className="p-4 border-t border-warm-roast/10 space-y-2">
+            <div className="p-4 pb-safe border-t border-warm-roast/10 space-y-2 shrink-0">
               <Link
                 href="/pos/floor"
                 onClick={() => setIsMobileMenuOpen(false)}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-expresso/70 hover:bg-warm-roast/5 hover:text-expresso transition-colors"
+                className="flex items-center gap-3 px-3 min-h-[44px] rounded-lg text-sm font-medium text-expresso/70 hover:bg-warm-roast/5 hover:text-expresso transition-colors"
               >
                 <ArrowLeft className="w-5 h-5 text-expresso/40" />
                 {t("nav.backToPOS")}
               </Link>
               <button
                 onClick={handleLogout}
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                className="w-full flex items-center gap-3 px-3 min-h-[44px] rounded-lg text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
               >
                 <LogOut className="w-5 h-5 text-red-500" />
                 {t("common.signOut")}
@@ -267,18 +269,18 @@ export default function AdminShell({
       )}
 
       {/* Sidebar */}
-      <aside className="w-64 bg-card border-r border-warm-roast/10 flex flex-col hidden md:flex shrink-0">
-        <div className="p-6 flex items-center justify-between border-b border-warm-roast/10">
-          <div className="flex items-center gap-3">
-            <div className="bg-coffee-fruit p-2 rounded-md">
+      <aside className="hidden md:flex w-64 bg-card border-r border-warm-roast/10 flex-col shrink-0">
+        <div className="p-6 flex items-center justify-between gap-2 border-b border-warm-roast/10">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="bg-coffee-fruit p-2 rounded-md shrink-0">
               <Store className="w-5 h-5 text-white" />
             </div>
-            <div>
-              <h1 className="font-bold tracking-tight text-expresso">Dos Tazas</h1>
-              <p className="text-xs text-expresso/60">{t("admin.adminPortal")}</p>
+            <div className="min-w-0">
+              <h1 className="font-bold tracking-tight text-expresso truncate">Dos Tazas</h1>
+              <p className="text-xs text-expresso/60 truncate">{t("admin.adminPortal")}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 shrink-0">
             <LanguageToggle />
             <ThemeToggle />
           </div>
@@ -305,17 +307,17 @@ export default function AdminShell({
           })}
         </nav>
 
-        <div className="p-4 border-t border-warm-roast/10 space-y-2">
+        <div className="p-4 pb-safe border-t border-warm-roast/10 space-y-2 shrink-0">
           <Link
             href="/pos/floor"
-            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-expresso/70 hover:bg-warm-roast/5 hover:text-expresso transition-colors"
+            className="flex items-center gap-3 px-3 min-h-[44px] rounded-lg text-sm font-medium text-expresso/70 hover:bg-warm-roast/5 hover:text-expresso transition-colors"
           >
             <ArrowLeft className="w-5 h-5 text-expresso/40" />
             {t("nav.backToPOS")}
           </Link>
           <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+            className="w-full flex items-center gap-3 px-3 min-h-[44px] rounded-lg text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
           >
             <LogOut className="w-5 h-5 text-red-500" />
             {t("common.signOut")}
@@ -325,21 +327,26 @@ export default function AdminShell({
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col overflow-hidden relative">
-        <div className="md:hidden flex items-center justify-between p-4 border-b border-warm-roast/10 bg-card">
-          <div className="flex items-center gap-2">
+        <div className="md:hidden flex items-center justify-between gap-2 p-4 border-b border-warm-roast/10 bg-card">
+          <div className="flex items-center gap-1 min-w-0">
             <button
               onClick={() => setIsMobileMenuOpen(true)}
-              className="p-2 -ml-2 text-expresso/60 hover:text-expresso dark:text-expresso/40 hover:text-expresso focus:outline-none"
+              className="shrink-0 min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-expresso/60 hover:text-expresso focus:outline-none"
               aria-label="Open menu"
             >
               <MenuIcon className="w-5 h-5" />
             </button>
             <LocationSwitcherSheet />
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1 shrink-0">
             <LanguageToggle />
             <ThemeToggle />
-            <Link href="/pos/floor" className="text-sm font-medium text-expresso/60 hover:text-expresso dark:text-expresso/40 hover:text-expresso">{t("nav.backToPOS")}</Link>
+            <Link
+              href="/pos/floor"
+              className="hidden sm:inline-flex items-center min-h-[44px] px-2 text-sm font-medium text-expresso/60 hover:text-expresso"
+            >
+              {t("nav.backToPOS")}
+            </Link>
           </div>
         </div>
         <div className="flex-1 overflow-y-auto">

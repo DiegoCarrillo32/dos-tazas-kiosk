@@ -3,6 +3,7 @@
 import { CRC_DENOMINATIONS, type CountedBreakdown } from "@/lib/types";
 import { formatMoney } from "@/lib/utils";
 import { useT } from "@/lib/i18n/LanguageContext";
+import { Input } from "@/components/ui/Input";
 
 const NOTES = CRC_DENOMINATIONS.filter((d) => d >= 1000);
 const COINS = CRC_DENOMINATIONS.filter((d) => d < 1000);
@@ -39,20 +40,22 @@ export function DenominationCounter({
     const qty = breakdown[String(denom)] ?? 0;
     return (
       <div key={denom} className="flex items-center gap-3">
-        <span className="w-20 shrink-0 text-sm font-medium text-expresso tabular-nums">
+        <span className="w-16 md:w-20 shrink-0 text-sm font-medium text-expresso tabular-nums">
           {formatMoney(denom, "CRC")}
         </span>
         <span className="text-expresso/40">×</span>
-        <input
-          type="number"
-          inputMode="numeric"
-          min={0}
-          step={1}
-          value={qty || ""}
-          onChange={(e) => setCount(denom, e.target.value)}
-          placeholder="0"
-          className="w-20 h-11 rounded-lg border border-warm-roast/20 bg-card px-3 text-sm text-expresso text-center focus:outline-none focus:ring-2 focus:ring-coffee-fruit/30 focus:border-coffee-fruit"
-        />
+        <div className="w-20 shrink-0">
+          <Input
+            type="number"
+            inputMode="numeric"
+            min={0}
+            step={1}
+            value={qty || ""}
+            onChange={(e) => setCount(denom, e.target.value)}
+            placeholder="0"
+            className="text-center px-2"
+          />
+        </div>
         <span className="flex-1 text-right text-sm text-expresso/60 tabular-nums">
           {qty > 0 ? formatMoney(denom * qty, "CRC") : ""}
         </span>
@@ -62,17 +65,21 @@ export function DenominationCounter({
 
   return (
     <div className="space-y-5">
-      <div>
-        <h4 className="text-xs font-semibold text-expresso/60 uppercase tracking-wider mb-2">
-          {t("cash.denominationNotes")}
-        </h4>
-        <div className="space-y-2">{NOTES.map(row)}</div>
-      </div>
-      <div>
-        <h4 className="text-xs font-semibold text-expresso/60 uppercase tracking-wider mb-2">
-          {t("cash.denominationCoins")}
-        </h4>
-        <div className="space-y-2">{COINS.map(row)}</div>
+      {/* Notes and coins sit side by side from `md` — halves the scroll
+          inside CloseShiftDialog's now-wider (`size="xl"`) panel. */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
+        <div>
+          <h4 className="text-xs font-semibold text-expresso/60 uppercase tracking-wider mb-2">
+            {t("cash.denominationNotes")}
+          </h4>
+          <div className="space-y-2">{NOTES.map(row)}</div>
+        </div>
+        <div>
+          <h4 className="text-xs font-semibold text-expresso/60 uppercase tracking-wider mb-2">
+            {t("cash.denominationCoins")}
+          </h4>
+          <div className="space-y-2">{COINS.map(row)}</div>
+        </div>
       </div>
       <div className="flex justify-between items-center pt-3 border-t border-warm-roast/10 font-bold text-expresso">
         <span>{t("cash.countedTotal")}</span>

@@ -44,7 +44,7 @@ function SettingsForm({
   };
 
   return (
-    <div className="p-6 lg:p-8 space-y-8 max-w-2xl">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-6 sm:space-y-8 max-w-2xl">
       <div>
         <h1 className="text-2xl font-bold text-expresso">{t("settings.title")}</h1>
         <p className="text-expresso/60 mt-1">{t("settings.subtitle")}</p>
@@ -53,14 +53,14 @@ function SettingsForm({
       {/* Profile Card */}
       <div className="bg-card rounded-2xl border border-warm-roast/10 shadow-sm p-6 space-y-6">
         <div className="flex items-center gap-4 pb-4 border-b border-warm-roast/10">
-          <div className="w-14 h-14 rounded-full bg-warm-roast/10 flex items-center justify-center">
+          <div className="w-14 h-14 shrink-0 rounded-full bg-warm-roast/10 flex items-center justify-center">
             <User className="w-7 h-7 text-expresso/40" />
           </div>
-          <div>
-            <p className="font-semibold text-expresso">
+          <div className="min-w-0">
+            <p className="font-semibold text-expresso truncate">
               {firstName} {lastName}
             </p>
-            <p className="text-sm text-expresso/60">{initialEmail}</p>
+            <p className="text-sm text-expresso/60 truncate">{initialEmail}</p>
             <span className={`inline-flex items-center mt-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${
               profile.role === "admin"
                 ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
@@ -72,7 +72,7 @@ function SettingsForm({
         </div>
 
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <Label className="mb-1 block">{t("settings.firstName")}</Label>
               <Input
@@ -221,10 +221,10 @@ function BusinessSettingsForm({ settings }: { settings: LocationSettings | null 
   return (
     <div className="bg-card rounded-2xl border border-warm-roast/10 shadow-sm p-6 space-y-6">
       <div className="flex items-center gap-3 pb-4 border-b border-warm-roast/10">
-        <div className="w-12 h-12 rounded-full bg-warm-roast/10 flex items-center justify-center">
+        <div className="w-12 h-12 shrink-0 rounded-full bg-warm-roast/10 flex items-center justify-center">
           <Store className="w-6 h-6 text-expresso/40" />
         </div>
-        <div>
+        <div className="min-w-0">
           <h2 className="font-semibold text-expresso">{t("settings.businessTitle")}</h2>
           <p className="text-sm text-expresso/60">{t("settings.businessSubtitle")}</p>
         </div>
@@ -235,7 +235,7 @@ function BusinessSettingsForm({ settings }: { settings: LocationSettings | null 
           <Label className="mb-1 block">{t("settings.legalName")}</Label>
           <Input type="text" value={legalName} onChange={(e) => setLegalName(e.target.value)} placeholder="Dos Tazas S.A." />
         </div>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <Label className="mb-1 block">{t("settings.taxId")}</Label>
             <Input type="text" value={taxId} onChange={(e) => setTaxId(e.target.value)} />
@@ -250,7 +250,7 @@ function BusinessSettingsForm({ settings }: { settings: LocationSettings | null 
           <Input type="text" value={address} onChange={(e) => setAddress(e.target.value)} />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <Label className="mb-1 block">{t("settings.ivaRate")}</Label>
             <Input type="number" inputMode="decimal" min={0} value={taxRatePct} onChange={(e) => setTaxRatePct(e.target.value)} />

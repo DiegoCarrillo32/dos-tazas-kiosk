@@ -101,7 +101,7 @@ export default function CashDrawerPage() {
   }
 
   return (
-    <div className="p-6 lg:p-8 space-y-6">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-expresso">{t("cash.title")}</h1>
@@ -176,15 +176,15 @@ export default function CashDrawerPage() {
 
             {/* Cash movements */}
             <div className="bg-card p-6 rounded-2xl border border-warm-roast/10 shadow-sm space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <h3 className="text-sm font-semibold text-expresso/60 uppercase tracking-wider">
                   {t("cash.movements")}
                 </h3>
                 <div className="flex gap-2">
-                  <Button size="sm" variant="secondary" leftIcon={<PlusCircle className="w-4 h-4" />} onClick={() => setMovementType("paid_in")}>
+                  <Button size="sm" variant="secondary" leftIcon={<PlusCircle className="w-4 h-4" />} onClick={() => setMovementType("paid_in")} className="flex-1 sm:flex-initial">
                     {t("cash.paidIn")}
                   </Button>
-                  <Button size="sm" variant="secondary" leftIcon={<MinusCircle className="w-4 h-4" />} onClick={() => setMovementType("paid_out")}>
+                  <Button size="sm" variant="secondary" leftIcon={<MinusCircle className="w-4 h-4" />} onClick={() => setMovementType("paid_out")} className="flex-1 sm:flex-initial">
                     {t("cash.paidOut")}
                   </Button>
                 </div>
@@ -216,47 +216,47 @@ export default function CashDrawerPage() {
 
       {/* Shift history */}
       <div className="bg-card rounded-2xl border border-warm-roast/10 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-warm-roast/10 flex items-center justify-between">
+        <div className="p-4 sm:p-6 border-b border-warm-roast/10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <h3 className="text-lg font-bold text-expresso">{t("cash.shiftHistory")}</h3>
-          <Button size="sm" variant="secondary" isLoading={isExporting} leftIcon={!isExporting && <Download className="w-4 h-4" />} onClick={handleExportShifts}>
+          <Button size="sm" variant="secondary" isLoading={isExporting} leftIcon={!isExporting && <Download className="w-4 h-4" />} onClick={handleExportShifts} className="w-full sm:w-auto">
             {t("cash.exportShifts")}
           </Button>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
+        <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+          <table className="w-full min-w-max whitespace-nowrap text-left text-sm">
             <thead className="bg-muted/40 text-expresso/60">
               <tr>
-                <th className="px-6 py-3 font-medium">{t("cash.openedAt")}</th>
-                <th className="px-6 py-3 font-medium">{t("cash.openedBy")}</th>
-                <th className="px-6 py-3 font-medium">{t("cash.grossSales")}</th>
-                <th className="px-6 py-3 font-medium">{t("cash.expectedCash")}</th>
-                <th className="px-6 py-3 font-medium">{t("cash.countedCash")}</th>
-                <th className="px-6 py-3 font-medium">{t("cash.variance")}</th>
-                <th className="px-6 py-3 font-medium">{t("cash.viewReport")}</th>
+                <th className="px-4 sm:px-6 py-3 font-medium">{t("cash.openedAt")}</th>
+                <th className="px-4 sm:px-6 py-3 font-medium">{t("cash.openedBy")}</th>
+                <th className="px-4 sm:px-6 py-3 font-medium">{t("cash.grossSales")}</th>
+                <th className="px-4 sm:px-6 py-3 font-medium">{t("cash.expectedCash")}</th>
+                <th className="px-4 sm:px-6 py-3 font-medium">{t("cash.countedCash")}</th>
+                <th className="px-4 sm:px-6 py-3 font-medium">{t("cash.variance")}</th>
+                <th className="px-4 sm:px-6 py-3 font-medium">{t("cash.viewReport")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-warm-roast/10">
               {historyLoading ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-8 text-center">
+                  <td colSpan={7} className="px-6 py-8 text-center whitespace-normal">
                     <Loader2 className="w-5 h-5 animate-spin text-expresso/40 mx-auto" />
                   </td>
                 </tr>
               ) : history.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-8 text-center text-expresso/40">
+                  <td colSpan={7} className="px-6 py-8 text-center whitespace-normal text-expresso/40">
                     {t("cash.noShifts")}
                   </td>
                 </tr>
               ) : (
                 history.map((s: ShiftListItem) => (
                   <tr key={s.id} className="hover:bg-warm-roast/5 transition-colors">
-                    <td className="px-6 py-4 text-expresso">{new Date(s.opened_at).toLocaleString("es-CR")}</td>
-                    <td className="px-6 py-4 text-expresso/70">{s.opened_by_name ?? "—"}</td>
-                    <td className="px-6 py-4 text-expresso">{formatMoney(s.gross_sales, "CRC")}</td>
-                    <td className="px-6 py-4 text-expresso/70">{s.expected_cash != null ? formatMoney(s.expected_cash, "CRC") : "—"}</td>
-                    <td className="px-6 py-4 text-expresso/70">{s.counted_cash != null ? formatMoney(s.counted_cash, "CRC") : "—"}</td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 sm:px-6 py-4 text-expresso">{new Date(s.opened_at).toLocaleString("es-CR")}</td>
+                    <td className="px-4 sm:px-6 py-4 text-expresso/70">{s.opened_by_name ?? "—"}</td>
+                    <td className="px-4 sm:px-6 py-4 text-expresso">{formatMoney(s.gross_sales, "CRC")}</td>
+                    <td className="px-4 sm:px-6 py-4 text-expresso/70">{s.expected_cash != null ? formatMoney(s.expected_cash, "CRC") : "—"}</td>
+                    <td className="px-4 sm:px-6 py-4 text-expresso/70">{s.counted_cash != null ? formatMoney(s.counted_cash, "CRC") : "—"}</td>
+                    <td className="px-4 sm:px-6 py-4">
                       {s.cash_variance != null ? (
                         <span className={s.cash_variance === 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400 font-medium"}>
                           {s.cash_variance > 0 ? "+" : ""}
@@ -266,8 +266,8 @@ export default function CashDrawerPage() {
                         <span className="text-expresso/40">{t("cash.statusOpen")}</span>
                       )}
                     </td>
-                    <td className="px-6 py-4">
-                      <button onClick={() => setViewShiftId(s.id)} className="text-coffee-fruit hover:underline font-medium">
+                    <td className="px-4 sm:px-6 py-4">
+                      <button onClick={() => setViewShiftId(s.id)} className="min-h-[44px] inline-flex items-center text-coffee-fruit hover:underline font-medium">
                         {t("cash.viewReport")}
                       </button>
                     </td>

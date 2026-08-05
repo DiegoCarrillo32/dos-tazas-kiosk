@@ -235,7 +235,7 @@ export default function MenuManagement() {
   }
 
   return (
-    <div className="p-6 lg:p-8 space-y-6">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-expresso">{t("menu.title")}</h1>
@@ -253,7 +253,7 @@ export default function MenuManagement() {
 
       {showCatForm && (
         <div className="bg-card p-4 rounded-xl border border-warm-roast/10 space-y-3">
-          <div className="flex gap-3">
+          <div className="flex flex-col sm:flex-row gap-3">
             <Input
               type="text"
               value={newCatName}
@@ -262,8 +262,10 @@ export default function MenuManagement() {
               placeholder={t("menu.categoryPlaceholder")}
               className="flex-1"
             />
-            <Button onClick={handleCreateCategory} disabled={!newCatName.trim()} isLoading={createCatMut.isPending}>{t("common.create")}</Button>
-            <button onClick={() => setShowCatForm(false)} className="p-2 text-expresso/40 hover:text-expresso"><X className="w-4 h-4" /></button>
+            <div className="flex gap-2">
+              <Button onClick={handleCreateCategory} disabled={!newCatName.trim()} isLoading={createCatMut.isPending} className="flex-1 sm:flex-initial">{t("common.create")}</Button>
+              <button onClick={() => setShowCatForm(false)} className="shrink-0 min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-expresso/40 hover:text-expresso"><X className="w-4 h-4" /></button>
+            </div>
           </div>
           {categories.length > 0 && (
             <ul className="divide-y divide-warm-roast/10 border-t border-warm-roast/10">
@@ -282,20 +284,20 @@ export default function MenuManagement() {
                         className="flex-1"
                         autoFocus
                       />
-                      <button onClick={saveEditCategory} className="p-2 text-green-600 hover:text-green-700" title={t("common.save")}>
+                      <button onClick={saveEditCategory} className="shrink-0 min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-green-600 hover:text-green-700" title={t("common.save")}>
                         <Check className="w-4 h-4" />
                       </button>
-                      <button onClick={() => setEditingCatId(null)} className="p-2 text-expresso/40 hover:text-expresso" title={t("common.cancel")}>
+                      <button onClick={() => setEditingCatId(null)} className="shrink-0 min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-expresso/40 hover:text-expresso" title={t("common.cancel")}>
                         <X className="w-4 h-4" />
                       </button>
                     </>
                   ) : (
                     <>
                       <span className="flex-1 text-sm text-expresso">{cat.name}</span>
-                      <button onClick={() => startEditCategory(cat)} className="p-2 text-expresso/40 hover:text-coffee-fruit transition-colors" title={t("menu.renameCategory")}>
+                      <button onClick={() => startEditCategory(cat)} className="shrink-0 min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-expresso/40 hover:text-coffee-fruit transition-colors" title={t("menu.renameCategory")}>
                         <Edit2 className="w-4 h-4" />
                       </button>
-                      <button onClick={() => handleDeleteCategory(cat)} className="p-2 text-expresso/40 hover:text-destructive transition-colors" title={t("menu.deleteCategoryTitle")}>
+                      <button onClick={() => handleDeleteCategory(cat)} className="shrink-0 min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-expresso/40 hover:text-destructive transition-colors" title={t("menu.deleteCategoryTitle")}>
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </>
@@ -319,7 +321,7 @@ export default function MenuManagement() {
                 <Label className="mb-1 block">{t("menu.description")}</Label>
                 <Input type="text" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <Label className="mb-1 block">{t("menu.price")}</Label>
                   <Input type="number" inputMode="numeric" step={1} min={0} value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
@@ -331,20 +333,20 @@ export default function MenuManagement() {
               </div>
               <div>
                 <Label className="mb-1 block">{t("menu.category")}</Label>
-                <select value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })} className="w-full px-3 py-2.5 bg-card text-expresso border border-warm-roast/20 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-coffee-fruit transition-all">
+                <select value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })} className="w-full h-11 px-3 bg-card text-expresso border border-warm-roast/20 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-coffee-fruit transition-all">
                   <option value="">{t("menu.noCategory")}</option>
                   {categories.map((cat) => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
                 </select>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 min-h-[44px]">
                 <Checkbox id="is_active" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} />
                 <Label htmlFor="is_active" className="cursor-pointer">{t("menu.activeLabel")}</Label>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 min-h-[44px]">
                 <Checkbox id="is_available" checked={form.is_available} onChange={(e) => setForm({ ...form, is_available: e.target.checked })} />
                 <Label htmlFor="is_available" className="cursor-pointer">{t("menu.availableLabel")}</Label>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 min-h-[44px]">
                 <Checkbox id="track_inventory" checked={form.track_inventory} onChange={(e) => setForm({ ...form, track_inventory: e.target.checked })} />
                 <Label htmlFor="track_inventory" className="cursor-pointer">{t("menu.trackInventoryLabel")}</Label>
               </div>
@@ -368,7 +370,7 @@ export default function MenuManagement() {
                           key={mod.id}
                           type="button"
                           onClick={() => toggleModifier(mod.id)}
-                          className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+                          className={`px-3 min-h-[44px] rounded-full text-sm font-medium border transition-colors ${
                             selected
                               ? "bg-coffee-fruit text-white border-coffee-fruit"
                               : "bg-card text-expresso/70 border-warm-roast/20 hover:border-coffee-fruit/50"
@@ -393,28 +395,28 @@ export default function MenuManagement() {
       )}
 
       <div className="bg-card rounded-2xl border border-warm-roast/10 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+        <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+          <table className="w-full min-w-max whitespace-nowrap text-left border-collapse">
             <thead>
               <tr className="border-b border-warm-roast/10 bg-muted/40">
-                <th className="px-6 py-4 text-sm font-semibold text-expresso">{t("menu.colName")}</th>
-                <th className="px-6 py-4 text-sm font-semibold text-expresso">{t("menu.colCategory")}</th>
-                <th className="px-6 py-4 text-sm font-semibold text-expresso">{t("menu.colPrice")}</th>
-                <th className="px-6 py-4 text-sm font-semibold text-expresso">{t("menu.colStock")}</th>
-                <th className="px-6 py-4 text-sm font-semibold text-expresso">{t("menu.colStatus")}</th>
-                <th className="px-6 py-4 text-sm font-semibold text-expresso text-right">{t("menu.colActions")}</th>
+                <th className="px-4 sm:px-6 py-3 sm:py-4 text-sm font-semibold text-expresso">{t("menu.colName")}</th>
+                <th className="px-4 sm:px-6 py-3 sm:py-4 text-sm font-semibold text-expresso">{t("menu.colCategory")}</th>
+                <th className="px-4 sm:px-6 py-3 sm:py-4 text-sm font-semibold text-expresso">{t("menu.colPrice")}</th>
+                <th className="px-4 sm:px-6 py-3 sm:py-4 text-sm font-semibold text-expresso">{t("menu.colStock")}</th>
+                <th className="px-4 sm:px-6 py-3 sm:py-4 text-sm font-semibold text-expresso">{t("menu.colStatus")}</th>
+                <th className="px-4 sm:px-6 py-3 sm:py-4 text-sm font-semibold text-expresso text-right">{t("menu.colActions")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-warm-roast/10">
               {items.length === 0 ? (
-                <tr><td colSpan={6} className="px-6 py-12 text-center text-expresso/40 text-sm">{t("menu.noItems")}</td></tr>
+                <tr><td colSpan={6} className="px-6 py-12 text-center whitespace-normal text-expresso/40 text-sm">{t("menu.noItems")}</td></tr>
               ) : (
                 items.map((item) => (
                   <tr key={item.id} className="hover:bg-warm-roast/5 transition-colors">
-                    <td className="px-6 py-4 text-sm font-medium text-expresso">{item.name}</td>
-                    <td className="px-6 py-4 text-sm text-expresso/60">{item.category?.name ?? "—"}</td>
-                    <td className="px-6 py-4 text-sm text-expresso/60">{formatMoney(item.price, "CRC")}</td>
-                    <td className="px-6 py-4 text-sm">
+                    <td className="px-4 sm:px-6 py-3 sm:py-4 text-sm font-medium text-expresso">{item.name}</td>
+                    <td className="px-4 sm:px-6 py-3 sm:py-4 text-sm text-expresso/60">{item.category?.name ?? "—"}</td>
+                    <td className="px-4 sm:px-6 py-3 sm:py-4 text-sm text-expresso/60">{formatMoney(item.price, "CRC")}</td>
+                    <td className="px-4 sm:px-6 py-3 sm:py-4 text-sm">
                       {!item.track_inventory ? (
                         <span className="text-expresso/40">{t("menu.untracked")}</span>
                       ) : (
@@ -428,7 +430,7 @@ export default function MenuManagement() {
                         </span>
                       )}
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 sm:px-6 py-3 sm:py-4">
                       <div className="flex flex-wrap items-center gap-1.5">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${item.is_active ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" : "bg-warm-roast/10 text-expresso/60"}`}>
                           {item.is_active ? t("menu.statusActive") : t("menu.statusDisabled")}
@@ -438,16 +440,22 @@ export default function MenuManagement() {
                         )}
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-right flex items-center justify-end gap-2">
-                      <button
-                        onClick={() => handleToggleAvailable(item)}
-                        title={item.is_available ? t("menu.markSoldOut") : t("menu.markAvailable")}
-                        className={`p-2 transition-colors ${item.is_available ? "text-expresso/40 hover:text-destructive" : "text-green-600 hover:text-green-700"}`}
-                      >
-                        {item.is_available ? <Ban className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
-                      </button>
-                      <button onClick={() => openEditForm(item)} className="p-2 text-expresso/40 hover:text-coffee-fruit transition-colors"><Edit2 className="w-4 h-4" /></button>
-                      <button onClick={() => handleDelete(item.id)} className="p-2 text-expresso/40 hover:text-destructive transition-colors"><Trash2 className="w-4 h-4" /></button>
+                    {/* A `<td>` cannot be `display:flex` — it removes the cell
+                        from the table's column-sizing algorithm, so the
+                        Actions column detaches from its header. Keep the
+                        cell a cell and nest the flex row inside it. */}
+                    <td className="px-4 sm:px-6 py-3 sm:py-4 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => handleToggleAvailable(item)}
+                          title={item.is_available ? t("menu.markSoldOut") : t("menu.markAvailable")}
+                          className={`min-h-[44px] min-w-[44px] inline-flex items-center justify-center transition-colors ${item.is_available ? "text-expresso/40 hover:text-destructive" : "text-green-600 hover:text-green-700"}`}
+                        >
+                          {item.is_available ? <Ban className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
+                        </button>
+                        <button onClick={() => openEditForm(item)} className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-expresso/40 hover:text-coffee-fruit transition-colors"><Edit2 className="w-4 h-4" /></button>
+                        <button onClick={() => handleDelete(item.id)} className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-expresso/40 hover:text-destructive transition-colors"><Trash2 className="w-4 h-4" /></button>
+                      </div>
                     </td>
                   </tr>
                 ))

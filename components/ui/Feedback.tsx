@@ -74,8 +74,13 @@ export function FeedbackProvider({ children }: { children: React.ReactNode }) {
     <FeedbackContext.Provider value={value}>
       {children}
 
-      {/* Toast stack */}
-      <div className="fixed inset-x-0 bottom-0 z-[100] flex flex-col items-center gap-2 p-4 pointer-events-none sm:items-end">
+      {/* Toast stack. Bottom offset clears the POS shell's `sm:hidden`
+          mobile tab nav (h-16) below `sm` — above `sm` there's no tab bar
+          to clear, so it collapses back to the normal 1rem. The safe-area
+          inset is added on top (not swapped in via a separate `pb-safe`
+          class — two classes on the same property would just let whichever
+          compiles last win outright instead of stacking). */}
+      <div className="fixed inset-x-0 bottom-0 z-[100] flex flex-col items-center gap-2 px-4 pt-4 pb-[calc(5rem+env(safe-area-inset-bottom))] sm:pb-[calc(1rem+env(safe-area-inset-bottom))] pointer-events-none sm:items-end">
         {toasts.map((item) => (
           <div
             key={item.id}
@@ -95,7 +100,7 @@ export function FeedbackProvider({ children }: { children: React.ReactNode }) {
             <p className="flex-1 text-sm font-medium">{item.message}</p>
             <button
               onClick={() => dismissToast(item.id)}
-              className="shrink-0 opacity-60 hover:opacity-100 transition-opacity"
+              className="shrink-0 -m-1 p-2 opacity-60 hover:opacity-100 transition-opacity"
               aria-label={t("common.close")}
             >
               <X className="w-4 h-4" />

@@ -125,7 +125,7 @@ export default function StaffManagement() {
   }
 
   return (
-    <div className="p-6 lg:p-8 space-y-6">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-expresso">{t("staff.title")}</h1>
@@ -167,7 +167,7 @@ export default function StaffManagement() {
                 <select
                   value={addRole}
                   onChange={(e) => setAddRole(e.target.value as "admin" | "staff")}
-                  className="w-full px-3 py-2 bg-background border border-warm-roast/10 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-coffee-fruit"
+                  className="w-full h-11 px-3 bg-background border border-warm-roast/10 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-coffee-fruit"
                 >
                   <option value="staff">{t("settings.roleStaff")}</option>
                   <option value="admin">{t("settings.roleAdmin")}</option>
@@ -192,7 +192,7 @@ export default function StaffManagement() {
         <Modal onClose={() => setShowInvite(false)} title={t("staff.inviteTitle")} size="md">
           <div className="space-y-5">
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <Label className="mb-1 block">{t("staff.firstName")}</Label>
                   <Input type="text" value={inviteFirst} onChange={(e) => setInviteFirst(e.target.value)} />
@@ -212,7 +212,7 @@ export default function StaffManagement() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-expresso/80 mb-1">{t("staff.role")}</label>
-                <select value={inviteRole} onChange={(e) => setInviteRole(e.target.value as "admin" | "staff")} className="w-full px-3 py-2 bg-background border border-warm-roast/10 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-coffee-fruit">
+                <select value={inviteRole} onChange={(e) => setInviteRole(e.target.value as "admin" | "staff")} className="w-full h-11 px-3 bg-background border border-warm-roast/10 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-coffee-fruit">
                   <option value="staff">{t("settings.roleStaff")}</option>
                   <option value="admin">{t("settings.roleAdmin")}</option>
                 </select>
@@ -233,20 +233,20 @@ export default function StaffManagement() {
 
       {/* Staff Table */}
       <div className="bg-card rounded-2xl border border-warm-roast/10 overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+        <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+          <table className="w-full min-w-max whitespace-nowrap text-left border-collapse">
             <thead>
               <tr className="border-b border-warm-roast/10 bg-muted/40">
-                <th className="px-6 py-4 text-sm font-semibold text-expresso">{t("staff.colName")}</th>
-                <th className="px-6 py-4 text-sm font-semibold text-expresso">{t("staff.colRole")}</th>
-                <th className="px-6 py-4 text-sm font-semibold text-expresso">{t("staff.colJoined")}</th>
-                <th className="px-6 py-4 text-sm font-semibold text-expresso text-right">{t("staff.colActions")}</th>
+                <th className="px-4 sm:px-6 py-3 sm:py-4 text-sm font-semibold text-expresso">{t("staff.colName")}</th>
+                <th className="px-4 sm:px-6 py-3 sm:py-4 text-sm font-semibold text-expresso">{t("staff.colRole")}</th>
+                <th className="px-4 sm:px-6 py-3 sm:py-4 text-sm font-semibold text-expresso">{t("staff.colJoined")}</th>
+                <th className="px-4 sm:px-6 py-3 sm:py-4 text-sm font-semibold text-expresso text-right">{t("staff.colActions")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-warm-roast/10">
               {staff.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-6 py-12 text-center">
+                  <td colSpan={4} className="px-6 py-12 text-center whitespace-normal">
                     <div className="flex flex-col items-center gap-3 text-expresso/40">
                       <Users className="w-10 h-10 opacity-20" />
                       <p className="text-sm">{t("staff.noStaff")}</p>
@@ -258,9 +258,9 @@ export default function StaffManagement() {
                   const isCurrentUser = member.id === currentUser?.id;
                   return (
                     <tr key={member.id} className="hover:bg-warm-roast/5 transition-colors">
-                      <td className="px-6 py-4">
+                      <td className="px-4 sm:px-6 py-3 sm:py-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-full bg-warm-roast/10 flex items-center justify-center font-bold text-sm text-expresso/70">
+                          <div className="w-9 h-9 shrink-0 rounded-full bg-warm-roast/10 flex items-center justify-center font-bold text-sm text-expresso/70">
                             {(member.first_name?.[0] ?? "?").toUpperCase()}
                           </div>
                           <div>
@@ -271,7 +271,7 @@ export default function StaffManagement() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-4 sm:px-6 py-3 sm:py-4">
                         <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
                           member.role === "admin"
                             ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
@@ -281,22 +281,22 @@ export default function StaffManagement() {
                           {member.role === "admin" ? t("settings.roleAdmin") : t("settings.roleStaff")}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-sm text-expresso/60">
+                      <td className="px-4 sm:px-6 py-3 sm:py-4 text-sm text-expresso/60">
                         {new Date(member.created_at).toLocaleDateString()}
                       </td>
-                      <td className="px-6 py-4 text-right">
+                      <td className="px-4 sm:px-6 py-3 sm:py-4 text-right">
                         <div className="flex items-center justify-end gap-2">
                           <button
                             onClick={() => handleToggleRole(member)}
                             disabled={isCurrentUser || updateRoleMut.isPending}
-                            className="px-3 py-1.5 text-xs font-medium border border-warm-roast/15 rounded-lg hover:bg-warm-roast/5 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                            className="px-3 min-h-[44px] text-xs font-medium border border-warm-roast/15 rounded-lg hover:bg-warm-roast/5 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                           >
                             {member.role === "admin" ? t("staff.demote") : t("staff.promote")}
                           </button>
                           <button
                             onClick={() => handleRemove(member)}
                             disabled={isCurrentUser || removeMut.isPending}
-                            className="p-2 text-expresso/40 hover:text-destructive transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                            className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-expresso/40 hover:text-destructive transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>

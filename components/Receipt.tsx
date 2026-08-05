@@ -49,7 +49,7 @@ export function Receipt({
   const handlePrint = () => window.print();
 
   return (
-    <Sheet onClose={onClose} maxHeight="90vh" wrapperClassName="no-print">
+    <Sheet onClose={onClose} maxHeight="90dvh" wrapperClassName="no-print">
         {/* Receipt body — the only part that prints */}
         <div className="receipt-print-area overflow-y-auto p-6 font-mono text-[13px] leading-snug text-expresso">
           <div className="text-center space-y-0.5 mb-3">

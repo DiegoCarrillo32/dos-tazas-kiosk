@@ -29,8 +29,8 @@ export function InvoiceSection({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-expresso/60 uppercase tracking-wider">{t("counter.electronicInvoice")}</h3>
-        <label className="flex items-center gap-2 cursor-pointer">
+        <h3 className="text-sm font-semibold text-expresso/70 uppercase tracking-wider">{t("counter.electronicInvoice")}</h3>
+        <label className="flex items-center gap-2 min-h-[44px] py-2 cursor-pointer">
           <Checkbox checked={needsInvoice} onChange={(e) => onNeedsInvoiceChange(e.target.checked)} />
           <span className="text-sm font-medium text-expresso/80">{t("counter.requestInvoice")}</span>
         </label>

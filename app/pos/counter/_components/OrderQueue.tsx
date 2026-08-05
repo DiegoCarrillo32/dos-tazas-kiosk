@@ -44,7 +44,7 @@ export function OrderQueue({
   const itemLabel = (count: number) => (count === 1 ? t("common.item") : t("common.items"));
 
   return (
-    <div className="w-full lg:w-1/3 border-b lg:border-b-0 lg:border-r border-warm-roast/10 bg-card flex flex-col h-[40vh] lg:h-full shrink-0">
+    <div className="w-full md:w-[300px] lg:w-[320px] xl:w-1/3 border-b md:border-b-0 md:border-r border-warm-roast/10 bg-card flex flex-col basis-2/5 md:basis-auto min-h-0 md:h-full shrink-0">
       <div className="p-4 border-b border-warm-roast/10 flex items-center justify-between shrink-0">
         <h2 className="font-bold text-lg text-expresso flex items-center gap-2">
           {t("counter.parkedOrders")}
@@ -58,7 +58,7 @@ export function OrderQueue({
           </span>
           {(pendingCount > 0 || failedCount > 0) && (
             <span
-              className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+              className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-bold ${
                 failedCount > 0
                   ? "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300"
                   : "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
@@ -72,7 +72,7 @@ export function OrderQueue({
           onClick={() => refetch()}
           disabled={isRefetching}
           title={t("counter.refresh")}
-          className="p-2 text-expresso/60 hover:text-expresso bg-warm-roast/10 hover:bg-warm-roast/20 rounded-md transition-colors"
+          className="p-3 min-h-[44px] min-w-[44px] flex items-center justify-center text-expresso/60 hover:text-expresso bg-warm-roast/10 hover:bg-warm-roast/20 rounded-md transition-colors"
         >
           <RefreshCw className={`w-4 h-4 ${isRefetching ? "animate-spin" : ""}`} />
         </button>
@@ -121,7 +121,7 @@ export function OrderQueue({
                         : `${order.id.slice(0, 8)}…`}
                     {order.__local && (
                       <span
-                        className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wide ${
+                        className={`px-1.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wide ${
                           order.__local.status === "failed"
                             ? "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300"
                             : "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
@@ -131,7 +131,7 @@ export function OrderQueue({
                       </span>
                     )}
                     {order.__payPending && (
-                      <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wide bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
+                      <span className="px-1.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wide bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
                         {t("offline.statePending")}
                       </span>
                     )}

@@ -1077,7 +1077,7 @@ export async function fetchStaffProfiles(): Promise<StaffMember[]> {
   const locationId = await getLocationId();
   const { data, error } = await supabase()
     .from("location_members")
-    .select("role, created_at, user_profiles(id, first_name, last_name)")
+    .select("role, created_at, user_profiles!location_members_user_id_fkey(id, first_name, last_name)")
     .eq("location_id", locationId)
     .order("created_at");
 

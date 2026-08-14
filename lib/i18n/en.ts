@@ -188,6 +188,18 @@ export const en = {
     modifiers: "Modifiers",
     modifiersHint: "Customers will be prompted to choose from these when ordering.",
     noModifiersAvailable: "No modifiers yet. Create some in the Modifiers page first.",
+    searchPlaceholder: "Search by name…",
+    allCategories: "All categories",
+    filterByCategory: "Filter by category",
+    noMatchingItems: "No menu items match your search.",
+    stockLow: "Low",
+  },
+  pagination: {
+    showing: "Showing {from}–{to} of {total}",
+    pageOf: "Page {page} of {pages}",
+    perPage: "per page",
+    previous: "Previous page",
+    next: "Next page",
   },
   analytics: {
     title: "Analytics",

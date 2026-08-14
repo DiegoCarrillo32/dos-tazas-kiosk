@@ -18,6 +18,8 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import { Pagination } from "@/components/ui/Pagination";
+import { usePagination } from "@/lib/usePagination";
 import { ChartSkeleton } from "../_components/Skeletons";
 
 // Brand tokens as CSS-var color strings (see app/globals.css /
@@ -43,6 +45,7 @@ export default function AnalyticsPage() {
 
   const { data, isLoading } = useSalesSummary(startStr, endStr);
   const money = (n: number) => formatMoney(n, "CRC");
+  const pg = usePagination(data?.top_items ?? [], { resetKey: `${startStr}|${endStr}` });
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6">
@@ -255,7 +258,7 @@ export default function AnalyticsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-warm-roast/10">
-                  {data.top_items.map((item, i) => (
+                  {pg.pageRows.map((item, i) => (
                     <tr key={i} className="hover:bg-warm-roast/5 transition-colors">
                       <td className="px-4 sm:px-6 py-3 sm:py-4 font-medium text-expresso">{item.name}</td>
                       <td className="px-4 sm:px-6 py-3 sm:py-4 text-expresso/60">{item.quantity} {t("analytics.units")}</td>
@@ -270,6 +273,7 @@ export default function AnalyticsPage() {
                 </tbody>
               </table>
             </div>
+            <Pagination {...pg} />
           </div>
         </div>
       )}

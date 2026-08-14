@@ -190,6 +190,18 @@ export const es: Translations = {
     modifiers: "Modificadores",
     modifiersHint: "Los clientes deberán elegir entre estos al ordenar.",
     noModifiersAvailable: "Sin modificadores aún. Créalos en la página de Modificadores primero.",
+    searchPlaceholder: "Buscar por nombre…",
+    allCategories: "Todas las categorías",
+    filterByCategory: "Filtrar por categoría",
+    noMatchingItems: "Ningún artículo coincide con tu búsqueda.",
+    stockLow: "Bajo",
+  },
+  pagination: {
+    showing: "Mostrando {from}–{to} de {total}",
+    pageOf: "Página {page} de {pages}",
+    perPage: "por página",
+    previous: "Página anterior",
+    next: "Página siguiente",
   },
   analytics: {
     title: "Analíticas",

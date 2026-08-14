@@ -24,9 +24,11 @@ import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
 import { OpenShiftDialog, CloseShiftDialog } from "@/components/ShiftDialogs";
 import { Modal } from "@/components/ui/Modal";
+import { Pagination } from "@/components/ui/Pagination";
 import { useToast } from "@/components/ui/Feedback";
 import { ZReport } from "@/components/ZReport";
 import { useT } from "@/lib/i18n/LanguageContext";
+import { usePagination } from "@/lib/usePagination";
 import { PageHeaderSkeleton, StatCardsSkeleton, TableSkeleton } from "../_components/Skeletons";
 import { Skeleton } from "@/components/ui/Skeleton";
 
@@ -51,6 +53,8 @@ export default function CashDrawerPage() {
   const { data: viewedSummary } = useShiftSummary(viewShiftId);
 
   const [isExporting, setIsExporting] = useState(false);
+
+  const pg = usePagination(history);
 
   const businessName = settings?.business_legal_name ?? undefined;
 
@@ -259,7 +263,7 @@ export default function CashDrawerPage() {
                   </td>
                 </tr>
               ) : (
-                history.map((s: ShiftListItem) => (
+                pg.pageRows.map((s: ShiftListItem) => (
                   <tr key={s.id} className="hover:bg-warm-roast/5 transition-colors">
                     <td className="px-4 sm:px-6 py-4 text-expresso">{new Date(s.opened_at).toLocaleString("es-CR")}</td>
                     <td className="px-4 sm:px-6 py-4 text-expresso/70">{s.opened_by_name ?? "—"}</td>
@@ -287,6 +291,7 @@ export default function CashDrawerPage() {
             </tbody>
           </table>
         </div>
+        <Pagination {...pg} />
       </div>
 
       {/* Open shift modal */}

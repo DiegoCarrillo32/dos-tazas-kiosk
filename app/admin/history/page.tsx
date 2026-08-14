@@ -16,10 +16,12 @@ import { DatePicker } from "@/components/ui/DatePicker";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
 import { Modal } from "@/components/ui/Modal";
+import { Pagination } from "@/components/ui/Pagination";
 import { useToast } from "@/components/ui/Feedback";
 import { Receipt } from "@/components/Receipt";
 import { formatMoney } from "@/lib/utils";
 import { useT } from "@/lib/i18n/LanguageContext";
+import { usePagination } from "@/lib/usePagination";
 import { Skeleton } from "@/components/ui/Skeleton";
 
 export default function TransactionHistory() {
@@ -49,6 +51,8 @@ export default function TransactionHistory() {
     const orderNumberMatch = o.order_number != null && String(o.order_number).includes(q);
     return orderNumberMatch || o.id.toLowerCase().includes(q);
   });
+
+  const pg = usePagination(filtered, { resetKey: `${searchQuery}|${startStr}|${endStr}` });
 
   const formatDate = (dateStr: string) =>
     new Date(dateStr).toLocaleString([], {
@@ -269,10 +273,10 @@ export default function TransactionHistory() {
                     ))}
                   </tr>
                 ))
-              ) : filtered.length === 0 ? (
+              ) : pg.pageRows.length === 0 ? (
                 <tr><td colSpan={7} className="px-6 py-12 text-center whitespace-normal text-expresso/40 text-sm">{searchQuery ? t("history.noMatching") : t("history.noOrders")}</td></tr>
               ) : (
-                filtered.map((order) => {
+                pg.pageRows.map((order) => {
                   const itemCount = (order.order_items ?? []).reduce((s: number, i: OrderItem) => s + i.quantity, 0);
                   return (
                     <tr key={order.id} className="hover:bg-warm-roast/5 transition-colors">
@@ -300,6 +304,7 @@ export default function TransactionHistory() {
             </tbody>
           </table>
         </div>
+        <Pagination {...pg} />
       </div>
     </div>
   );

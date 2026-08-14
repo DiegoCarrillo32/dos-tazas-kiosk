@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Edit2, Trash2, X, Save, Ban, CheckCircle2, Check } from "lucide-react";
+import { Plus, Edit2, Trash2, X, Save, Ban, CheckCircle2, Check, Search } from "lucide-react";
 import type { MenuItem, Category } from "@/lib/types";
 import {
   useAllMenuItems,
@@ -18,13 +18,16 @@ import {
 } from "@/lib/hooks";
 import { getLocationId } from "@/lib/queries";
 import { Input } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
 import { Label } from "@/components/ui/Label";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { Modal } from "@/components/ui/Modal";
+import { Pagination } from "@/components/ui/Pagination";
 import { useToast, useConfirm } from "@/components/ui/Feedback";
-import { formatMoney } from "@/lib/utils";
+import { formatMoney, normalizeText } from "@/lib/utils";
 import { useT } from "@/lib/i18n/LanguageContext";
+import { usePagination } from "@/lib/usePagination";
 import { TableSkeleton } from "../_components/Skeletons";
 
 type MenuItemForm = {
@@ -93,6 +96,21 @@ export default function MenuManagement() {
   const [editCatName, setEditCatName] = useState("");
 
   const isLoading = itemsLoading || catsLoading;
+
+  const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const hasFilters = search.trim() !== "" || categoryFilter !== "all";
+
+  const filteredItems = items.filter((item) => {
+    if (search.trim() && !normalizeText(item.name).includes(normalizeText(search.trim()))) {
+      return false;
+    }
+    if (categoryFilter === "none") return item.category_id == null;
+    if (categoryFilter !== "all") return item.category_id === categoryFilter;
+    return true;
+  });
+
+  const pg = usePagination(filteredItems, { resetKey: `${search}|${categoryFilter}` });
 
   const openCreateForm = () => {
     setEditingId(null);
@@ -244,6 +262,28 @@ export default function MenuManagement() {
         </div>
       </div>
 
+      <div className="flex flex-col sm:flex-row gap-3">
+        <Input
+          icon={<Search className="w-4 h-4" />}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder={t("menu.searchPlaceholder")}
+          className="flex-1"
+        />
+        <Select
+          value={categoryFilter}
+          onChange={(e) => setCategoryFilter(e.target.value)}
+          aria-label={t("menu.filterByCategory")}
+          className="sm:w-56"
+        >
+          <option value="all">{t("menu.allCategories")}</option>
+          <option value="none">{t("menu.noCategory")}</option>
+          {categories.map((cat) => (
+            <option key={cat.id} value={cat.id}>{cat.name}</option>
+          ))}
+        </Select>
+      </div>
+
       {showCatForm && (
         <div className="bg-card p-4 rounded-xl border border-warm-roast/10 space-y-3">
           <div className="flex flex-col sm:flex-row gap-3">
@@ -326,10 +366,10 @@ export default function MenuManagement() {
               </div>
               <div>
                 <Label className="mb-1 block">{t("menu.category")}</Label>
-                <select value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })} className="w-full h-11 px-3 bg-card text-expresso border border-warm-roast/20 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-coffee-fruit transition-all">
+                <Select value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })}>
                   <option value="">{t("menu.noCategory")}</option>
                   {categories.map((cat) => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
-                </select>
+                </Select>
               </div>
               <div className="flex items-center gap-2 min-h-[44px]">
                 <Checkbox id="is_active" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} />
@@ -404,10 +444,10 @@ export default function MenuManagement() {
               </tr>
             </thead>
             <tbody className="divide-y divide-warm-roast/10">
-              {items.length === 0 ? (
-                <tr><td colSpan={6} className="px-6 py-12 text-center whitespace-normal text-expresso/40 text-sm">{t("menu.noItems")}</td></tr>
+              {pg.pageRows.length === 0 ? (
+                <tr><td colSpan={6} className="px-6 py-12 text-center whitespace-normal text-expresso/40 text-sm">{hasFilters ? t("menu.noMatchingItems") : t("menu.noItems")}</td></tr>
               ) : (
-                items.map((item) => (
+                pg.pageRows.map((item) => (
                   <tr key={item.id} className="hover:bg-warm-roast/5 transition-colors">
                     <td className="px-4 sm:px-6 py-3 sm:py-4 text-sm font-medium text-expresso">{item.name}</td>
                     <td className="px-4 sm:px-6 py-3 sm:py-4 text-sm text-expresso/60">{item.category?.name ?? "—"}</td>
@@ -421,7 +461,7 @@ export default function MenuManagement() {
                             {item.available_quantity}
                           </span>
                           {item.available_quantity > 0 && item.available_quantity <= item.low_stock_threshold && (
-                            <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">Low</span>
+                            <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">{t("menu.stockLow")}</span>
                           )}
                         </span>
                       )}
@@ -459,6 +499,7 @@ export default function MenuManagement() {
             </tbody>
           </table>
         </div>
+        <Pagination {...pg} />
       </div>
       )}
     </div>

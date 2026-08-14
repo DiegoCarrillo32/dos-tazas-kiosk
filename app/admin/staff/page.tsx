@@ -16,8 +16,10 @@ import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Label } from "@/components/ui/Label";
 import { Modal } from "@/components/ui/Modal";
+import { Pagination } from "@/components/ui/Pagination";
 import { useToast, useConfirm } from "@/components/ui/Feedback";
 import { useT } from "@/lib/i18n/LanguageContext";
+import { usePagination } from "@/lib/usePagination";
 import { TableSkeleton } from "../_components/Skeletons";
 
 export default function StaffManagement() {
@@ -45,6 +47,8 @@ export default function StaffManagement() {
   const [showAddByEmail, setShowAddByEmail] = useState(false);
   const [addEmail, setAddEmail] = useState("");
   const [addRole, setAddRole] = useState<"admin" | "staff">("staff");
+
+  const pg = usePagination(staff);
 
   const handleInvite = () => {
     if (!inviteEmail || !invitePassword || !inviteFirst) {
@@ -250,7 +254,7 @@ export default function StaffManagement() {
                   </td>
                 </tr>
               ) : (
-                staff.map((member) => {
+                pg.pageRows.map((member) => {
                   const isCurrentUser = member.id === currentUser?.id;
                   return (
                     <tr key={member.id} className="hover:bg-warm-roast/5 transition-colors">
@@ -305,6 +309,7 @@ export default function StaffManagement() {
             </tbody>
           </table>
         </div>
+        <Pagination {...pg} />
       </div>
       )}
     </div>

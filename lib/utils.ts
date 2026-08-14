@@ -17,3 +17,14 @@ export function formatMoney(amount: number | string, currency = "CRC"): string {
   }
   return "$" + n.toFixed(2);
 }
+
+/**
+ * Lowercase and strip diacritics for accent-insensitive search, e.g. so a
+ * search for "cafe" matches "Café".
+ */
+export function normalizeText(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "");
+}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Edit2, Trash2, X, Save, Loader2, Ban, CheckCircle2, Check } from "lucide-react";
+import { Plus, Edit2, Trash2, X, Save, Ban, CheckCircle2, Check } from "lucide-react";
 import type { MenuItem, Category } from "@/lib/types";
 import {
   useAllMenuItems,
@@ -25,6 +25,7 @@ import { Modal } from "@/components/ui/Modal";
 import { useToast, useConfirm } from "@/components/ui/Feedback";
 import { formatMoney } from "@/lib/utils";
 import { useT } from "@/lib/i18n/LanguageContext";
+import { TableSkeleton } from "../_components/Skeletons";
 
 type MenuItemForm = {
   name: string;
@@ -226,14 +227,6 @@ export default function MenuManagement() {
 
   const isSaving = createItemMut.isPending || updateItemMut.isPending || setModifiersMut.isPending;
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-expresso/40" />
-      </div>
-    );
-  }
-
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -394,7 +387,10 @@ export default function MenuManagement() {
         </Modal>
       )}
 
-      <div className="bg-card rounded-2xl border border-warm-roast/10 overflow-hidden">
+      {isLoading ? (
+        <TableSkeleton rows={6} cols={6} />
+      ) : (
+      <div className="bg-card rounded-2xl border border-warm-roast/10 overflow-hidden animate-in fade-in-0 duration-200">
         <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
           <table className="w-full min-w-max whitespace-nowrap text-left border-collapse">
             <thead>
@@ -464,6 +460,7 @@ export default function MenuManagement() {
           </table>
         </div>
       </div>
+      )}
     </div>
   );
 }

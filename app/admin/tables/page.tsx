@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Trash2, Loader2, Armchair, Check, X, Pencil } from "lucide-react";
+import { Plus, Trash2, Armchair, Check, X, Pencil } from "lucide-react";
 import type { Table } from "@/lib/types";
 import { useTables, useCreateTable, useUpdateTable, useDeleteTable } from "@/lib/hooks";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { useToast, useConfirm } from "@/components/ui/Feedback";
 import { useT } from "@/lib/i18n/LanguageContext";
+import { CardListSkeleton } from "../_components/Skeletons";
 
 export default function TablesManagement() {
   const t = useT();
@@ -48,14 +49,6 @@ export default function TablesManagement() {
     deleteMut.mutate(tbl.id, { onError: () => toast(t("tables.failedToDelete")) });
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-expresso/40" />
-      </div>
-    );
-  }
-
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-3xl">
       <div>
@@ -79,7 +72,10 @@ export default function TablesManagement() {
       </div>
 
       {/* List */}
-      <div className="bg-card rounded-2xl border border-warm-roast/10 overflow-hidden">
+      {isLoading ? (
+        <CardListSkeleton rows={6} />
+      ) : (
+      <div className="bg-card rounded-2xl border border-warm-roast/10 overflow-hidden animate-in fade-in-0 duration-200">
         {tables.length === 0 ? (
           <div className="px-6 py-12 text-center text-expresso/40 text-sm">
             {t("tables.noTables")}
@@ -127,6 +123,7 @@ export default function TablesManagement() {
           </ul>
         )}
       </div>
+      )}
     </div>
   );
 }

@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import {
-  Loader2,
   Wallet,
   PlusCircle,
   MinusCircle,
@@ -28,6 +27,8 @@ import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Feedback";
 import { ZReport } from "@/components/ZReport";
 import { useT } from "@/lib/i18n/LanguageContext";
+import { PageHeaderSkeleton, StatCardsSkeleton, TableSkeleton } from "../_components/Skeletons";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 export default function CashDrawerPage() {
   const t = useT();
@@ -94,14 +95,19 @@ export default function CashDrawerPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-expresso/40" />
+      <div className="p-4 sm:p-6 lg:p-8 space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <PageHeaderSkeleton />
+          <Skeleton className="h-11 w-full sm:w-36 rounded-md" />
+        </div>
+        <StatCardsSkeleton count={3} />
+        <TableSkeleton rows={5} cols={7} />
       </div>
     );
   }
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 space-y-6">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-6 animate-in fade-in-0 duration-200">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-expresso">{t("cash.title")}</h1>
@@ -237,11 +243,15 @@ export default function CashDrawerPage() {
             </thead>
             <tbody className="divide-y divide-warm-roast/10">
               {historyLoading ? (
-                <tr>
-                  <td colSpan={7} className="px-6 py-8 text-center whitespace-normal">
-                    <Loader2 className="w-5 h-5 animate-spin text-expresso/40 mx-auto" />
-                  </td>
-                </tr>
+                Array.from({ length: 4 }).map((_, r) => (
+                  <tr key={r}>
+                    {Array.from({ length: 7 }).map((_, c) => (
+                      <td key={c} className="px-4 sm:px-6 py-4">
+                        <Skeleton className={c === 0 ? "h-4 w-28" : "h-4 w-16"} />
+                      </td>
+                    ))}
+                  </tr>
+                ))
               ) : history.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-6 py-8 text-center whitespace-normal text-expresso/40">

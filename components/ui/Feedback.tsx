@@ -22,7 +22,7 @@ import { Button } from "@/components/ui/Button";
  */
 
 type ToastVariant = "error" | "success";
-type ToastItem = { id: number; message: string; variant: ToastVariant };
+type ToastItem = { id: number; message: string; variant: ToastVariant; exiting?: boolean };
 
 type ConfirmRequest = { message: string; resolve: (ok: boolean) => void };
 
@@ -34,6 +34,10 @@ type FeedbackContextValue = {
 const FeedbackContext = createContext<FeedbackContextValue | null>(null);
 
 const TOAST_DURATION_MS = 5000;
+// Must match the animate-out duration on the toast element below — this is
+// how long the exit animation gets to play before the toast is actually
+// removed from the DOM.
+const TOAST_EXIT_MS = 200;
 
 export function FeedbackProvider({ children }: { children: React.ReactNode }) {
   const t = useT();
@@ -45,13 +49,25 @@ export function FeedbackProvider({ children }: { children: React.ReactNode }) {
     setToasts((prev) => prev.filter((toast) => toast.id !== id));
   }, []);
 
+  // Marks a toast as exiting (triggering its animate-out) instead of
+  // removing it immediately, then removes it once that animation has had
+  // time to play. Shared by the auto-dismiss timer and the manual close
+  // button so both animate out the same way.
+  const beginDismiss = useCallback(
+    (id: number) => {
+      setToasts((prev) => prev.map((toast) => (toast.id === id ? { ...toast, exiting: true } : toast)));
+      setTimeout(() => dismissToast(id), TOAST_EXIT_MS);
+    },
+    [dismissToast]
+  );
+
   const toast = useCallback(
     (message: string, variant: ToastVariant = "error") => {
       const id = nextId.current++;
       setToasts((prev) => [...prev, { id, message, variant }]);
-      setTimeout(() => dismissToast(id), TOAST_DURATION_MS);
+      setTimeout(() => beginDismiss(id), TOAST_DURATION_MS - TOAST_EXIT_MS);
     },
-    [dismissToast]
+    [beginDismiss]
   );
 
   // Only one confirm dialog can be open at a time in this app (they're
@@ -87,6 +103,9 @@ export function FeedbackProvider({ children }: { children: React.ReactNode }) {
             role="alert"
             className={cn(
               "pointer-events-auto w-full max-w-sm rounded-xl border shadow-lg p-4 flex items-start gap-3",
+              item.exiting
+                ? "animate-out fade-out-0 slide-out-to-bottom-4 sm:slide-out-to-right-4 duration-200"
+                : "animate-in fade-in-0 slide-in-from-bottom-4 sm:slide-in-from-right-4 duration-300",
               item.variant === "error"
                 ? "bg-red-50 dark:bg-red-950/90 border-red-200 dark:border-red-900/40 text-red-800 dark:text-red-300"
                 : "bg-green-50 dark:bg-green-950/90 border-green-200 dark:border-green-900/40 text-green-800 dark:text-green-300"
@@ -99,7 +118,7 @@ export function FeedbackProvider({ children }: { children: React.ReactNode }) {
             )}
             <p className="flex-1 text-sm font-medium">{item.message}</p>
             <button
-              onClick={() => dismissToast(item.id)}
+              onClick={() => beginDismiss(item.id)}
               className="shrink-0 -m-1 p-2 opacity-60 hover:opacity-100 transition-opacity"
               aria-label={t("common.close")}
             >
@@ -112,8 +131,8 @@ export function FeedbackProvider({ children }: { children: React.ReactNode }) {
       {/* Confirm dialog */}
       {confirmRequest && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => resolveConfirm(false)} />
-          <div className="relative w-full max-w-sm bg-card rounded-2xl border border-warm-roast/10 shadow-xl p-6 space-y-5">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-in fade-in-0 duration-200" onClick={() => resolveConfirm(false)} />
+          <div className="relative w-full max-w-sm bg-card rounded-2xl border border-warm-roast/10 shadow-xl p-6 space-y-5 animate-in fade-in-0 zoom-in-95 duration-200">
             <p className="text-sm font-medium text-expresso whitespace-pre-line">{confirmRequest.message}</p>
             <div className="flex gap-3">
               <Button variant="secondary" className="flex-1" onClick={() => resolveConfirm(false)}>

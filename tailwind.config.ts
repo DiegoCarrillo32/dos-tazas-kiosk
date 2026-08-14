@@ -1,4 +1,5 @@
 import type { Config } from "tailwindcss";
+import tailwindcssAnimate from "tailwindcss-animate";
 
 // Brand/semantic colors are stored as "R G B" channels in globals.css so that
 // Tailwind opacity modifiers (e.g. text-expresso/70) work with CSS variables.
@@ -51,9 +52,20 @@ const config: Config = {
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
+      keyframes: {
+        // Sweep for the skeleton loading blocks — see components/ui/Skeleton.tsx.
+        shimmer: {
+          "100%": { transform: "translateX(100%)" },
+        },
+      },
+      animation: {
+        shimmer: "shimmer 1.6s infinite",
+      },
     },
   },
-  plugins: [],
+  // tailwindcss-animate adds animate-in/animate-out + fade/zoom/slide utilities
+  // (data-attribute driven), used by Popover, Modal, Sheet, and Feedback.
+  plugins: [tailwindcssAnimate],
 };
 
 export default config;

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { format, subDays } from "date-fns";
-import { Loader2, TrendingUp, ShoppingBag, Receipt, Wallet } from "lucide-react";
+import { TrendingUp, ShoppingBag, Receipt, Wallet } from "lucide-react";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { useSalesSummary, useBusinessDate } from "@/lib/hooks";
 import { formatMoney } from "@/lib/utils";
@@ -18,6 +18,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import { ChartSkeleton } from "../_components/Skeletons";
 
 // Brand tokens as CSS-var color strings (see app/globals.css /
 // tailwind.config.ts) so charts stay on-brand and flip with dark mode
@@ -58,15 +59,13 @@ export default function AnalyticsPage() {
       </div>
 
       {isLoading ? (
-        <div className="h-64 flex items-center justify-center">
-          <Loader2 className="w-8 h-8 animate-spin text-expresso/40" />
-        </div>
+        <ChartSkeleton />
       ) : !data ? (
         <div className="h-64 flex items-center justify-center text-expresso/60">
           {t("analytics.noData")}
         </div>
       ) : (
-        <>
+        <div className="space-y-6 animate-in fade-in-0 duration-200">
           {/* KPI Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             <KpiCard
@@ -272,7 +271,7 @@ export default function AnalyticsPage() {
               </table>
             </div>
           </div>
-        </>
+        </div>
       )}
     </div>
   );

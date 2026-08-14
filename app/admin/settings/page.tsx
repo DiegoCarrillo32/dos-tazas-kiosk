@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Save, Loader2, User, LogOut, Store } from "lucide-react";
+import { Save, User, LogOut, Store } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import {
@@ -19,6 +19,7 @@ import type { UserProfile, LocationSettings } from "@/lib/types";
 import { useT } from "@/lib/i18n/LanguageContext";
 import { LANDING_COOKIE, LANDING_COOKIE_MAX_AGE } from "@/lib/landing";
 import { cn } from "@/lib/utils";
+import { PageHeaderSkeleton, FormSkeleton } from "../_components/Skeletons";
 
 function SettingsForm({
   profile,
@@ -315,17 +316,20 @@ export default function SettingsPage() {
 
   if (isLoading || authLoading || !profile) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-expresso/40" />
+      <div className="p-4 sm:p-6 lg:p-8 space-y-6 sm:space-y-8 max-w-2xl">
+        <PageHeaderSkeleton />
+        <FormSkeleton />
       </div>
     );
   }
 
   return (
-    <SettingsForm
-      profile={profile}
-      initialEmail={email}
-      onLogout={handleLogout}
-    />
+    <div className="animate-in fade-in-0 duration-200">
+      <SettingsForm
+        profile={profile}
+        initialEmail={email}
+        onLogout={handleLogout}
+      />
+    </div>
   );
 }

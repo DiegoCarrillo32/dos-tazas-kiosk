@@ -47,10 +47,10 @@ export function Modal({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-in fade-in-0 duration-200" onClick={onClose} />
       <div
         className={cn(
-          "relative w-full bg-card rounded-2xl border border-warm-roast/10 shadow-xl flex flex-col max-h-modal",
+          "relative w-full bg-card rounded-2xl border border-warm-roast/10 shadow-xl flex flex-col max-h-modal animate-in fade-in-0 zoom-in-95 duration-200",
           MODAL_MAX_WIDTH[size]
         )}
       >
@@ -110,10 +110,10 @@ export function Sheet({
 }) {
   return (
     <div className={cn("fixed inset-0 z-50 flex items-end sm:items-center justify-center", wrapperClassName)}>
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-in fade-in-0 duration-200" onClick={onClose} />
       <div
         className={cn(
-          "relative w-full bg-card rounded-t-2xl sm:rounded-2xl border border-warm-roast/10 shadow-xl flex flex-col",
+          "relative w-full bg-card rounded-t-2xl sm:rounded-2xl border border-warm-roast/10 shadow-xl flex flex-col animate-in fade-in-0 slide-in-from-bottom duration-300 sm:slide-in-from-bottom-0 sm:zoom-in-95 sm:duration-200",
           SHEET_MAX_WIDTH[maxWidth],
           className
         )}

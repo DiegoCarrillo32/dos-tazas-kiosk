@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { format, subDays } from "date-fns";
-import { Search, Eye, Loader2, Printer, RotateCcw } from "lucide-react";
+import { Search, Eye, Printer, RotateCcw } from "lucide-react";
 import type { Order, OrderItem } from "@/lib/types";
 import {
   useCompletedOrders,
@@ -20,6 +20,7 @@ import { useToast } from "@/components/ui/Feedback";
 import { Receipt } from "@/components/Receipt";
 import { formatMoney } from "@/lib/utils";
 import { useT } from "@/lib/i18n/LanguageContext";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 export default function TransactionHistory() {
   const t = useT();
@@ -259,7 +260,15 @@ export default function TransactionHistory() {
             </thead>
             <tbody className="divide-y divide-warm-roast/10">
               {isLoading ? (
-                <tr><td colSpan={7} className="px-6 py-12 text-center whitespace-normal"><Loader2 className="w-6 h-6 animate-spin text-expresso/40 mx-auto" /></td></tr>
+                Array.from({ length: 6 }).map((_, r) => (
+                  <tr key={r}>
+                    {Array.from({ length: 7 }).map((_, c) => (
+                      <td key={c} className="px-4 sm:px-6 py-4">
+                        <Skeleton className={c === 0 ? "h-4 w-24" : "h-4 w-16"} />
+                      </td>
+                    ))}
+                  </tr>
+                ))
               ) : filtered.length === 0 ? (
                 <tr><td colSpan={7} className="px-6 py-12 text-center whitespace-normal text-expresso/40 text-sm">{searchQuery ? t("history.noMatching") : t("history.noOrders")}</td></tr>
               ) : (

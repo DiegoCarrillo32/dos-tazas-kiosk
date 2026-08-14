@@ -4,7 +4,6 @@ import { useState } from "react";
 import {
   Building2,
   Plus,
-  Loader2,
   MapPin,
   Pencil,
   Archive,
@@ -28,6 +27,8 @@ import { Modal } from "@/components/ui/Modal";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { useToast, useConfirm } from "@/components/ui/Feedback";
 import { useT } from "@/lib/i18n/LanguageContext";
+import { PageHeaderSkeleton, CardListSkeleton } from "../_components/Skeletons";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 export default function LocationsManagement() {
   const t = useT();
@@ -114,14 +115,18 @@ export default function LocationsManagement() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-expresso/40" />
+      <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-3xl">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <PageHeaderSkeleton />
+          <Skeleton className="h-11 w-32 rounded-md" />
+        </div>
+        <CardListSkeleton rows={4} />
       </div>
     );
   }
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-3xl">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-3xl animate-in fade-in-0 duration-200">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-expresso">{t("locations.title")}</h1>

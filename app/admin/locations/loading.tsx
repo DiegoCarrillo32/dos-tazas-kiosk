@@ -1,0 +1,14 @@
+import { PageHeaderSkeleton, CardListSkeleton } from "../_components/Skeletons";
+import { Skeleton } from "@/components/ui/Skeleton";
+
+export default function Loading() {
+  return (
+    <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-3xl">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <PageHeaderSkeleton />
+        <Skeleton className="h-11 w-32 rounded-md" />
+      </div>
+      <CardListSkeleton rows={4} />
+    </div>
+  );
+}

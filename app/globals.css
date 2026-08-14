@@ -163,6 +163,20 @@
   }
 }
 
+/* Respect the OS-level motion setting. This is a touch device used all day,
+   so every transition/animation added for the admin skeletons, drawer,
+   modals, and toasts must collapse cleanly here rather than being skipped
+   piecemeal at each call site. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 /* ── Receipt printing ──────────────────────────────────────────────
    When printing, hide the whole app and show only the receipt body at
    the top-left, sized for an 80mm thermal roll. */

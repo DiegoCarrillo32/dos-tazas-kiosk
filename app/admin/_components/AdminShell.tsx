@@ -325,7 +325,11 @@ export default function AdminShell({
             <NavLinks pathname={pathname} t={t} onNavigate={() => setIsMobileMenuOpen(false)} />
           </nav>
 
-          <div className="p-4 pb-safe border-t border-warm-roast/10 space-y-2 shrink-0">
+          {/* Safe-area inset is added to the 1rem, not swapped in for it — a
+            bare `pb-safe` alongside `p-4` sets padding-bottom twice and the
+            later-compiled one wins outright, which zeroes the padding on
+            every device without a home indicator. */}
+        <div className="p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] border-t border-warm-roast/10 space-y-2 shrink-0">
             <SidebarFooter t={t} onNavigate={() => setIsMobileMenuOpen(false)} onLogout={handleLogout} />
           </div>
         </aside>
@@ -353,7 +357,11 @@ export default function AdminShell({
           <NavLinks pathname={pathname} t={t} />
         </nav>
 
-        <div className="p-4 pb-safe border-t border-warm-roast/10 space-y-2 shrink-0">
+        {/* Safe-area inset is added to the 1rem, not swapped in for it — a
+            bare `pb-safe` alongside `p-4` sets padding-bottom twice and the
+            later-compiled one wins outright, which zeroes the padding on
+            every device without a home indicator. */}
+        <div className="p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] border-t border-warm-roast/10 space-y-2 shrink-0">
           <SidebarFooter t={t} onLogout={handleLogout} />
         </div>
       </aside>

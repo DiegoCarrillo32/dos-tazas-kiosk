@@ -119,46 +119,52 @@ export default function POSNav({
         {children}
       </main>
 
-      {/* Mobile Bottom Navigation */}
-      <nav className="sm:hidden h-16 bg-card border-t border-warm-roast/10 shrink-0 flex items-center justify-around pb-safe">
-        <Link
-          href="/pos/floor"
-          className={`flex flex-col items-center justify-center w-full h-full gap-1 transition-colors ${
-            pathname === "/pos/floor" ? "text-expresso" : "text-expresso/60"
-          }`}
-        >
-          <Coffee className="w-5 h-5" />
-          <span className="text-xs font-medium">{t("nav.floor")}</span>
-        </Link>
-        <Link
-          href="/pos/counter"
-          className={`relative flex flex-col items-center justify-center w-full h-full gap-1 transition-colors ${
-            pathname === "/pos/counter" ? "text-expresso" : "text-expresso/60"
-          }`}
-        >
-          <span className="relative">
-            <MonitorPlay className="w-5 h-5" />
-            {badgeCount > 0 && (
-              <span
-                className={`absolute -top-1.5 -right-2 inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full text-[10px] font-bold ${
-                  failedCount > 0 ? "bg-red-500 text-white" : "bg-amber-500 text-white"
-                }`}
-              >
-                {badgeCount}
-              </span>
-            )}
-          </span>
-          <span className="text-xs font-medium">{t("nav.counter")}</span>
-        </Link>
-        {isAdmin && (
+      {/* Mobile Bottom Navigation. The safe-area inset has to sit *outside*
+          the h-16 tab row: putting `pb-safe` on the same box as a fixed
+          height makes the home indicator's ~34px eat into the 64px instead
+          of adding below it, crushing the icon+label stack (iPhone 17 Pro).
+          So the nav is the padded shell and the row keeps its own height. */}
+      <nav className="sm:hidden bg-card border-t border-warm-roast/10 shrink-0 pb-safe">
+        <div className="h-16 flex items-stretch justify-around">
           <Link
-            href="/admin"
-            className="flex flex-col items-center justify-center w-full h-full gap-1 text-expresso/60 hover:text-expresso transition-colors"
+            href="/pos/floor"
+            className={`flex flex-col items-center justify-center w-full gap-1 transition-colors ${
+              pathname === "/pos/floor" ? "text-expresso" : "text-expresso/60"
+            }`}
           >
-            <UserCircle className="w-5 h-5" />
-            <span className="text-xs font-medium">{t("nav.admin")}</span>
+            <Coffee className="w-5 h-5" />
+            <span className="text-xs font-medium">{t("nav.floor")}</span>
           </Link>
-        )}
+          <Link
+            href="/pos/counter"
+            className={`relative flex flex-col items-center justify-center w-full gap-1 transition-colors ${
+              pathname === "/pos/counter" ? "text-expresso" : "text-expresso/60"
+            }`}
+          >
+            <span className="relative">
+              <MonitorPlay className="w-5 h-5" />
+              {badgeCount > 0 && (
+                <span
+                  className={`absolute -top-1.5 -right-2 inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full text-[10px] font-bold ${
+                    failedCount > 0 ? "bg-red-500 text-white" : "bg-amber-500 text-white"
+                  }`}
+                >
+                  {badgeCount}
+                </span>
+              )}
+            </span>
+            <span className="text-xs font-medium">{t("nav.counter")}</span>
+          </Link>
+          {isAdmin && (
+            <Link
+              href="/admin"
+              className="flex flex-col items-center justify-center w-full gap-1 text-expresso/60 hover:text-expresso transition-colors"
+            >
+              <UserCircle className="w-5 h-5" />
+              <span className="text-xs font-medium">{t("nav.admin")}</span>
+            </Link>
+          )}
+        </div>
       </nav>
     </div>
   );

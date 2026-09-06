@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { changeDue, priceCart, priceCheckout, round2 } from "./pricing";
+import { tenderSuggestions } from "@/app/pos/counter/_components/PaymentSection";
+import {
+  changeDue,
+  discountBase,
+  priceCart,
+  priceCheckout,
+  round2,
+  selectionToRpcItems,
+} from "./pricing";
 import type { CartItem, MenuItem, ModifierOption } from "./types";
 
 // These cases are pinned against the server arithmetic they mirror:
@@ -245,6 +253,178 @@ describe("priceCheckout — discount + IVA re-split + tip (mirrors complete_orde
   });
 });
 
+describe("discountBase — the lines a discount is aimed at (mirrors _resolve_discount_scope)", () => {
+  // A ₡2.500 latte (×2) and a ₡1.500 pastry, IVA-inclusive at 13%.
+  const lines = [
+    { id: "latte", quantity: 2, total_price: 5000, tax_amount: 575.22 },
+    { id: "pastry", quantity: 1, total_price: 1500, tax_amount: 172.57 },
+  ];
+
+  it("is empty when nothing is selected", () => {
+    expect(discountBase(lines, {})).toEqual({ gross: 0, tax: 0, unitCount: 0, lineCount: 0 });
+  });
+
+  it("takes a whole line", () => {
+    const base = discountBase(lines, { pastry: 1 });
+    expect(base).toEqual({ gross: 1500, tax: 172.57, unitCount: 1, lineCount: 1 });
+  });
+
+  it("prorates a single unit out of a multi-unit line", () => {
+    // The free coffee case: one of two lattes.
+    const base = discountBase(lines, { latte: 1 });
+    expect(base.gross).toBe(2500);
+    expect(base.tax).toBe(round2(575.22 / 2));
+    expect(base.unitCount).toBe(1);
+  });
+
+  it("clamps a stale quantity to the line's own, so the base cannot inflate", () => {
+    expect(discountBase(lines, { pastry: 9 }).gross).toBe(1500);
+    expect(discountBase(lines, { latte: 99 }).gross).toBe(5000);
+  });
+
+  it("clamps a zero or negative quantity up to one unit", () => {
+    expect(discountBase(lines, { latte: 0 }).unitCount).toBe(1);
+    expect(discountBase(lines, { latte: -3 }).unitCount).toBe(1);
+  });
+
+  it("sums several lines", () => {
+    const base = discountBase(lines, { latte: 1, pastry: 1 });
+    expect(base.gross).toBe(4000);
+    expect(base.lineCount).toBe(2);
+    expect(base.unitCount).toBe(2);
+  });
+
+  it("sends the same clamped quantities to the RPC that it priced", () => {
+    expect(selectionToRpcItems(lines, { latte: 99, pastry: 1 })).toEqual([
+      { order_item_id: "latte", quantity: 2 },
+      { order_item_id: "pastry", quantity: 1 },
+    ]);
+  });
+});
+
+describe("priceCheckout — item-scoped discounts (mirrors _price_checkout in 00030)", () => {
+  // Order: one ₡2.500 latte + one ₡1.500 pastry = ₡4.000 gross,
+  // IVA-inclusive at 13% → ₡460.18 tax (287.61 + 172.57).
+  const GROSS = 4000;
+  const TAX = 460.18;
+  const LATTE_GROSS = 2500;
+  const LATTE_TAX = 287.61;
+
+  it("comps one line entirely and leaves the rest of the tab whole", () => {
+    const math = priceCheckout({
+      gross: GROSS,
+      tax: TAX,
+      baseGross: LATTE_GROSS,
+      baseTax: LATTE_TAX,
+      discountType: "percent",
+      discountValue: 100,
+      tip: 0,
+    });
+    expect(math.discountAmount).toBe(LATTE_GROSS);
+    expect(math.totalAmount).toBe(1500);
+    // Only the latte's IVA came off — the pastry still owes Hacienda its own.
+    expect(math.taxAmount).toBe(round2(TAX - LATTE_TAX));
+    expect(math.discountExceedsGross).toBe(false);
+  });
+
+  it("takes a percentage of the selected line only", () => {
+    const math = priceCheckout({
+      gross: GROSS,
+      tax: TAX,
+      baseGross: LATTE_GROSS,
+      baseTax: LATTE_TAX,
+      discountType: "percent",
+      discountValue: 10,
+      tip: 0,
+    });
+    expect(math.discountAmount).toBe(250);
+    expect(math.totalAmount).toBe(3750);
+    expect(math.taxAmount).toBe(round2(TAX - LATTE_TAX + round2((LATTE_TAX * 2250) / LATTE_GROSS)));
+  });
+
+  it("caps a flat amount at the selected line, not at the order", () => {
+    const math = priceCheckout({
+      gross: GROSS,
+      tax: TAX,
+      baseGross: LATTE_GROSS,
+      baseTax: LATTE_TAX,
+      discountType: "amount",
+      discountValue: 3000,
+      tip: 0,
+    });
+    // ₡3.000 is under the ₡4.000 order but over the ₡2.500 line it names.
+    expect(math.discountExceedsGross).toBe(true);
+    expect(math.discountAmount).toBe(LATTE_GROSS);
+    expect(math.totalAmount).toBe(1500);
+  });
+
+  it("keeps subtotal + tax + tip == total with a scoped discount and a tip", () => {
+    const math = priceCheckout({
+      gross: GROSS,
+      tax: TAX,
+      baseGross: LATTE_GROSS,
+      baseTax: LATTE_TAX,
+      discountType: "percent",
+      discountValue: 100,
+      tip: 200,
+    });
+    expect(round2(math.subtotal + math.taxAmount + math.tipAmount)).toBe(math.totalAmount);
+    expect(math.totalAmount).toBe(1700);
+  });
+
+  it("reproduces the whole-order figures exactly when the base is the whole order", () => {
+    // The regression lock: passing the base explicitly must not shift a
+    // colón against the pre-00030 arithmetic.
+    for (const [type, value] of [
+      ["percent", 10],
+      ["percent", 100],
+      ["amount", 333.33],
+      ["amount", 5000],
+    ] as const) {
+      const plain = priceCheckout({ gross: 3456.78, tax: 397.66, discountType: type, discountValue: value, tip: 200 });
+      const scoped = priceCheckout({
+        gross: 3456.78,
+        tax: 397.66,
+        baseGross: 3456.78,
+        baseTax: 397.66,
+        discountType: type,
+        discountValue: value,
+        tip: 200,
+      });
+      expect(scoped).toEqual(plain);
+    }
+  });
+
+  it("ignores a base larger than the order rather than trusting it", () => {
+    const math = priceCheckout({
+      gross: 1000,
+      tax: 115,
+      baseGross: 99999,
+      baseTax: 99999,
+      discountType: "percent",
+      discountValue: 100,
+      tip: 0,
+    });
+    expect(math.discountAmount).toBe(1000);
+    expect(math.totalAmount).toBe(0);
+  });
+
+  it("handles a zero base without dividing by zero", () => {
+    const math = priceCheckout({
+      gross: 4000,
+      tax: 460.18,
+      baseGross: 0,
+      baseTax: 0,
+      discountType: "percent",
+      discountValue: 100,
+      tip: 0,
+    });
+    expect(math.discountAmount).toBe(0);
+    expect(math.totalAmount).toBe(4000);
+    expect(Number.isFinite(math.taxAmount)).toBe(true);
+  });
+});
+
 describe("changeDue", () => {
   it("computes change owed when tendered exceeds the total", () => {
     expect(changeDue(1230, 1500)).toBe(270);
@@ -256,5 +436,40 @@ describe("changeDue", () => {
 
   it("returns zero for exact change", () => {
     expect(changeDue(1230, 1230)).toBe(0);
+  });
+});
+
+describe("tenderSuggestions", () => {
+  it("offers the notes a customer would hand over for a small order", () => {
+    // ₡1,500 → the ₡2,000 note, then ₡5,000 and ₡10,000.
+    expect(tenderSuggestions(1500)).toEqual([2000, 5000, 10000]);
+  });
+
+  it("still offers chips above ₡10,000 — the old hardcoded list offered none", () => {
+    // A round ₡12,000 needs no "next ₡1,000" chip: that IS the total, and
+    // the Exact button already covers it.
+    expect(tenderSuggestions(12000)).toEqual([15000, 20000]);
+    expect(tenderSuggestions(12500)).toEqual([13000, 15000, 20000]);
+  });
+
+  it("includes the ₡20,000 note, which was missing entirely", () => {
+    expect(tenderSuggestions(15500)).toContain(20000);
+  });
+
+  it("never suggests less than the total", () => {
+    for (const total of [900, 4300, 9999, 21000, 47500]) {
+      for (const s of tenderSuggestions(total)) expect(s).toBeGreaterThan(total);
+    }
+  });
+
+  it("never repeats an amount", () => {
+    // A total that is already a round 1,000 makes several rules agree.
+    const s = tenderSuggestions(5000);
+    expect(new Set(s).size).toBe(s.length);
+  });
+
+  it("returns nothing for a zero or nonsense total", () => {
+    expect(tenderSuggestions(0)).toEqual([]);
+    expect(tenderSuggestions(NaN)).toEqual([]);
   });
 });

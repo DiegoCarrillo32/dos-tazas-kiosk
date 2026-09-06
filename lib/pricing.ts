@@ -31,7 +31,7 @@ export const round2 = (n: number) => Math.round(n * 100) / 100;
  * trail rather than silently reinterpreting old offline sales. Bump it
  * whenever the rounding or formulas below change.
  */
-export const PRICING_VERSION = "2026-07-28-a";
+export const PRICING_VERSION = "2026-09-05-a";
 
 export type PricingContext = {
   /** `location_settings.tax_rate`, e.g. 0.13 for 13% IVA. */
@@ -124,19 +124,28 @@ export type CheckoutMath = {
   preTipTotal: number;
   /** subtotal + taxAmount + tip — what's actually due */
   totalAmount: number;
-  /** A keyed discount that overshoots the order. Checkout should be blocked, not silently zeroed. */
+  /**
+   * A keyed discount that overshoots what it applies to (the selected
+   * lines, or the whole order when nothing is selected). Checkout should
+   * be blocked, not silently zeroed.
+   */
   discountExceedsGross: boolean;
 };
 
 /**
  * Mirrors `complete_order`'s discount / IVA-re-split / tip arithmetic
- * (00018_order_discounts.sql:149-187) exactly. The server is what actually
- * charges — any drift here would quote the customer a total the till never
- * takes.
+ * (00030_item_scoped_discounts.sql — `_price_checkout`) exactly. The server
+ * is what actually charges — any drift here would quote the customer a total
+ * the till never takes.
  *
  * @param gross list price of the order, IVA included (subtotal + taxAmount
- *   from `priceCart`) — the base a discount comes off.
+ *   from `priceCart`).
  * @param tax   the IVA component of `gross`.
+ * @param baseGross the slice of `gross` the discount is taken on — the
+ *   selected lines when the cashier targets specific items, otherwise the
+ *   whole order. Defaults to `gross`, which reproduces 00018's whole-order
+ *   arithmetic term for term.
+ * @param baseTax the IVA component of `baseGross`.
  */
 export function priceCheckout(input: {
   gross: number;
@@ -144,32 +153,42 @@ export function priceCheckout(input: {
   discountType: DiscountType | null;
   discountValue: number;
   tip: number;
+  baseGross?: number;
+  baseTax?: number;
 }): CheckoutMath {
   const gross = Math.max(0, input.gross || 0);
   const tax = Math.max(0, input.tax || 0);
   const tip = Math.max(0, input.tip || 0);
   const discountInput = Math.max(0, input.discountValue || 0);
+  const baseGross = Math.min(Math.max(0, input.baseGross ?? gross), gross);
+  const baseTax = Math.min(Math.max(0, input.baseTax ?? tax), tax);
 
   let discountAmount = 0;
   if (input.discountType && discountInput > 0) {
     discountAmount =
       input.discountType === "percent"
-        ? round2((gross * Math.min(discountInput, 100)) / 100)
+        ? round2((baseGross * Math.min(discountInput, 100)) / 100)
         : round2(discountInput);
   }
 
-  // A keyed amount can overshoot the order; the caller shows it capped but
-  // blocks checkout rather than silently charging zero (00018:160-161).
-  const discountExceedsGross = discountAmount > gross;
-  const cappedDiscount = Math.min(discountAmount, gross);
+  // A keyed amount can overshoot what it applies to; the caller shows it
+  // capped but blocks checkout rather than silently charging zero
+  // (00018:160-161).
+  const discountExceedsGross = discountAmount > baseGross;
+  const cappedDiscount = Math.min(discountAmount, baseGross);
 
   // Prices are IVA-inclusive, so a discount takes the tax inside it down
   // too: the IVA owed is the IVA on what the customer actually paid, not on
-  // the list price. Split the discounted gross in the original proportion
-  // (00018:178-183).
+  // the list price. Only the IVA inside the discounted lines moves —
+  // comping a coffee must not reduce the tax owed on the sandwich beside
+  // it — so the tax outside the base (tax - baseTax) is carried through
+  // untouched and the base's own tax is re-split in the original
+  // proportion (00018:178-183, generalised in 00030).
   const discountedGross = gross - cappedDiscount;
   const taxDue =
-    cappedDiscount > 0 && gross > 0 ? round2((tax * discountedGross) / gross) : tax;
+    cappedDiscount > 0 && baseGross > 0
+      ? round2(tax - baseTax + round2((baseTax * (baseGross - cappedDiscount)) / baseGross))
+      : tax;
   const netDue = round2(discountedGross - taxDue);
 
   const preTipTotal = discountedGross;
@@ -184,6 +203,67 @@ export function priceCheckout(input: {
     totalAmount,
     discountExceedsGross,
   };
+}
+
+/**
+ * The lines a discount is aimed at, and what they are worth — the client
+ * mirror of `_resolve_discount_scope`
+ * (00030_item_scoped_discounts.sql). Rounds at the same points the SQL
+ * does, so the base shown on the Counter is the base the server derives.
+ *
+ * `selection` maps an order_item id to how many of its units are covered;
+ * a line absent from the map is not discounted. Quantities are clamped
+ * into [1, line quantity] exactly as the SQL clamps them, so a stale
+ * selection can never inflate the base.
+ */
+export function discountBase(
+  items: DiscountableLine[],
+  selection: Record<string, number>
+): { gross: number; tax: number; unitCount: number; lineCount: number } {
+  let gross = 0;
+  let tax = 0;
+  let unitCount = 0;
+  let lineCount = 0;
+
+  for (const item of items) {
+    const requested = selection[item.id];
+    if (requested == null) continue;
+    const lineQty = Math.max(1, Number(item.quantity) || 1);
+    const qty = Math.min(Math.max(1, Math.floor(requested)), lineQty);
+    gross += round2((Number(item.total_price) || 0) * qty / lineQty);
+    tax += round2((Number(item.tax_amount) || 0) * qty / lineQty);
+    unitCount += qty;
+    lineCount += 1;
+  }
+
+  return { gross: round2(gross), tax: round2(tax), unitCount, lineCount };
+}
+
+/** The `order_items` fields `discountBase` needs — a structural subset of OrderItem. */
+export type DiscountableLine = {
+  id: string;
+  quantity: number;
+  total_price: number | string;
+  tax_amount: number | string;
+};
+
+/** What `complete_order`'s `p_discount_items` expects. */
+export type DiscountItemRef = { order_item_id: string; quantity: number };
+
+/** The selection, in the shape the RPC takes. Order-independent; the server re-sorts. */
+export function selectionToRpcItems(
+  items: DiscountableLine[],
+  selection: Record<string, number>
+): DiscountItemRef[] {
+  return items
+    .filter((item) => selection[item.id] != null)
+    .map((item) => {
+      const lineQty = Math.max(1, Number(item.quantity) || 1);
+      return {
+        order_item_id: item.id,
+        quantity: Math.min(Math.max(1, Math.floor(selection[item.id])), lineQty),
+      };
+    });
 }
 
 export function changeDue(total: number, tendered: number): number {

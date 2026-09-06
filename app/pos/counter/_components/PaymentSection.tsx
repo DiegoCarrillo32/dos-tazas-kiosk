@@ -7,6 +7,33 @@ import { Label } from "@/components/ui/Label";
 import { formatMoney } from "@/lib/utils";
 import { useT } from "@/lib/i18n/LanguageContext";
 
+/** Notes actually in circulation in Costa Rica. */
+const CRC_NOTES = [1000, 2000, 5000, 10000, 20000];
+
+/**
+ * What a customer plausibly hands over for `total`: the next note that
+ * covers it, plus the round numbers people actually pay with.
+ *
+ * The old list was a hardcoded `[1000, 2000, 5000, 10000]` filtered to
+ * those >= the total, which meant a ₡12,000 order offered no chips at all
+ * (and ₡20,000 — a real note — was never in the list to begin with), so
+ * the cashier fell back to typing every digit on the busiest orders.
+ */
+export function tenderSuggestions(total: number): number[] {
+  if (!Number.isFinite(total) || total <= 0) return [];
+  const ceilTo = (step: number) => Math.ceil(total / step) * step;
+  const candidates = [
+    ...CRC_NOTES.filter((n) => n >= total),
+    ceilTo(1000),
+    ceilTo(5000),
+    ceilTo(10000),
+  ];
+  return [...new Set(candidates)]
+    .filter((amount) => amount > total)
+    .sort((a, b) => a - b)
+    .slice(0, 3);
+}
+
 export function PaymentSection({
   paymentMethod,
   onSelectMethod,
@@ -82,19 +109,16 @@ export function PaymentSection({
             >
               {t("counter.exact")}
             </button>
-            {[1000, 2000, 5000, 10000]
-              .filter((amt) => amt >= totalDue)
-              .slice(0, 3)
-              .map((amt) => (
-                <button
-                  key={amt}
-                  type="button"
-                  onClick={() => onTenderedChange(String(amt))}
-                  className="px-4 min-h-[44px] text-sm rounded-lg bg-warm-roast/10 text-expresso/70 hover:bg-warm-roast/20 transition-colors"
-                >
-                  {formatMoney(amt, currency)}
-                </button>
-              ))}
+            {tenderSuggestions(totalDue).map((amt) => (
+              <button
+                key={amt}
+                type="button"
+                onClick={() => onTenderedChange(String(amt))}
+                className="px-4 min-h-[44px] text-sm rounded-lg bg-warm-roast/10 text-expresso/70 hover:bg-warm-roast/20 transition-colors"
+              >
+                {formatMoney(amt, currency)}
+              </button>
+            ))}
           </div>
           <div className="flex justify-between items-center pt-1 border-t border-warm-roast/10">
             <span className="text-sm font-medium text-expresso/60">{t("counter.changeDue")}</span>

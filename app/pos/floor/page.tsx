@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { Coffee, Plus, Minus, Trash2, Send, Loader2, X, ShoppingBag, Armchair } from "lucide-react";
+import { useState, useMemo, useEffect } from "react";
+import { Coffee, Plus, Minus, Trash2, Send, Loader2, X, ShoppingBag, Armchair, Search, Pencil, AlertTriangle } from "lucide-react";
 import type { MenuItem, ModifierOption, CartItem, SelectedModifier, Modifier, OrderItem } from "@/lib/types";
 import {
   useCategories,
@@ -16,16 +16,22 @@ import {
   useMenuItemModifierMap,
   useCurrentShift,
 } from "@/lib/hooks";
-import { formatMoney } from "@/lib/utils";
+import { fetchOrderNumber } from "@/lib/queries";
+import { formatMoney, normalizeText } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
 import { Sheet } from "@/components/ui/Modal";
-import { useToast } from "@/components/ui/Feedback";
+import { useToast, useConfirm } from "@/components/ui/Feedback";
 import { useT } from "@/lib/i18n/LanguageContext";
 import { useConnectionStatus } from "@/lib/offline/useConnectionStatus";
 import { enqueuePark } from "@/lib/offline/outbox";
 import { isNetworkError } from "@/lib/offline/sync";
+import { clearFloorCart, loadFloorCart, reconcileCart, saveFloorCart } from "@/lib/floorCart";
 
 const generateCartId = () => Math.random().toString(36).substring(2, 11);
+
+/** Stable identity, so an untouched cart doesn't look "changed" every render. */
+const EMPTY_CART: CartItem[] = [];
 
 // ─── Modifier Drawer ──────────────────────────────────────────────
 
@@ -33,18 +39,25 @@ function ModifierDrawer({
   menuItem,
   modifiers,
   currency,
+  initialSelected,
+  initialNotes,
+  isEditing,
   onConfirm,
   onClose,
 }: {
   menuItem: MenuItem;
   modifiers: Modifier[];
   currency: string;
-  onConfirm: (item: CartItem) => void;
+  initialSelected?: SelectedModifier[];
+  initialNotes?: string;
+  isEditing?: boolean;
+  onConfirm: (selected: SelectedModifier[], notes: string) => void;
   onClose: () => void;
 }) {
   const t = useT();
   const toast = useToast();
-  const [selected, setSelected] = useState<SelectedModifier[]>([]);
+  const [selected, setSelected] = useState<SelectedModifier[]>(initialSelected ?? []);
+  const [notes, setNotes] = useState(initialNotes ?? "");
 
   const toggleOption = (mod: Modifier, option: ModifierOption) => {
     if (!option) return;
@@ -62,6 +75,25 @@ function ModifierDrawer({
     });
   };
 
+  // Chips append rather than replace: "sin azúcar" and "para llevar" are
+  // routinely both true, and retyping the first one is exactly the friction
+  // these are here to remove.
+  const appendNote = (chip: string) => {
+    setNotes((prev) => {
+      const trimmed = prev.trim();
+      if (!trimmed) return chip;
+      if (normalizeText(trimmed).includes(normalizeText(chip))) return trimmed;
+      return `${trimmed}, ${chip}`;
+    });
+  };
+
+  const noteChips = [
+    t("floor.noteChipNoSugar"),
+    t("floor.noteChipExtraHot"),
+    t("floor.noteChipIced"),
+    t("floor.noteChipToGo"),
+  ];
+
   const totalExtra = selected.reduce((s, m) => s + m.option.extra_price, 0);
 
   const handleConfirm = () => {
@@ -71,12 +103,7 @@ function ModifierDrawer({
         return;
       }
     }
-    onConfirm({
-      cartId: generateCartId(),
-      menuItem,
-      quantity: 1,
-      selectedModifiers: selected,
-    });
+    onConfirm(selected, notes.trim());
   };
 
   return (
@@ -124,6 +151,33 @@ function ModifierDrawer({
               </div>
             ))
           )}
+
+          {/* Prep note — order_items.notes, which every order RPC already
+              reads but nothing in the app has ever written. */}
+          <div>
+            <h4 className="text-sm font-semibold text-expresso/60 uppercase tracking-wider mb-3">
+              {t("floor.note")}
+            </h4>
+            <Input
+              type="text"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder={t("floor.notePlaceholder")}
+              maxLength={120}
+            />
+            <div className="flex flex-wrap gap-2 mt-2">
+              {noteChips.map((chip) => (
+                <button
+                  key={chip}
+                  type="button"
+                  onClick={() => appendNote(chip)}
+                  className="px-3.5 min-h-[44px] text-sm rounded-lg bg-warm-roast/10 text-expresso/70 hover:bg-warm-roast/20 transition-colors"
+                >
+                  {chip}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
         <div className="p-5 border-t border-warm-roast/10 shrink-0">
           <Button
@@ -131,7 +185,7 @@ function ModifierDrawer({
             onClick={handleConfirm}
             className="w-full bg-coffee-fruit hover:bg-fruit-light text-white border-transparent"
           >
-            {t("floor.addToOrder")} — {formatMoney(Number(menuItem.price) + totalExtra, currency)}
+            {isEditing ? t("floor.updateItem") : t("floor.addToOrder")} — {formatMoney(Number(menuItem.price) + totalExtra, currency)}
           </Button>
         </div>
     </Sheet>
@@ -140,10 +194,22 @@ function ModifierDrawer({
 
 // ─── Helpers ───────────────────────────────────────────────────────
 
-const areModifiersEqual = (a: SelectedModifier[], b: SelectedModifier[]) => {
-  if (a.length !== b.length) return false;
-  const aOptionIds = new Set(a.map((m) => m.option.id));
-  return b.every((m) => aOptionIds.has(m.option.id));
+/**
+ * Whether two cart lines are the same thing and should merge into one row.
+ *
+ * The note is part of this on purpose: a "sin azúcar" latte and a plain
+ * latte are different drinks to whoever makes them, and merging them would
+ * silently drop the instruction.
+ */
+const isSameCartLine = (
+  a: Pick<CartItem, "menuItem" | "selectedModifiers" | "notes">,
+  b: Pick<CartItem, "menuItem" | "selectedModifiers" | "notes">
+) => {
+  if (a.menuItem.id !== b.menuItem.id) return false;
+  if ((a.notes ?? "").trim() !== (b.notes ?? "").trim()) return false;
+  if (a.selectedModifiers.length !== b.selectedModifiers.length) return false;
+  const aOptionIds = new Set(a.selectedModifiers.map((m) => m.option.id));
+  return b.selectedModifiers.every((m) => aOptionIds.has(m.option.id));
 };
 
 // ─── Floor View ────────────────────────────────────────────────────
@@ -151,8 +217,19 @@ const areModifiersEqual = (a: SelectedModifier[], b: SelectedModifier[]) => {
 export default function FloorView() {
   const t = useT();
   const toast = useToast();
-  const { data: categories = [], isLoading: catsLoading } = useCategories();
-  const { data: menuItems = [], isLoading: itemsLoading } = useMenuItems();
+  const confirmDialog = useConfirm();
+  const {
+    data: categories = [],
+    isLoading: catsLoading,
+    isError: catsError,
+    refetch: refetchCategories,
+  } = useCategories();
+  const {
+    data: menuItems = [],
+    isLoading: itemsLoading,
+    isError: itemsError,
+    refetch: refetchMenuItems,
+  } = useMenuItems();
   const { data: tables = [] } = useTables();
   const { data: parkedOrders = [] } = useParkedOrders();
   const { data: settings } = useLocationSettings();
@@ -179,9 +256,40 @@ export default function FloorView() {
   useOrdersRealtime();
 
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
-  const [orderItems, setOrderItems] = useState<CartItem[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
   const [isOrderExpanded, setIsOrderExpanded] = useState(false);
-  const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
+
+  // ── Draft-cart persistence ──────────────────────────────────────
+  // The saved cart is *derived* during render rather than pushed in from an
+  // effect. Two reasons: an effect that calls setState on mount cascades a
+  // second render on every visit, and — because this component is still
+  // server-rendered — a localStorage read at mount would make the server's
+  // markup (empty cart) disagree with the client's. Gating on `menuItems`
+  // sidesteps both: the menu is empty on the server AND on the first client
+  // render, so both agree, and by the time it isn't empty reconcileCart can
+  // tell "this item was deleted" apart from "the menu hasn't loaded yet".
+  const restoredCart = useMemo(() => {
+    if (menuItems.length === 0) return null;
+    const saved = loadFloorCart();
+    if (!saved) return null;
+    const items = reconcileCart(saved.items, menuItems);
+    return items.length > 0 ? { items, tableId: saved.tableId } : null;
+  }, [menuItems]);
+
+  // `null`/`undefined` mean "the cashier hasn't touched this yet, so the
+  // restored draft still speaks for it".
+  const [cartOverride, setCartOverride] = useState<CartItem[] | null>(null);
+  const [tableOverride, setTableOverride] = useState<string | null | undefined>(undefined);
+
+  const orderItems = cartOverride ?? restoredCart?.items ?? EMPTY_CART;
+  const selectedTableId = tableOverride !== undefined ? tableOverride : restoredCart?.tableId ?? null;
+
+  useEffect(() => {
+    // Nothing is written before the menu lands — otherwise this fires on
+    // mount with an empty cart and deletes the very draft we're restoring.
+    if (menuItems.length === 0) return;
+    saveFloorCart(orderItems, selectedTableId);
+  }, [menuItems, orderItems, selectedTableId]);
 
   const occupiedTableIds = new Set(
     parkedOrders.map((o) => o.table_id).filter(Boolean) as string[]
@@ -196,14 +304,28 @@ export default function FloorView() {
 
   const [drawerItem, setDrawerItem] = useState<MenuItem | null>(null);
   const [drawerModifiers, setDrawerModifiers] = useState<Modifier[]>([]);
+  // Set when the drawer was opened to edit an existing line rather than add
+  // a new one; holds that line's cartId.
+  const [editingCartId, setEditingCartId] = useState<string | null>(null);
+  const editingLine = editingCartId ? orderItems.find((i) => i.cartId === editingCartId) ?? null : null;
 
   const isLoading = catsLoading || itemsLoading;
+  const loadFailed = catsError || itemsError;
 
   const effectiveCategory = activeCategory ?? categories[0]?.id ?? null;
 
-  const filteredProducts = effectiveCategory
-    ? menuItems.filter((p) => p.category_id === effectiveCategory)
-    : menuItems;
+  // A search spans the whole menu — reaching an item you can name shouldn't
+  // require knowing which category it lives in.
+  const trimmedQuery = searchQuery.trim();
+  const filteredProducts = useMemo(() => {
+    if (trimmedQuery) {
+      const q = normalizeText(trimmedQuery);
+      return menuItems.filter((p) => normalizeText(p.name).includes(q));
+    }
+    return effectiveCategory
+      ? menuItems.filter((p) => p.category_id === effectiveCategory)
+      : menuItems;
+  }, [menuItems, trimmedQuery, effectiveCategory]);
 
   const total = orderItems.reduce((sum, item) => {
     const modExtra = item.selectedModifiers.reduce((s, m) => s + m.option.extra_price, 0);
@@ -212,8 +334,15 @@ export default function FloorView() {
 
   const totalQuantity = orderItems.reduce((sum, item) => sum + item.quantity, 0);
 
+  const closeDrawer = () => {
+    setDrawerItem(null);
+    setDrawerModifiers([]);
+    setEditingCartId(null);
+  };
+
   const handleProductClick = (product: MenuItem) => {
     const mods = modsByItem.get(product.id) ?? [];
+    setEditingCartId(null);
     if (mods.length > 0) {
       setDrawerItem(product);
       setDrawerModifiers(mods);
@@ -227,55 +356,93 @@ export default function FloorView() {
     }
   };
 
+  const openLineEditor = (item: CartItem) => {
+    setEditingCartId(item.cartId);
+    setDrawerItem(item.menuItem);
+    setDrawerModifiers(modsByItem.get(item.menuItem.id) ?? []);
+  };
+
   const addToOrder = (newItem: CartItem) => {
-    setOrderItems((prev) => {
-      const existingIndex = prev.findIndex(
-        (item) =>
-          item.menuItem.id === newItem.menuItem.id &&
-          areModifiersEqual(item.selectedModifiers, newItem.selectedModifiers)
+    const existingIndex = orderItems.findIndex((item) => isSameCartLine(item, newItem));
+    if (existingIndex > -1) {
+      setCartOverride(
+        orderItems.map((item, i) =>
+          i === existingIndex ? { ...item, quantity: item.quantity + newItem.quantity } : item
+        )
       );
+    } else {
+      setCartOverride([...orderItems, newItem]);
+    }
+    closeDrawer();
+    // Land back on the full grid, ready for the next item, instead of on a
+    // one-result screen the cashier has to clear by hand.
+    setSearchQuery("");
+  };
 
-      if (existingIndex > -1) {
-        const updated = [...prev];
-        updated[existingIndex] = {
-          ...updated[existingIndex],
-          quantity: updated[existingIndex].quantity + newItem.quantity,
-        };
-        return updated;
-      }
+  /** Apply a drawer confirmation to the line being edited. */
+  const updateLine = (cartId: string, selected: SelectedModifier[], notes: string) => {
+    const target = orderItems.find((i) => i.cartId === cartId);
+    if (!target) return;
+    const edited: CartItem = { ...target, selectedModifiers: selected, notes: notes || undefined };
 
-      return [...prev, newItem];
-    });
-    setDrawerItem(null);
-    setDrawerModifiers([]);
+    // The edit can make this line identical to another one — merge rather
+    // than leave two rows that look the same and can't be told apart.
+    const twin = orderItems.find((i) => i.cartId !== cartId && isSameCartLine(i, edited));
+    if (twin) {
+      setCartOverride(
+        orderItems
+          .filter((i) => i.cartId !== cartId)
+          .map((i) => (i.cartId === twin.cartId ? { ...i, quantity: i.quantity + edited.quantity } : i))
+      );
+    } else {
+      setCartOverride(orderItems.map((i) => (i.cartId === cartId ? edited : i)));
+    }
+    closeDrawer();
   };
 
   const updateQuantity = (cartId: string, delta: number) => {
-    setOrderItems((items) =>
-      items.map((item) =>
-        item.cartId === cartId
-          ? { ...item, quantity: Math.max(1, item.quantity + delta) }
-          : item
-      )
+    setCartOverride(
+      orderItems.flatMap((item) => {
+        if (item.cartId !== cartId) return [item];
+        const next = item.quantity + delta;
+        // Minus at 1 removes the line. It used to clamp at 1, which made it
+        // a dead tap and forced a detour to the trash button.
+        if (next < 1) return [];
+        return [{ ...item, quantity: next }];
+      })
     );
   };
 
   const removeItem = (cartId: string) => {
-    setOrderItems((items) => items.filter((item) => item.cartId !== cartId));
+    setCartOverride(orderItems.filter((item) => item.cartId !== cartId));
+  };
+
+  const handleClearCart = async () => {
+    if (orderItems.length === 0) return;
+    if (!(await confirmDialog(t("floor.confirmClearCart")))) return;
+    setCartOverride([]);
   };
 
   const [isQueueing, setIsQueueing] = useState(false);
   const isSending = createOrderMut.isPending || appendOrderMut.isPending || isQueueing;
 
+  const itemLabel = (count: number) => (count === 1 ? t("common.item") : t("common.items"));
+
+  const finishSend = () => {
+    setCartOverride([]);
+    setIsOrderExpanded(false);
+    clearFloorCart();
+  };
+
   const queueCart = async () => {
     setIsQueueing(true);
     try {
-      await enqueuePark(
+      const entry = await enqueuePark(
         { cartItems: orderItems, tableId: selectedTableId, tableName: selectedTableName, currency },
         shift?.shift_id ?? null
       );
-      setOrderItems([]);
-      setIsOrderExpanded(false);
+      finishSend();
+      toast(t("floor.orderQueued", { ref: entry.offlineRef }), "success");
     } finally {
       setIsQueueing(false);
     }
@@ -292,12 +459,20 @@ export default function FloorView() {
         toast(t("floor.appendNeedsConnection"));
         return;
       }
+      const addedCount = totalQuantity;
       appendOrderMut.mutate(
         { orderId: openTab.id, cartItems: orderItems },
         {
           onSuccess: () => {
-            setOrderItems([]);
-            setIsOrderExpanded(false);
+            finishSend();
+            toast(
+              t("floor.itemsAddedToTab", {
+                count: addedCount,
+                itemLabel: itemLabel(addedCount),
+                name: selectedTableName,
+              }),
+              "success"
+            );
           },
           onError: () => toast(t("floor.failedToAddToTab")),
         }
@@ -313,9 +488,24 @@ export default function FloorView() {
     createOrderMut.mutate(
       { cartItems: orderItems, tableId: selectedTableId },
       {
-        onSuccess: () => {
-          setOrderItems([]);
-          setIsOrderExpanded(false);
+        onSuccess: async (orderId) => {
+          finishSend();
+          // The order number is what the cashier actually tells the
+          // customer, but create_order returns only the uuid. Look it up
+          // separately and fall back to a generic confirmation — a failure
+          // here must never read as a failed sale, since the sale landed.
+          let orderNumber: number | null = null;
+          try {
+            orderNumber = await fetchOrderNumber(orderId);
+          } catch {
+            // fall through to the generic message
+          }
+          toast(
+            orderNumber != null
+              ? t("floor.orderSent", { number: orderNumber })
+              : t("floor.orderSentGeneric"),
+            "success"
+          );
         },
         onError: (err) => {
           // navigator.onLine said "online" but the request itself
@@ -339,17 +529,51 @@ export default function FloorView() {
     );
   }
 
-  const itemLabel = (count: number) => count === 1 ? t("common.item") : t("common.items");
+  // A failed menu load used to render as "No products in this category",
+  // which reads as an empty menu and sends the cashier to Admin for nothing.
+  if (loadFailed) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center gap-4 p-6 text-center">
+        <AlertTriangle className="w-10 h-10 text-expresso/30" />
+        <p className="text-sm text-expresso/70">{t("floor.loadFailed")}</p>
+        <Button
+          variant="secondary"
+          onClick={() => {
+            void refetchCategories();
+            void refetchMenuItems();
+          }}
+        >
+          {t("floor.retry")}
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col md:flex-row h-full min-h-0 relative overflow-hidden">
       {drawerItem && (
         <ModifierDrawer
+          key={editingCartId ?? drawerItem.id}
           menuItem={drawerItem}
           modifiers={drawerModifiers}
           currency={currency}
-          onConfirm={addToOrder}
-          onClose={() => { setDrawerItem(null); setDrawerModifiers([]); }}
+          initialSelected={editingLine?.selectedModifiers}
+          initialNotes={editingLine?.notes}
+          isEditing={!!editingLine}
+          onConfirm={(selected, notes) => {
+            if (editingCartId) {
+              updateLine(editingCartId, selected, notes);
+              return;
+            }
+            addToOrder({
+              cartId: generateCartId(),
+              menuItem: drawerItem,
+              quantity: 1,
+              selectedModifiers: selected,
+              notes: notes || undefined,
+            });
+          }}
+          onClose={closeDrawer}
         />
       )}
 
@@ -360,7 +584,7 @@ export default function FloorView() {
           <div className="flex items-center gap-2 overflow-x-auto px-4 py-1.5 hide-scrollbar">
             <span className="text-xs font-semibold text-expresso/50 uppercase tracking-wider shrink-0 pr-1">{t("floor.table")}</span>
             <button
-              onClick={() => setSelectedTableId(null)}
+              onClick={() => setTableOverride(null)}
               className={`flex items-center gap-1.5 px-3.5 min-h-[44px] rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
                 selectedTableId === null
                   ? "bg-coffee-fruit text-white shadow-sm"
@@ -376,7 +600,7 @@ export default function FloorView() {
               return (
                 <button
                   key={tbl.id}
-                  onClick={() => setSelectedTableId(tbl.id)}
+                  onClick={() => setTableOverride(tbl.id)}
                   className={`flex items-center gap-1.5 px-3.5 min-h-[44px] rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
                     active
                       ? "bg-coffee-fruit text-white shadow-sm"
@@ -400,33 +624,66 @@ export default function FloorView() {
           <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-muted to-transparent" />
         </div>
 
-        <div className="relative shrink-0 border-b border-warm-roast/10">
-          <div className="flex overflow-x-auto p-4 gap-2 hide-scrollbar">
-            {categories.map((cat) => (
-              <button
-                key={cat.id}
-                onClick={() => setActiveCategory(cat.id)}
-                className={`px-6 py-3 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
-                  effectiveCategory === cat.id
-                    ? "bg-coffee-fruit text-white shadow-sm"
-                    : "bg-warm-roast/10 text-expresso/70 hover:bg-warm-roast/20"
-                }`}
-              >
-                {cat.name}
-              </button>
-            ))}
-            {categories.length === 0 && (
-              <p className="text-sm text-expresso/40 p-2">{t("floor.noCategories")}</p>
-            )}
-          </div>
-          <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-card to-transparent" />
+        {/* Menu search — spans every category, so an item you can name is
+            always two taps away regardless of where it's filed. */}
+        <div className="shrink-0 border-b border-warm-roast/10 px-4 pt-4">
+          <Input
+            type="text"
+            icon={<Search className="w-4 h-4" />}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder={t("floor.searchPlaceholder")}
+            rightElement={
+              searchQuery ? (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  aria-label={t("floor.clearSearch")}
+                  className="min-h-[44px] min-w-[44px] -mr-1 inline-flex items-center justify-center text-expresso/40 hover:text-expresso transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              ) : undefined
+            }
+          />
         </div>
+
+        {/* Categories are what a search replaces, so hide the strip while
+            one is active rather than showing a selection that isn't
+            filtering anything. */}
+        {!trimmedQuery && (
+          <div className="relative shrink-0 border-b border-warm-roast/10">
+            <div className="flex overflow-x-auto p-4 gap-2 hide-scrollbar">
+              {categories.map((cat) => (
+                <button
+                  key={cat.id}
+                  onClick={() => setActiveCategory(cat.id)}
+                  className={`px-6 py-3 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
+                    effectiveCategory === cat.id
+                      ? "bg-coffee-fruit text-white shadow-sm"
+                      : "bg-warm-roast/10 text-expresso/70 hover:bg-warm-roast/20"
+                  }`}
+                >
+                  {cat.name}
+                </button>
+              ))}
+              {categories.length === 0 && (
+                <p className="text-sm text-expresso/40 p-2">{t("floor.noCategories")}</p>
+              )}
+            </div>
+            <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-card to-transparent" />
+          </div>
+        )}
 
         <div className="flex-1 overflow-y-auto p-4 bg-background">
           {filteredProducts.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-expresso/40 space-y-2">
               <Coffee className="w-12 h-12 opacity-20" />
-              <p className="text-sm">{t("floor.noProducts")}</p>
+              <p className="text-sm">
+                {trimmedQuery
+                  ? t("floor.noSearchResults", { query: trimmedQuery })
+                  : t("floor.noProducts")}
+              </p>
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
@@ -490,23 +747,33 @@ export default function FloorView() {
       {/* Right: Current Order — a full-screen slide-up sheet below `md`
           (tablet portrait and phones), a persistent side panel from `md` up. */}
       <div className={`fixed inset-0 z-50 md:static md:z-auto w-full md:w-[320px] lg:w-[380px] xl:w-[440px] flex flex-col bg-card h-full min-h-0 shrink-0 transition-transform duration-300 md:translate-y-0 ${isOrderExpanded ? "translate-y-0" : "translate-y-full"}`}>
-        <div className="p-4 border-b border-warm-roast/10 shrink-0 flex justify-between items-center bg-card">
-          <div className="flex items-center gap-2">
+        <div className="p-4 border-b border-warm-roast/10 shrink-0 flex justify-between items-center bg-card gap-2">
+          <div className="flex items-center gap-2 min-w-0">
             {selectedTableId === null ? (
-              <ShoppingBag className="w-4 h-4 text-expresso/50" />
+              <ShoppingBag className="w-4 h-4 text-expresso/50 shrink-0" />
             ) : (
-              <Armchair className="w-4 h-4 text-expresso/50" />
+              <Armchair className="w-4 h-4 text-expresso/50 shrink-0" />
             )}
-            <h2 className="font-bold text-lg text-expresso">{selectedTableName}</h2>
+            <h2 className="font-bold text-lg text-expresso truncate">{selectedTableName}</h2>
             {openTab && (
-              <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+              <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 shrink-0">
                 {t("floor.openTabBadge")}
               </span>
             )}
           </div>
-          <button className="md:hidden p-2.5 text-expresso/60 hover:text-expresso" onClick={() => setIsOrderExpanded(false)}>
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-1 shrink-0">
+            {orderItems.length > 0 && (
+              <button
+                onClick={handleClearCart}
+                className="min-h-[44px] px-3 text-sm font-medium text-expresso/60 hover:text-red-600 rounded-lg transition-colors"
+              >
+                {t("floor.clearCart")}
+              </button>
+            )}
+            <button className="md:hidden min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-expresso/60 hover:text-expresso" onClick={() => setIsOrderExpanded(false)}>
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-muted/40">
@@ -539,31 +806,50 @@ export default function FloorView() {
               const unitTotal = Number(item.menuItem.price) + modExtra;
               return (
                 <div key={item.cartId} className="bg-card border border-warm-roast/10 rounded-lg p-3 flex flex-col gap-3 shadow-sm">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h4 className="font-medium text-expresso">{item.menuItem.name}</h4>
+                  <div className="flex justify-between items-start gap-2">
+                    {/* Tapping the line reopens the modifier drawer seeded
+                        with what's already on it — editing used to mean
+                        deleting the line and building it again. */}
+                    <button
+                      type="button"
+                      onClick={() => openLineEditor(item)}
+                      aria-label={t("floor.editItem")}
+                      className="flex-1 min-w-0 text-left group"
+                    >
+                      <h4 className="font-medium text-expresso flex items-center gap-1.5">
+                        <span className="truncate">{item.menuItem.name}</span>
+                        <Pencil className="w-3 h-3 shrink-0 text-expresso/30 group-hover:text-expresso/70 transition-colors" />
+                      </h4>
                       {item.selectedModifiers.length > 0 && (
                         <p className="text-xs text-expresso/40 mt-0.5">
                           {item.selectedModifiers.map((m) => m.option.name).join(", ")}
                         </p>
                       )}
-                      <p className="text-sm text-expresso/60">{formatMoney(unitTotal, currency)} {t("floor.each")}</p>
-                    </div>
-                    <span className="font-semibold text-expresso">
+                      {/* Deliberately styled apart from the modifiers above:
+                          a note is an instruction to whoever makes the drink,
+                          not a priced option. */}
+                      {item.notes && (
+                        <p className="text-xs font-medium text-coffee-fruit mt-1 break-words">
+                          {item.notes}
+                        </p>
+                      )}
+                      <p className="text-sm text-expresso/60 mt-0.5">{formatMoney(unitTotal, currency)} {t("floor.each")}</p>
+                    </button>
+                    <span className="font-semibold text-expresso shrink-0">
                       {formatMoney(unitTotal * item.quantity, currency)}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1 bg-warm-roast/10 rounded-lg p-1">
-                      <button onClick={() => updateQuantity(item.cartId, -1)} aria-label="Decrease quantity" className="h-10 w-10 flex items-center justify-center hover:bg-card rounded-md text-expresso/70 transition-colors active:scale-95">
+                      <button onClick={() => updateQuantity(item.cartId, -1)} aria-label="Decrease quantity" className="h-11 w-11 flex items-center justify-center hover:bg-card rounded-md text-expresso/70 transition-colors active:scale-95">
                         <Minus className="w-4 h-4" />
                       </button>
                       <span className="w-8 text-center font-medium text-sm tabular-nums">{item.quantity}</span>
-                      <button onClick={() => updateQuantity(item.cartId, 1)} aria-label="Increase quantity" className="h-10 w-10 flex items-center justify-center hover:bg-card rounded-md text-expresso/70 transition-colors active:scale-95">
+                      <button onClick={() => updateQuantity(item.cartId, 1)} aria-label="Increase quantity" className="h-11 w-11 flex items-center justify-center hover:bg-card rounded-md text-expresso/70 transition-colors active:scale-95">
                         <Plus className="w-4 h-4" />
                       </button>
                     </div>
-                    <button onClick={() => removeItem(item.cartId)} aria-label="Remove item" className="h-10 w-10 flex items-center justify-center text-red-500 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors active:scale-95">
+                    <button onClick={() => removeItem(item.cartId)} aria-label="Remove item" className="h-11 w-11 flex items-center justify-center text-red-500 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors active:scale-95">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>

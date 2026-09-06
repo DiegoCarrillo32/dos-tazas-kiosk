@@ -7,6 +7,7 @@ import { useOutbox } from "./offline/useOutbox";
 import { writeMeta } from "./offline/db";
 import { clearOfflineShell } from "@/components/ServiceWorkerRegistrar";
 import { useT } from "./i18n/LanguageContext";
+import type { DiscountItemRef } from "./pricing";
 import { useToast, useConfirm } from "@/components/ui/Feedback";
 import { PERSISTED_QUERY_CACHE_KEY } from "./QueryProvider";
 import {
@@ -254,6 +255,7 @@ export function useCompleteOrder() {
       discountType?: DiscountType | null;
       discountValue?: number;
       discountReason?: string | null;
+      discountItems?: DiscountItemRef[] | null;
     }) => completeOrder(params),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.parkedOrders });

@@ -21,6 +21,7 @@ export type RpcItem = {
   menu_item_id: string;
   quantity: number;
   modifier_option_ids: string[];
+  notes?: string;
 };
 
 /** Snake_case to match sync_offline_order/sync_offline_payment's p_payment jsonb. */
@@ -42,7 +43,7 @@ export type OfflineOrderSnapshot = {
   offlineRef: string;
   tableName: string | null;
   itemCount: number;
-  lines: { name: string; quantity: number; modifiers: string[] }[];
+  lines: { name: string; quantity: number; modifiers: string[]; notes?: string }[];
   totalAmount: number;
   currency: string;
 };

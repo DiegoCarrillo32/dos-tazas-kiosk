@@ -1,8 +1,9 @@
 "use client";
 
-import { Loader2, RefreshCw, Search } from "lucide-react";
+import { AlertTriangle, Loader2, RefreshCw, Search } from "lucide-react";
 import type { OrderItem } from "@/lib/types";
 import type { QueueOrder } from "@/lib/offline/useMergedParkedOrders";
+import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { formatMoney } from "@/lib/utils";
 import { useT } from "@/lib/i18n/LanguageContext";
@@ -12,6 +13,7 @@ export function OrderQueue({
   orders,
   filteredOrders,
   isLoading,
+  isError,
   isRefetching,
   refetch,
   live,
@@ -26,6 +28,7 @@ export function OrderQueue({
   orders: QueueOrder[];
   filteredOrders: QueueOrder[];
   isLoading: boolean;
+  isError: boolean;
   isRefetching: boolean;
   refetch: () => void;
   live: boolean;
@@ -94,6 +97,17 @@ export function OrderQueue({
         {isLoading && orders.length === 0 ? (
           <div className="flex items-center justify-center py-8">
             <Loader2 className="w-6 h-6 animate-spin text-expresso/40" />
+          </div>
+        ) : isError && orders.length === 0 ? (
+          /* Without this a failed fetch renders as "No parked orders" —
+             indistinguishable from a genuinely quiet counter, which is the
+             worst possible reading on a flaky kiosk connection. */
+          <div className="flex flex-col items-center gap-3 py-8 px-4 text-center">
+            <AlertTriangle className="w-6 h-6 text-expresso/30" />
+            <p className="text-sm text-expresso/70">{t("counter.loadFailed")}</p>
+            <Button variant="secondary" size="sm" onClick={() => refetch()} disabled={isRefetching}>
+              {t("floor.retry")}
+            </Button>
           </div>
         ) : filteredOrders.length === 0 ? (
           <div className="text-center text-expresso/60 py-8">

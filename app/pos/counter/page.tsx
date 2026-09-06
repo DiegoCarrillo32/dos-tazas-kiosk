@@ -16,7 +16,14 @@ import { useToast, useConfirm } from "@/components/ui/Feedback";
 import { Receipt as ReceiptView } from "@/components/Receipt";
 import { OpenShiftDialog, CloseShiftDialog } from "@/components/ShiftDialogs";
 import { useT } from "@/lib/i18n/LanguageContext";
-import { priceCheckout, changeDue as computeChangeDue, toClientCharge } from "@/lib/pricing";
+import {
+  priceCheckout,
+  changeDue as computeChangeDue,
+  toClientCharge,
+  discountBase,
+  selectionToRpcItems,
+} from "@/lib/pricing";
+import { normalizeText } from "@/lib/utils";
 import { useConnectionStatus } from "@/lib/offline/useConnectionStatus";
 import { useMergedParkedOrders, type QueueOrder } from "@/lib/offline/useMergedParkedOrders";
 import { useOutbox } from "@/lib/offline/useOutbox";
@@ -36,7 +43,7 @@ export default function CounterView() {
   const t = useT();
   const toast = useToast();
   const confirmDialog = useConfirm();
-  const { orders, isLoading, refetch, isRefetching, pendingCount, failedCount } = useMergedParkedOrders();
+  const { orders, isLoading, isError, refetch, isRefetching, pendingCount, failedCount } = useMergedParkedOrders();
   const { data: settings } = useLocationSettings();
   const { data: shift } = useCurrentShift();
   const live = useOrdersRealtime();
@@ -65,13 +72,21 @@ export default function CounterView() {
   const [showOpenShift, setShowOpenShift] = useState(false);
   const [showCloseShift, setShowCloseShift] = useState(false);
 
+  // "Who ordered the latte?" and "what's on Mesa 2?" are the questions
+  // actually asked at the counter, so the search covers the table and the
+  // item names too — not just the order number and uuid it used to.
   const filteredOrders = orders.filter((o) => {
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) return true;
+    const raw = searchQuery.trim();
+    if (!raw) return true;
+    const q = normalizeText(raw);
     const orderNumberMatch =
       o.order_number != null &&
       (String(o.order_number).includes(q) || `#${o.order_number}`.includes(q));
-    return orderNumberMatch || o.id.toLowerCase().includes(q);
+    if (orderNumberMatch || o.id.toLowerCase().includes(q)) return true;
+    if (o.table?.name && normalizeText(o.table.name).includes(q)) return true;
+    return (o.order_items ?? []).some((i) =>
+      i.menu_item?.name ? normalizeText(i.menu_item.name).includes(q) : false
+    );
   });
 
   const currentSelected = selectedOrder
@@ -99,9 +114,26 @@ export default function CounterView() {
   // would quote the customer a total the till never takes.
   const discountInput = Math.max(0, parseFloat(checkout.discountValue) || 0);
   const grossBeforeDiscount = subtotal + taxAmount;
+
+  // A discount can be aimed at named lines — a redeemed loyalty club
+  // coffee comes off that drink, not off the whole tab, so the IVA on
+  // everything else stays where it is. An order that hasn't reached the
+  // server yet has no line ids to aim at (and its local projection
+  // carries no per-line prices), so the picker is unavailable there and
+  // the scope falls back to the whole order.
+  const orderLines = currentSelected?.order_items ?? [];
+  const itemPickerDisabled = conn === "offline" || !!currentSelected?.__local;
+  const scope = itemPickerDisabled ? "order" : checkout.discountScope;
+  const base =
+    scope === "items"
+      ? discountBase(orderLines, checkout.discountItems)
+      : { gross: grossBeforeDiscount, tax: taxAmount, unitCount: 0, lineCount: 0 };
+
   const math = priceCheckout({
     gross: grossBeforeDiscount,
     tax: taxAmount,
+    baseGross: base.gross,
+    baseTax: base.tax,
     discountType: checkout.discountType,
     discountValue: discountInput,
     tip: tipAmount,
@@ -115,6 +147,10 @@ export default function CounterView() {
     discountExceedsGross: discountExceedsTotal,
   } = math;
   const discountReasonMissing = discountAmount > 0 && !checkout.discountReason.trim();
+  // Naming no lines while keying a value is a half-finished action, and
+  // complete_order refuses it too — block it here rather than letting the
+  // cashier discover it at the moment of payment.
+  const discountNoItemsSelected = scope === "items" && discountInput > 0 && base.lineCount === 0;
   const tenderedAmount = parseFloat(checkout.tendered) || 0;
   const changeDue = computeChangeDue(totalDue, tenderedAmount);
 
@@ -131,6 +167,7 @@ export default function CounterView() {
     !!checkout.paymentMethod &&
     !discountExceedsTotal &&
     !discountReasonMissing &&
+    !discountNoItemsSelected &&
     !currentSelected?.__payPending &&
     !(checkout.paymentMethod === "cash" && tenderedAmount < totalDue);
 
@@ -229,6 +266,10 @@ export default function CounterView() {
       toast(t("counter.alertDiscountReason"));
       return;
     }
+    if (discountNoItemsSelected) {
+      toast(t("counter.alertDiscountNoItems"));
+      return;
+    }
     if (currentSelected.__payPending) return; // button is disabled; belt & braces
 
     const completed: Order = {
@@ -240,6 +281,16 @@ export default function CounterView() {
       tax_amount: taxDue,
       discount_amount: discountAmount,
       discount_reason: discountAmount > 0 ? checkout.discountReason.trim() : null,
+      // Mirrors the snapshot complete_order is about to store, so the
+      // receipt shown a moment from now names the comped drinks.
+      discount_scope:
+        discountAmount > 0 && scope === "items"
+          ? {
+              items: selectionToRpcItems(orderLines, checkout.discountItems),
+              base_gross: base.gross,
+              base_tax: base.tax,
+            }
+          : null,
       tip_amount: tipAmount,
       total_amount: totalDue,
       amount_tendered: checkout.paymentMethod === "cash" ? tenderedAmount : null,
@@ -286,6 +337,12 @@ export default function CounterView() {
               : discountInput
             : 0,
         discountReason: discountAmount > 0 ? checkout.discountReason.trim() : null,
+        // Line ids only — the server reads their stored prices itself and
+        // refuses any id that isn't part of this order.
+        discountItems:
+          discountAmount > 0 && scope === "items"
+            ? selectionToRpcItems(orderLines, checkout.discountItems)
+            : null,
       },
       {
         onSuccess: () => {
@@ -368,6 +425,7 @@ export default function CounterView() {
           orders={orders}
           filteredOrders={filteredOrders}
           isLoading={isLoading}
+          isError={isError}
           isRefetching={isRefetching}
           refetch={refetch}
           live={live}
@@ -398,6 +456,7 @@ export default function CounterView() {
                   totalDue={totalDue}
                   discountAmount={discountAmount}
                   discountReason={checkout.discountReason}
+                  discountedItems={scope === "items" ? checkout.discountItems : {}}
                   grossBeforeDiscount={grossBeforeDiscount}
                   netDue={netDue}
                   taxDue={taxDue}
@@ -414,10 +473,21 @@ export default function CounterView() {
                   discountReason={checkout.discountReason}
                   discountExceedsTotal={discountExceedsTotal}
                   discountAmount={discountAmount}
+                  discountScope={scope}
+                  discountItems={checkout.discountItems}
+                  items={orderLines}
+                  itemPickerDisabled={itemPickerDisabled}
+                  noItemsSelected={discountNoItemsSelected}
+                  baseGross={base.gross}
+                  baseUnits={base.unitCount}
+                  currency={currency}
                   currencySymbol={currencySymbol}
                   onTypeChange={(v) => checkout.setField("discountType", v)}
                   onValueChange={(v) => checkout.setField("discountValue", v)}
                   onReasonChange={(v) => checkout.setField("discountReason", v)}
+                  onScopeChange={(v) => checkout.setField("discountScope", v)}
+                  onToggleItem={checkout.toggleDiscountItem}
+                  onItemQtyChange={checkout.setDiscountItemQty}
                   onClear={checkout.clearDiscount}
                 />
 

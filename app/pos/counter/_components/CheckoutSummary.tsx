@@ -11,6 +11,7 @@ export function CheckoutSummary({
   totalDue,
   discountAmount,
   discountReason,
+  discountedItems,
   grossBeforeDiscount,
   netDue,
   taxDue,
@@ -22,6 +23,8 @@ export function CheckoutSummary({
   totalDue: number;
   discountAmount: number;
   discountReason: string;
+  /** order_item id → units covered, when the discount targets named lines. */
+  discountedItems: Record<string, number>;
   grossBeforeDiscount: number;
   netDue: number;
   taxDue: number;
@@ -65,10 +68,21 @@ export function CheckoutSummary({
               <span className="text-expresso font-medium">
                 {item.quantity}× {item.menu_item?.name ?? "Item"}
               </span>
+              {/* Which lines the discount is actually coming off — without
+                  this the breakdown shows a figure with no explanation of
+                  where it landed. */}
+              {discountedItems[item.id] != null && (
+                <span className="ml-2 align-middle text-[11px] font-medium text-coffee-fruit bg-coffee-fruit/10 rounded px-1.5 py-0.5">
+                  {t("counter.discountLineBadge", { count: discountedItems[item.id] })}
+                </span>
+              )}
               {(item.modifiers ?? []).length > 0 && (
                 <p className="text-xs text-expresso/40 mt-0.5">
                   {(item.modifiers ?? []).map((m) => m.name).join(", ")}
                 </p>
+              )}
+              {item.notes && (
+                <p className="text-xs font-medium text-coffee-fruit mt-0.5">{item.notes}</p>
               )}
             </div>
             <span className="text-expresso/80">{formatMoney(Number(item.total_price), currency)}</span>

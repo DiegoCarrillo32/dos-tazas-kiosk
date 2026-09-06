@@ -252,6 +252,12 @@ export type CartItem = {
   menuItem: MenuItem;
   quantity: number;
   selectedModifiers: SelectedModifier[];
+  /**
+   * Free-text prep instruction for whoever makes the drink ("sin azúcar").
+   * Every order RPC already reads `items[]->>'notes'` and stores it on
+   * order_items.notes — see supabase/migrations/00005, 00009, 00013, 00019.
+   */
+  notes?: string;
 };
 
 export type SelectedModifier = {

@@ -33,6 +33,10 @@ export function Receipt({
   const items = order.order_items ?? [];
 
   const discount = Number(order.discount_amount ?? 0);
+  // A discount aimed at particular lines says so on the receipt: "one free
+  // coffee" and "₡1.500 off the whole tab" are different conversations to
+  // have with a customer holding the paper.
+  const discountedLines = discountScopeLabels(order, items);
   // The list price of the lines above: subtotal and tax are stored net of
   // the discount, so adding it back recovers what the items came to.
   const grossItems = Number(order.subtotal) + Number(order.tax_amount) + discount;
@@ -90,6 +94,9 @@ export function Receipt({
                     {(item.modifiers ?? []).map((m) => m.name).join(", ")}
                   </div>
                 )}
+                {item.notes && (
+                  <div className="pl-4 text-[11px] font-semibold">* {item.notes}</div>
+                )}
               </div>
             ))}
           </div>
@@ -111,6 +118,9 @@ export function Receipt({
                   }
                   value={"-" + money(discount)}
                 />
+                {discountedLines.length > 0 && (
+                  <div className="pl-4 text-[11px]">{discountedLines.join(", ")}</div>
+                )}
               </>
             )}
             <Row label={t("receipt.subtotal")} value={money(order.subtotal)} />
@@ -200,4 +210,30 @@ function Row({ label, value }: { label: string; value: string }) {
       <span className="tabular-nums">{value}</span>
     </div>
   );
+}
+
+/**
+ * Names the lines an item-scoped discount was taken on, from the snapshot
+ * `complete_order` stores in `orders.discount_scope`
+ * (00030_item_scoped_discounts.sql). Returns nothing for a whole-order
+ * discount, or for a row written before that column existed.
+ */
+function discountScopeLabels(order: Order, items: OrderItem[]): string[] {
+  const scope = order.discount_scope;
+  if (!scope || typeof scope !== "object" || Array.isArray(scope)) return [];
+  const entries = (scope as { items?: unknown }).items;
+  if (!Array.isArray(entries)) return [];
+
+  const byId = new Map(items.map((i) => [i.id, i]));
+  return entries.flatMap((entry) => {
+    if (!entry || typeof entry !== "object") return [];
+    const { order_item_id: id, quantity } = entry as {
+      order_item_id?: unknown;
+      quantity?: unknown;
+    };
+    if (typeof id !== "string") return [];
+    const name = byId.get(id)?.menu_item?.name;
+    if (!name) return [];
+    return [`${name} ×${Number(quantity) || 1}`];
+  });
 }

@@ -587,6 +587,7 @@ export type Database = {
           device_id: string | null
           discount_amount: number
           discount_reason: string | null
+          discount_scope: Json | null
           id: string
           location_id: string
           occurred_at: string | null
@@ -621,6 +622,7 @@ export type Database = {
           device_id?: string | null
           discount_amount?: number
           discount_reason?: string | null
+          discount_scope?: Json | null
           id?: string
           location_id: string
           occurred_at?: string | null
@@ -655,6 +657,7 @@ export type Database = {
           device_id?: string | null
           discount_amount?: number
           discount_reason?: string | null
+          discount_scope?: Json | null
           id?: string
           location_id?: string
           occurred_at?: string | null
@@ -931,6 +934,7 @@ export type Database = {
           p_customer_email?: string
           p_customer_id?: string
           p_customer_name?: string
+          p_discount_items?: Json
           p_discount_reason?: string
           p_discount_type?: string
           p_discount_value?: number

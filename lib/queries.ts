@@ -20,6 +20,8 @@ import type {
   ShiftSummary,
 } from "./types";
 import type { Json } from "./database.types";
+import type { RpcItem } from "./offline/types";
+import type { DiscountItemRef } from "./pricing";
 
 // ─── Helpers ───────────────────────────────────────────────────────
 
@@ -390,13 +392,17 @@ export async function setMenuItemModifiers(
 
 // ─── Orders ────────────────────────────────────────────────────────
 
-export function cartItemsToRpcItems(cartItems: CartItem[]) {
+export function cartItemsToRpcItems(cartItems: CartItem[]): RpcItem[] {
   // The client only sends item/quantity/option IDs — never prices — so
   // server-side pricing cannot be tampered with.
   return cartItems.map((item) => ({
     menu_item_id: item.menuItem.id,
     quantity: item.quantity,
     modifier_option_ids: item.selectedModifiers.map((m) => m.option.id),
+    // Omitted rather than sent as "" when blank: the RPCs run the value
+    // through `nullif(v_item->>'notes', '')` anyway, and leaving the key
+    // out keeps the payload identical to before for un-noted lines.
+    notes: item.notes?.trim() || undefined,
   }));
 }
 
@@ -414,6 +420,23 @@ export async function createOrder(
   });
   if (error) throw error;
   return data as string;
+}
+
+/**
+ * The daily order number for an order the cashier just created, so the
+ * send confirmation can say "Order #42" instead of a bare success.
+ * `create_order` returns only the uuid, and this is a single indexed PK
+ * lookup — callers treat a null as "just say it worked" rather than an
+ * error, so a failure here must never surface as a failed sale.
+ */
+export async function fetchOrderNumber(orderId: string): Promise<number | null> {
+  const { data, error } = await supabase()
+    .from("orders")
+    .select("order_number")
+    .eq("id", orderId)
+    .single();
+  if (error) return null;
+  return data?.order_number ?? null;
 }
 
 // Append items to an existing open tab (parked order on a table).
@@ -455,6 +478,12 @@ export async function completeOrder(params: {
   discountType?: DiscountType | null;
   discountValue?: number;
   discountReason?: string | null;
+  /**
+   * The lines the discount applies to, when the cashier targeted specific
+   * items (a loyalty club free coffee). Null/omitted = the whole order,
+   * which is what every discount was before 00030.
+   */
+  discountItems?: DiscountItemRef[] | null;
 }): Promise<void> {
   // complete_order recomputes the total (discount, IVA re-split, tip) and
   // validates the cash tendered server-side before marking the order
@@ -476,6 +505,10 @@ export async function completeOrder(params: {
     p_discount_type: params.discountType ?? undefined,
     p_discount_value: params.discountValue ?? 0,
     p_discount_reason: params.discountReason ?? undefined,
+    // The ids go over, never the money they add up to: _resolve_discount_scope
+    // reads those lines' own stored prices and refuses any id that is not
+    // part of this order.
+    p_discount_items: params.discountItems?.length ? params.discountItems : undefined,
   });
   if (error) throw error;
 }

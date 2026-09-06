@@ -91,6 +91,7 @@ function buildSnapshot(input: EnqueueCartInput): OfflineOrderSnapshot {
     name: item.menuItem.name,
     quantity: item.quantity,
     modifiers: item.selectedModifiers.map((m) => m.option.name),
+    notes: item.notes?.trim() || undefined,
   }));
   const totalAmount = input.cartItems.reduce((sum, item) => {
     const extra = item.selectedModifiers.reduce((s, m) => s + Number(m.option.extra_price), 0);

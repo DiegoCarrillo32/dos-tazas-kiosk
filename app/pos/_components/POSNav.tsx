@@ -9,7 +9,7 @@ import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { LanguageToggle } from "@/components/ui/LanguageToggle";
 import { useT } from "@/lib/i18n/LanguageContext";
 import { initSyncEngine } from "@/lib/offline/sync";
-import { useLogout } from "@/lib/hooks";
+import { useLogout, useParkedOrders } from "@/lib/hooks";
 import { useOutbox } from "@/lib/offline/useOutbox";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import ServiceWorkerRegistrar from "@/components/ServiceWorkerRegistrar";
@@ -26,6 +26,7 @@ export default function POSNav({
   const pathname = usePathname();
   const qc = useQueryClient();
   const { pendingCount, failedCount } = useOutbox();
+  const { data: parkedOrders = [] } = useParkedOrders();
   const handleLogout = useLogout();
 
   useEffect(() => {
@@ -44,6 +45,20 @@ export default function POSNav({
       }`}
     >
       {badgeCount}
+    </span>
+  );
+
+  // Orders sitting on the Counter waiting to be paid. Kept visually
+  // distinct from the amber/red sync badge above and never merged into one
+  // number — "3 unsynced" and "3 waiting to be charged" mean very
+  // different things, and only one of them is a problem.
+  const waitingCount = parkedOrders.length;
+  const waitingBadge = waitingCount > 0 && (
+    <span
+      title={t("nav.ordersWaiting", { n: waitingCount })}
+      className="inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full text-xs font-bold bg-coffee-fruit text-white"
+    >
+      {waitingCount}
     </span>
   );
 
@@ -84,6 +99,7 @@ export default function POSNav({
           >
             <MonitorPlay className="w-4 h-4" />
             {t("nav.counterView")}
+            {waitingBadge}
             {pendingBadge}
           </Link>
         </div>
@@ -143,6 +159,11 @@ export default function POSNav({
           >
             <span className="relative">
               <MonitorPlay className="w-5 h-5" />
+              {waitingCount > 0 && (
+                <span className="absolute -bottom-1 -left-2 inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full text-[10px] font-bold bg-coffee-fruit text-white">
+                  {waitingCount}
+                </span>
+              )}
               {badgeCount > 0 && (
                 <span
                   className={`absolute -top-1.5 -right-2 inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full text-[10px] font-bold ${

@@ -47,6 +47,7 @@ function projectEntryToOrder(e: OutboxEntry): QueueOrder {
     tax_rate: 0,
     discount_amount: 0,
     discount_reason: null,
+    discount_scope: null,
     tip_amount: 0,
     total_amount: e.snapshot.totalAmount,
     amount_tendered: null,
@@ -84,7 +85,7 @@ function projectEntryToOrder(e: OutboxEntry): QueueOrder {
  * layers the local projection on top.
  */
 export function useMergedParkedOrders() {
-  const { data: serverOrders = [], isLoading, isRefetching, refetch } = useParkedOrders();
+  const { data: serverOrders = [], isLoading, isError, isRefetching, refetch } = useParkedOrders();
   const { entries, pendingCount, failedCount } = useOutbox();
 
   const payPendingOrderIds = new Set(
@@ -107,5 +108,5 @@ export function useMergedParkedOrders() {
     ...localOrders,
   ];
 
-  return { orders, isLoading, isRefetching, refetch, pendingCount, failedCount };
+  return { orders, isLoading, isError, isRefetching, refetch, pendingCount, failedCount };
 }

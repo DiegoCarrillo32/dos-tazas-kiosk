@@ -8,9 +8,19 @@ import { useOutbox } from "@/lib/offline/useOutbox";
 const ENABLE_SW =
   process.env.NODE_ENV === "production" || process.env.NEXT_PUBLIC_ENABLE_SW === "1";
 
-// How long an installed update waits for an idle moment before it's
-// allowed to take over — see the "never swap mid-sale" reasoning below.
-const IDLE_ACTIVATE_MS = 5 * 60 * 1000;
+// How long an installed update waits before it's allowed to take over on
+// the POS — see the "never swap mid-sale" reasoning below. The outbox
+// guard is the real safety check; this delay just keeps the reload away
+// from a cashier's hands during a busy stretch.
+const POS_IDLE_ACTIVATE_MS = 5 * 60 * 1000;
+
+/**
+ * The build this bundle belongs to (next.config.js bakes it from the
+ * commit SHA). It keys the service worker's caches, so registering at a
+ * new URL per build is what makes a deploy evict the previous build's
+ * cached shell instead of shadowing it.
+ */
+const BUILD_ID = process.env.NEXT_PUBLIC_BUILD_ID || "dev";
 
 export function warmOfflineShell() {
   navigator.serviceWorker?.controller?.postMessage({ type: "WARM_SHELL" });
@@ -24,13 +34,31 @@ export function clearOfflineShell() {
 }
 
 /**
- * Registers public/sw.js and drives its update lifecycle. Mounted once
- * from POSNav — not the root layout, so /login and /admin's CSV downloads
- * stay untouched by it. Registration failing (or being disabled in dev)
- * is silently fine: the app works fully online without it, it just won't
- * survive a reload while genuinely offline.
+ * Registers public/sw.js and drives its update lifecycle.
+ *
+ * Mounted from BOTH the POS shell and the admin shell. It used to be POS-
+ * only, on the belief that this left /admin "untouched" — but the worker
+ * registers with `scope: "/"`, and scope is what decides which pages a
+ * worker controls, not where `register()` happens to be called. /admin was
+ * always controlled by it; it just had no code that could ever *update*
+ * it, so a new worker installed and then sat in `waiting` forever while
+ * the old one kept serving a stale shell.
+ *
+ * `activateDelayMs` is why the two mounts differ: the POS waits for a
+ * quiet moment because a reload mid-checkout is disruptive, while /admin
+ * has no sale to interrupt and wants the fresh build immediately. The
+ * outbox guard in `activateIfSafe` applies to both regardless — that, not
+ * the delay, is what makes this safe.
+ *
+ * Registration failing (or being disabled in dev) is silently fine: the
+ * app works fully online without it, it just won't survive a reload while
+ * genuinely offline.
  */
-export default function ServiceWorkerRegistrar() {
+export default function ServiceWorkerRegistrar({
+  activateDelayMs = POS_IDLE_ACTIVATE_MS,
+}: {
+  activateDelayMs?: number;
+} = {}) {
   const { pendingCount, failedCount } = useOutbox();
   const blockedRef = useRef(0);
 
@@ -65,7 +93,10 @@ export default function ServiceWorkerRegistrar() {
     };
 
     navigator.serviceWorker
-      .register("/sw.js", { scope: "/" })
+      // The ?v= is load-bearing, not cosmetic: it is both what makes the
+      // browser see a new script to install on each deploy and what the
+      // worker reads to name its caches.
+      .register(`/sw.js?v=${encodeURIComponent(BUILD_ID)}`, { scope: "/" })
       .then((registration) => {
         warmOfflineShell();
 
@@ -73,7 +104,7 @@ export default function ServiceWorkerRegistrar() {
           const waiting = registration.waiting;
           if (!waiting) return;
           if (idleTimer) clearTimeout(idleTimer);
-          idleTimer = setTimeout(() => activateIfSafe(waiting), IDLE_ACTIVATE_MS);
+          idleTimer = setTimeout(() => activateIfSafe(waiting), activateDelayMs);
         };
 
         if (registration.waiting) scheduleActivate();
@@ -95,7 +126,7 @@ export default function ServiceWorkerRegistrar() {
       navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange);
       if (idleTimer) clearTimeout(idleTimer);
     };
-  }, []);
+  }, [activateDelayMs]);
 
   return null;
 }

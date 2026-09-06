@@ -7,13 +7,21 @@
 // on a blank tab. It intentionally knows nothing about orders, auth, or
 // Supabase beyond "never touch that traffic" (rule 1 below).
 //
-// Bump CACHE_VERSION on every deploy that changes what should be
-// precached. There's no build-hash-driven precache manifest here (no
-// bundler step for this file), so a stale cached shell after a deploy is
-// an accepted, bounded cost — see the network-first navigation strategy,
-// which always prefers a live response when one is reachable.
-
-const CACHE_VERSION = "v1";
+// CACHE_VERSION used to be the hardcoded string "v1", with a comment
+// asking whoever deployed to remember to bump it. Nobody ever did, and
+// `activate` only evicts caches whose name differs from the current one —
+// so across every deploy the caches were never evicted at all. A device
+// that had used the POS kept serving an older build's `/admin` document
+// and, because `/_next/static` is cache-first, that build's chunks with
+// it. The page booted against a shell it no longer matched.
+//
+// The version now rides in on the registration URL (`/sw.js?v=<build>`,
+// see components/ServiceWorkerRegistrar.tsx), which is baked from the
+// commit SHA at build time. A new deploy is therefore a different script
+// URL AND a different set of cache names, so installing the new worker
+// evicts the old build's caches instead of shadowing them.
+const CACHE_VERSION =
+  new URL(self.location.href).searchParams.get("v") || "unversioned";
 const SHELL_CACHE = `dostazas-shell-${CACHE_VERSION}`;
 const STATIC_CACHE = `dostazas-static-${CACHE_VERSION}`;
 
@@ -102,22 +110,28 @@ async function networkFirstNav(request) {
     }
     return response;
   } catch {
-    const cached = await caches.match(request);
+    // Scoped to THIS build's cache on purpose: caches.match() with no
+    // cacheName searches every cache in the origin, which would happily
+    // hand back a previous build's document — the exact failure this
+    // file's versioning is meant to end.
+    const cache = await caches.open(SHELL_CACHE);
+    const cached = await cache.match(request);
     if (cached) return cached;
-    const offline = await caches.match("/offline");
+    const offline = await cache.match("/offline");
     if (offline) return offline;
     return new Response("Offline", { status: 503, statusText: "Offline" });
   }
 }
 
+// Safe for `/_next/static` only because the cache name now carries the
+// build id: hashed asset URLs are immutable within a build, and the whole
+// cache is dropped when the next build activates.
 async function cacheFirst(request, cacheName) {
-  const cached = await caches.match(request);
+  const cache = await caches.open(cacheName);
+  const cached = await cache.match(request);
   if (cached) return cached;
   const response = await fetch(request);
-  if (isCacheableResponse(response)) {
-    const cache = await caches.open(cacheName);
-    cache.put(request, response.clone());
-  }
+  if (isCacheableResponse(response)) cache.put(request, response.clone());
   return response;
 }
 
@@ -142,7 +156,8 @@ async function networkFirst(request, cacheName) {
     }
     return response;
   } catch {
-    const cached = await caches.match(request);
+    const cache = await caches.open(cacheName);
+    const cached = await cache.match(request);
     if (cached) return cached;
     throw new Error("offline and not cached");
   }

@@ -11,6 +11,7 @@ import { Sheet } from "@/components/ui/Modal";
 import { useT } from "@/lib/i18n/LanguageContext";
 import { useLogout, useSessionContext, useSwitchLocation, useLocationSwitchListener } from "@/lib/hooks";
 import { useScrollIntoViewOnFocus } from "@/lib/useScrollIntoViewOnFocus";
+import ServiceWorkerRegistrar from "@/components/ServiceWorkerRegistrar";
 
 type NavKey =
   | "admin.dashboard"
@@ -282,6 +283,14 @@ export default function AdminShell({
 
   return (
     <div className="flex h-app bg-background overflow-hidden pl-safe pr-safe">
+      {/* The service worker registers with scope "/" and so has always
+          controlled /admin — but it was only ever mounted from POSNav, so
+          nothing here could drive its update lifecycle. A new worker
+          installed and then waited forever while the old one kept serving
+          a stale shell. Zero delay because there is no sale to interrupt
+          on an admin screen; the outbox guard inside still applies. */}
+      <ServiceWorkerRegistrar activateDelayMs={0} />
+
       {/* Mobile Sidebar Navigation Drawer — always mounted (unlike a
           conditional `{isMobileMenuOpen && ...}`) so the transform/opacity
           transitions below actually have something to animate between,

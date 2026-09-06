@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Edit2, Trash2, X, Save, Ban, CheckCircle2, Check, Search } from "lucide-react";
+import { Plus, Edit2, Trash2, X, Save, Ban, CheckCircle2, Check, Search, Undo2 } from "lucide-react";
 import type { MenuItem, Category } from "@/lib/types";
 import {
   useAllMenuItems,
@@ -9,6 +9,7 @@ import {
   useCreateMenuItem,
   useUpdateMenuItem,
   useDeleteMenuItem,
+  useRestoreMenuItem,
   useCreateCategory,
   useUpdateCategory,
   useDeleteCategory,
@@ -58,11 +59,18 @@ export default function MenuManagement() {
   const t = useT();
   const toast = useToast();
   const confirmDialog = useConfirm();
-  const { data: items = [], isLoading: itemsLoading } = useAllMenuItems();
+  // "Archived" is a separate axis from the category filter: an archived
+  // item is one that was deleted but had sales history, so it survives to
+  // keep old receipts readable (see delete_menu_item, migration 00031).
+  const [view, setView] = useState<"active" | "archived">("active");
+  const showArchived = view === "archived";
+
+  const { data: items = [], isLoading: itemsLoading } = useAllMenuItems(showArchived);
   const { data: categories = [], isLoading: catsLoading } = useCategories();
   const createItemMut = useCreateMenuItem();
   const updateItemMut = useUpdateMenuItem();
   const deleteItemMut = useDeleteMenuItem();
+  const restoreItemMut = useRestoreMenuItem();
   const createCatMut = useCreateCategory();
   const updateCatMut = useUpdateCategory();
   const deleteCatMut = useDeleteCategory();
@@ -102,6 +110,9 @@ export default function MenuManagement() {
   const hasFilters = search.trim() !== "" || categoryFilter !== "all";
 
   const filteredItems = items.filter((item) => {
+    // fetchAllMenuItems(true) returns archived AND live rows; the archived
+    // view wants only the archived ones.
+    if (showArchived !== (item.archived_at != null)) return false;
     if (search.trim() && !normalizeText(item.name).includes(normalizeText(search.trim()))) {
       return false;
     }
@@ -110,7 +121,9 @@ export default function MenuManagement() {
     return true;
   });
 
-  const pg = usePagination(filteredItems, { resetKey: `${search}|${categoryFilter}` });
+  const pg = usePagination(filteredItems, {
+    resetKey: `${search}|${categoryFilter}|${view}`,
+  });
 
   const openCreateForm = () => {
     setEditingId(null);
@@ -194,13 +207,35 @@ export default function MenuManagement() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!(await confirmDialog(t("menu.deleteConfirm")))) return;
-    deleteItemMut.mutate(id);
+  const handleDelete = async (item: MenuItem) => {
+    if (!(await confirmDialog(t("menu.deleteConfirm", { name: item.name })))) return;
+    deleteItemMut.mutate(item.id, {
+      // delete_menu_item reports which branch it took: a product nobody
+      // ever ordered is really gone, one with sales history is archived so
+      // past receipts keep their product name.
+      onSuccess: (outcome) =>
+        toast(
+          outcome === "deleted"
+            ? t("menu.itemDeleted", { name: item.name })
+            : t("menu.itemArchived", { name: item.name }),
+          "success"
+        ),
+      onError: () => toast(t("menu.failedToDelete")),
+    });
+  };
+
+  const handleRestore = (item: MenuItem) => {
+    restoreItemMut.mutate(item.id, {
+      onSuccess: () => toast(t("menu.itemRestored", { name: item.name }), "success"),
+      onError: () => toast(t("menu.failedToRestore")),
+    });
   };
 
   const handleToggleAvailable = (item: MenuItem) => {
-    updateItemMut.mutate({ id: item.id, updates: { is_available: !item.is_available } });
+    updateItemMut.mutate(
+      { id: item.id, updates: { is_available: !item.is_available } },
+      { onError: () => toast(t("menu.failedToSave")) }
+    );
   };
 
   const handleCreateCategory = async () => {
@@ -281,6 +316,15 @@ export default function MenuManagement() {
           {categories.map((cat) => (
             <option key={cat.id} value={cat.id}>{cat.name}</option>
           ))}
+        </Select>
+        <Select
+          value={view}
+          onChange={(e) => setView(e.target.value as "active" | "archived")}
+          aria-label={t("menu.filterByView")}
+          className="sm:w-44"
+        >
+          <option value="active">{t("menu.viewActive")}</option>
+          <option value="archived">{t("menu.viewArchived")}</option>
         </Select>
       </div>
 
@@ -445,7 +489,7 @@ export default function MenuManagement() {
             </thead>
             <tbody className="divide-y divide-warm-roast/10">
               {pg.pageRows.length === 0 ? (
-                <tr><td colSpan={6} className="px-6 py-12 text-center whitespace-normal text-expresso/40 text-sm">{hasFilters ? t("menu.noMatchingItems") : t("menu.noItems")}</td></tr>
+                <tr><td colSpan={6} className="px-6 py-12 text-center whitespace-normal text-expresso/40 text-sm">{showArchived ? t("menu.noArchivedItems") : hasFilters ? t("menu.noMatchingItems") : t("menu.noItems")}</td></tr>
               ) : (
                 pg.pageRows.map((item) => (
                   <tr key={item.id} className="hover:bg-warm-roast/5 transition-colors">
@@ -471,8 +515,11 @@ export default function MenuManagement() {
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${item.is_active ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" : "bg-warm-roast/10 text-expresso/60"}`}>
                           {item.is_active ? t("menu.statusActive") : t("menu.statusDisabled")}
                         </span>
-                        {!item.is_available && (
+                        {!item.is_available && item.archived_at == null && (
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">{t("menu.statusSoldOut")}</span>
+                        )}
+                        {item.archived_at != null && (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-warm-roast/15 text-expresso/70">{t("menu.statusArchived")}</span>
                         )}
                       </div>
                     </td>
@@ -482,15 +529,27 @@ export default function MenuManagement() {
                         cell a cell and nest the flex row inside it. */}
                     <td className="px-4 sm:px-6 py-3 sm:py-4 text-right">
                       <div className="flex items-center justify-end gap-1">
-                        <button
-                          onClick={() => handleToggleAvailable(item)}
-                          title={item.is_available ? t("menu.markSoldOut") : t("menu.markAvailable")}
-                          className={`min-h-[44px] min-w-[44px] inline-flex items-center justify-center transition-colors ${item.is_available ? "text-expresso/40 hover:text-destructive" : "text-green-600 hover:text-green-700"}`}
-                        >
-                          {item.is_available ? <Ban className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
-                        </button>
-                        <button onClick={() => openEditForm(item)} className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-expresso/40 hover:text-coffee-fruit transition-colors"><Edit2 className="w-4 h-4" /></button>
-                        <button onClick={() => handleDelete(item.id)} className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-expresso/40 hover:text-destructive transition-colors"><Trash2 className="w-4 h-4" /></button>
+                        {item.archived_at != null ? (
+                          <button
+                            onClick={() => handleRestore(item)}
+                            title={t("menu.restore")}
+                            className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-expresso/40 hover:text-coffee-fruit transition-colors"
+                          >
+                            <Undo2 className="w-4 h-4" />
+                          </button>
+                        ) : (
+                          <>
+                            <button
+                              onClick={() => handleToggleAvailable(item)}
+                              title={item.is_available ? t("menu.markSoldOut") : t("menu.markAvailable")}
+                              className={`min-h-[44px] min-w-[44px] inline-flex items-center justify-center transition-colors ${item.is_available ? "text-expresso/40 hover:text-destructive" : "text-green-600 hover:text-green-700"}`}
+                            >
+                              {item.is_available ? <Ban className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
+                            </button>
+                            <button onClick={() => openEditForm(item)} className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-expresso/40 hover:text-coffee-fruit transition-colors"><Edit2 className="w-4 h-4" /></button>
+                            <button onClick={() => handleDelete(item)} className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-expresso/40 hover:text-destructive transition-colors"><Trash2 className="w-4 h-4" /></button>
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>

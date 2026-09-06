@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { format, subDays } from "date-fns";
-import { Search, Eye, Printer, RotateCcw } from "lucide-react";
+import { Search, Eye, Printer, RotateCcw, Info } from "lucide-react";
 import type { Order, OrderItem } from "@/lib/types";
 import {
   useCompletedOrders,
@@ -10,6 +10,7 @@ import {
   useCurrentProfile,
   useRefundOrder,
   useOfflineSyncFlags,
+  useBusinessDate,
 } from "@/lib/hooks";
 import { Button } from "@/components/ui/Button";
 import { DatePicker } from "@/components/ui/DatePicker";
@@ -23,14 +24,27 @@ import { formatMoney } from "@/lib/utils";
 import { useT } from "@/lib/i18n/LanguageContext";
 import { usePagination } from "@/lib/usePagination";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { COMPLETED_ORDERS_LIMIT } from "@/lib/queries";
+
+/** "YYYY-MM-DD" → a Date at local midnight (never UTC — that shifts the day). */
+function parseBusinessDate(iso: string): Date {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
 
 export default function TransactionHistory() {
   const t = useT();
   const toast = useToast();
-  const [startDate, setStartDate] = useState<Date | undefined>(subDays(new Date(), 30));
-  const [endDate, setEndDate] = useState<Date | undefined>(new Date());
-  const startStr = startDate ? format(startDate, "yyyy-MM-dd") : undefined;
-  const endStr = endDate ? format(endDate, "yyyy-MM-dd") : undefined;
+  // Seeded from the shop's business day, not the browser's: an admin looking
+  // from a timezone ahead of the shop used to get tomorrow as the end bound.
+  const { data: today } = useBusinessDate();
+  const [startDate, setStartDate] = useState<Date | undefined>(undefined);
+  const [endDate, setEndDate] = useState<Date | undefined>(undefined);
+  const shopToday = today ? parseBusinessDate(today) : undefined;
+  const effectiveEnd = endDate ?? shopToday;
+  const effectiveStart = startDate ?? (shopToday ? subDays(shopToday, 29) : undefined);
+  const startStr = effectiveStart ? format(effectiveStart, "yyyy-MM-dd") : undefined;
+  const endStr = effectiveEnd ? format(effectiveEnd, "yyyy-MM-dd") : undefined;
 
   const { data: history = [], isLoading } = useCompletedOrders(startStr, endStr);
   const { data: syncFlags = [] } = useOfflineSyncFlags();
@@ -53,6 +67,11 @@ export default function TransactionHistory() {
   });
 
   const pg = usePagination(filtered, { resetKey: `${searchQuery}|${startStr}|${endStr}` });
+
+  // fetchCompletedOrders takes the most recent N and stops. Without saying so,
+  // a busy month looks like a complete list, and the search box below only
+  // ever searches inside the slice that was loaded.
+  const isTruncated = history.length >= COMPLETED_ORDERS_LIMIT;
 
   const formatDate = (dateStr: string) =>
     new Date(dateStr).toLocaleString([], {
@@ -84,6 +103,13 @@ export default function TransactionHistory() {
         <h1 className="text-2xl font-bold text-expresso">{t("history.title")}</h1>
         <p className="text-expresso/60 mt-1">{t("history.subtitle")}</p>
       </div>
+
+      {isTruncated && (
+        <div className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-expresso/80 dark:border-amber-900/40 dark:bg-amber-950/30">
+          <Info className="w-4 h-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+          <p>{t("history.truncated", { count: String(COMPLETED_ORDERS_LIMIT) })}</p>
+        </div>
+      )}
 
       {syncFlags.length > 0 && (
         <div className="bg-card rounded-2xl border border-amber-200 dark:border-amber-900/40 overflow-hidden shadow-sm">
@@ -134,8 +160,8 @@ export default function TransactionHistory() {
             className="w-full h-11 pl-9 pr-4 bg-card border border-warm-roast/10 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-coffee-fruit shadow-sm"
           />
         </div>
-        <DatePicker date={startDate} setDate={setStartDate} placeholder={t("history.startDate")} className="w-full sm:w-44" />
-        <DatePicker date={endDate} setDate={setEndDate} placeholder={t("history.endDate")} className="w-full sm:w-44" />
+        <DatePicker date={effectiveStart} setDate={setStartDate} placeholder={t("history.startDate")} className="w-full sm:w-44" />
+        <DatePicker date={effectiveEnd} setDate={setEndDate} placeholder={t("history.endDate")} className="w-full sm:w-44" />
       </div>
 
       {selectedOrder && (

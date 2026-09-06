@@ -180,28 +180,74 @@ export type ShiftListItem = {
 
 // ─── Reporting ─────────────────────────────────────────────────────
 
-/** Shape returned by the `sales_summary` RPC (all aggregation done in SQL). */
+/**
+ * Shape returned by the `sales_summary` RPC (all aggregation done in SQL).
+ *
+ * Every `revenue`/`net` field here is on ONE basis: ex-IVA and net of
+ * discount, the same basis as `net_sales`. That is what rev 2 of the RPC
+ * (supabase/migrations/00033) fixed — the breakdowns used to report
+ * IVA-inclusive list prices, so they reconciled to nothing. `gross_*`
+ * fields keep the old list-price figure beside it.
+ *
+ * A sale is counted in the period it was RUNG UP, a refund in the period
+ * the money was PAID BACK (`orders.refunded_at`, 00032), so a closed
+ * period's report no longer changes when something is refunded later.
+ */
 export type SalesSummary = {
   order_count: number;
   refund_count: number;
   void_count: number;
   /** What customers paid, including IVA and tips. */
   gross_sales: number;
-  /** Ex-IVA sales — the real revenue line. */
+  /** Ex-IVA, discount-net sales — the real revenue line. */
   net_sales: number;
+  /** `net_sales` less the ex-IVA value of everything refunded in the period. */
+  net_sales_after_refunds: number;
   tax_amount: number;
   /** Reported separately: a tip is owed to staff, not shop revenue. */
   tip_amount: number;
   discount_amount: number;
   refund_total: number;
   items_sold: number;
+  /** Tip- and IVA-inclusive. Kept for existing callers. */
   average_ticket: number;
+  /** IVA-inclusive but ex-tip — the like-for-like companion to net_sales. */
+  average_ticket_net: number;
+  /** Days in the range that rang up at least one sale. */
+  operating_days: number;
+  basket: { avg_items_per_order: number; avg_lines_per_order: number };
+  /** The immediately preceding window of equal length, for deltas. */
+  previous_period: {
+    order_count: number;
+    net_sales: number;
+    gross_sales: number;
+    items_sold: number;
+    average_ticket_net: number;
+    /** Same length and gap-filling as `by_day`, so index i pairs with index i. */
+    by_day: { date: string; net: number }[];
+  };
   by_payment_method: { method: PaymentMethod; total: number; count: number }[];
   by_day: { date: string; gross: number; net: number; orders: number }[];
-  by_hour: { hour: number; orders: number; gross: number }[];
-  by_category: { name: string; quantity: number; revenue: number }[];
-  by_staff: { name: string; orders: number; gross: number }[];
-  top_items: { name: string; quantity: number; revenue: number }[];
+  /** Gap-filled 0–23. `avg_*` are per operating day, not range totals. */
+  by_hour: {
+    hour: number;
+    orders: number;
+    gross: number;
+    net: number;
+    avg_orders: number;
+    avg_net: number;
+  }[];
+  /** Gap-filled 1–7, ISO day-of-week (1 = Monday). */
+  by_weekday: { dow: number; orders: number; net: number; days: number; avg_net: number }[];
+  by_category: { name: string; quantity: number; revenue: number; gross_revenue: number }[];
+  by_staff: { name: string; orders: number; net: number; tips: number; gross: number }[];
+  top_items: { name: string; quantity: number; revenue: number; gross_revenue: number }[];
+  /** Attach counts only — extra_price is already inside order_items.unit_price. */
+  by_modifier: { name: string; quantity: number }[];
+  by_discount_reason: { reason: string; count: number; total: number }[];
+  by_refund_reason: { reason: string; count: number; total: number }[];
+  /** On the menu, orderable, and nobody bought one in the period. */
+  never_sold: { name: string; price: number }[];
 };
 
 /**

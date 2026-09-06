@@ -18,7 +18,7 @@ import {
 } from "@/lib/hooks";
 import { exportShiftsCSV } from "@/lib/queries";
 import type { CashMovementType, ShiftListItem } from "@/lib/types";
-import { formatMoney } from "@/lib/utils";
+import { formatMoney, isZeroMoney } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
@@ -272,8 +272,8 @@ export default function CashDrawerPage() {
                     <td className="px-4 sm:px-6 py-4 text-expresso/70">{s.counted_cash != null ? formatMoney(s.counted_cash, "CRC") : "—"}</td>
                     <td className="px-4 sm:px-6 py-4">
                       {s.cash_variance != null ? (
-                        <span className={s.cash_variance === 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400 font-medium"}>
-                          {s.cash_variance > 0 ? "+" : ""}
+                        <span className={isZeroMoney(s.cash_variance) ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400 font-medium"}>
+                          {!isZeroMoney(s.cash_variance) && s.cash_variance > 0 ? "+" : ""}
                           {formatMoney(s.cash_variance, "CRC")}
                         </span>
                       ) : (

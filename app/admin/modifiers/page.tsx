@@ -18,13 +18,14 @@ import { Button } from "@/components/ui/Button";
 import { Label } from "@/components/ui/Label";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { Modal } from "@/components/ui/Modal";
-import { useConfirm } from "@/components/ui/Feedback";
+import { useConfirm, useToast } from "@/components/ui/Feedback";
 import { formatMoney } from "@/lib/utils";
 import { useT } from "@/lib/i18n/LanguageContext";
 import { CardListSkeleton } from "../_components/Skeletons";
 
 export default function ModifiersManagement() {
   const t = useT();
+  const toast = useToast();
   const confirmDialog = useConfirm();
   const { data: modifiers = [], isLoading } = useAllModifiers();
   const createModMut = useCreateModifier();
@@ -71,27 +72,61 @@ export default function ModifiersManagement() {
     if (editingModId) {
       updateModMut.mutate(
         { id: editingModId, updates: { name: modName.trim(), is_multiple: modIsMultiple, is_required: modIsRequired } },
-        { onSuccess: () => setShowModForm(false) }
+        {
+          onSuccess: () => setShowModForm(false),
+          onError: () => toast(t("modifiers.failedToSave")),
+        }
       );
     } else {
       const locationId = await getLocationId();
       createModMut.mutate(
         { location_id: locationId, name: modName.trim(), is_multiple: modIsMultiple, is_required: modIsRequired },
-        { onSuccess: () => setShowModForm(false) }
+        {
+          onSuccess: () => setShowModForm(false),
+          onError: () => toast(t("modifiers.failedToSave")),
+        }
       );
     }
   };
 
-  const handleDeleteMod = async (id: string) => {
+  const handleDeleteMod = async (mod: Modifier) => {
     if (!(await confirmDialog(t("modifiers.deleteConfirm")))) return;
-    deleteModMut.mutate(id);
+    deleteModMut.mutate(mod.id, {
+      // A group whose options have been sold is archived rather than
+      // deleted: order_item_modifiers points at those options with a NOT
+      // NULL FK, so a hard delete would fail (silently, until now).
+      onSuccess: (outcome) =>
+        toast(
+          outcome === "deleted"
+            ? t("modifiers.deleted", { name: mod.name })
+            : t("modifiers.archived", { name: mod.name }),
+          "success"
+        ),
+      onError: () => toast(t("modifiers.failedToDelete")),
+    });
+  };
+
+  const handleDeleteOption = (opt: ModifierOption) => {
+    deleteOptMut.mutate(opt.id, {
+      onSuccess: (outcome) =>
+        toast(
+          outcome === "deleted"
+            ? t("modifiers.optionDeleted", { name: opt.name })
+            : t("modifiers.optionArchived", { name: opt.name }),
+          "success"
+        ),
+      onError: () => toast(t("modifiers.failedToDeleteOption")),
+    });
   };
 
   const handleAddOption = (modifierId: string) => {
     if (!optName.trim()) return;
     createOptMut.mutate(
       { modifier_id: modifierId, name: optName.trim(), extra_price: parseFloat(optPrice) || 0 },
-      { onSuccess: () => { setAddingOptionFor(null); setOptName(""); setOptPrice("0"); } }
+      {
+        onSuccess: () => { setAddingOptionFor(null); setOptName(""); setOptPrice("0"); },
+        onError: () => toast(t("modifiers.failedToSaveOption")),
+      }
     );
   };
 
@@ -111,7 +146,7 @@ export default function ModifiersManagement() {
     if (!editOptName.trim()) return;
     updateOptMut.mutate(
       { id, updates: { name: editOptName.trim(), extra_price: parseFloat(editOptPrice) || 0 } },
-      { onSuccess: cancelEditOption }
+      { onSuccess: cancelEditOption, onError: () => toast(t("modifiers.failedToSaveOption")) }
     );
   };
 
@@ -184,7 +219,7 @@ export default function ModifiersManagement() {
                   </div>
                   <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
                     <button onClick={() => openEditMod(mod)} className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-expresso/40 hover:text-coffee-fruit transition-colors"><Edit2 className="w-4 h-4" /></button>
-                    <button onClick={() => handleDeleteMod(mod.id)} className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-expresso/40 hover:text-destructive transition-colors"><Trash2 className="w-4 h-4" /></button>
+                    <button onClick={() => handleDeleteMod(mod)} className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-expresso/40 hover:text-destructive transition-colors"><Trash2 className="w-4 h-4" /></button>
                   </div>
                 </div>
                 {isExpanded && (
@@ -211,7 +246,7 @@ export default function ModifiersManagement() {
                           </div>
                           <div className="flex items-center gap-1 shrink-0">
                             <button onClick={() => openEditOption(opt)} className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-expresso/40 hover:text-coffee-fruit transition-colors"><Edit2 className="w-3.5 h-3.5" /></button>
-                            <button onClick={() => deleteOptMut.mutate(opt.id)} className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-expresso/40 hover:text-destructive transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
+                            <button onClick={() => handleDeleteOption(opt)} className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-expresso/40 hover:text-destructive transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
                           </div>
                         </div>
                       )

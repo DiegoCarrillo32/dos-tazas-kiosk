@@ -40,7 +40,10 @@ function SettingsForm({
   const handleSave = () => {
     updateProfileMut.mutate(
       { first_name: firstName.trim(), last_name: lastName.trim() },
-      { onSuccess: () => toast(t("settings.profileUpdated"), "success") }
+      {
+        onSuccess: () => toast(t("settings.profileUpdated"), "success"),
+        onError: () => toast(t("settings.failedToSave")),
+      }
     );
   };
 
@@ -215,7 +218,10 @@ function BusinessSettingsForm({ settings }: { settings: LocationSettings | null 
         tip_enabled: tipEnabled,
         receipt_footer: receiptFooter.trim() || null,
       },
-      { onSuccess: () => toast(t("settings.businessSaved"), "success") }
+      {
+        onSuccess: () => toast(t("settings.businessSaved"), "success"),
+        onError: () => toast(t("settings.failedToSave")),
+      }
     );
   };
 

@@ -26,7 +26,10 @@ export default function TablesManagement() {
   const handleCreate = () => {
     const name = newName.trim();
     if (!name) return;
-    createMut.mutate(name, { onSuccess: () => setNewName("") });
+    createMut.mutate(name, {
+      onSuccess: () => setNewName(""),
+      onError: () => toast(t("tables.failedToSave")),
+    });
   };
 
   const startEdit = (tbl: Table) => {
@@ -40,7 +43,10 @@ export default function TablesManagement() {
     if (!name) return;
     updateMut.mutate(
       { id: editingId, updates: { name } },
-      { onSuccess: () => setEditingId(null) }
+      {
+        onSuccess: () => setEditingId(null),
+        onError: () => toast(t("tables.failedToSave")),
+      }
     );
   };
 

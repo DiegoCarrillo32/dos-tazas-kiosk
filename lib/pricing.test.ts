@@ -31,6 +31,7 @@ function menuItem(overrides: Partial<MenuItem> = {}): MenuItem {
     is_available: true,
     created_at: "2026-01-01T00:00:00Z",
     updated_at: "2026-01-01T00:00:00Z",
+    archived_at: null,
     ...overrides,
   };
 }
@@ -42,6 +43,7 @@ function option(overrides: Partial<ModifierOption> = {}): ModifierOption {
     name: "Oat milk",
     extra_price: 300,
     created_at: "2026-01-01T00:00:00Z",
+    archived_at: null,
     ...overrides,
   };
 }

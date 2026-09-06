@@ -2,7 +2,7 @@
 
 import { Printer, X } from "lucide-react";
 import type { ShiftSummary } from "@/lib/types";
-import { formatMoney } from "@/lib/utils";
+import { formatMoney, isZeroMoney } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Modal";
 import { useT } from "@/lib/i18n/LanguageContext";
@@ -39,14 +39,17 @@ export function ZReport({
       : "—";
 
   const variance = summary.cash_variance;
+  // A drawer that balanced to the colón still carries centimos (see
+  // isZeroMoney), so "balanced" has to mean "zero once displayed".
+  const varianceIsZero = isZeroMoney(variance);
   const varianceLabel =
     variance == null
       ? null
-      : variance > 0
-        ? t("cash.over")
-        : variance < 0
-          ? t("cash.short")
-          : t("cash.balanced");
+      : varianceIsZero
+        ? t("cash.balanced")
+        : variance > 0
+          ? t("cash.over")
+          : t("cash.short");
 
   const methods = Object.entries(summary.sales.by_payment_method ?? {});
 
@@ -126,14 +129,16 @@ export function ZReport({
                 <Row label={t("cash.countedCash")} value={money(summary.counted_cash)} />
                 <div
                   className={`flex justify-between font-bold text-[15px] pt-1 mt-1 border-t border-expresso/40 ${
-                    variance != null && variance !== 0 ? "text-red-600" : ""
+                    variance != null && !varianceIsZero ? "text-red-600" : ""
                   }`}
                 >
                   <span>
                     {t("cash.variance")} {varianceLabel ? `(${varianceLabel})` : ""}
                   </span>
                   <span className="tabular-nums">
-                    {variance != null ? (variance > 0 ? "+" : "") + money(variance) : "—"}
+                    {variance != null
+                      ? (!varianceIsZero && variance > 0 ? "+" : "") + money(variance)
+                      : "—"}
                   </span>
                 </div>
               </>

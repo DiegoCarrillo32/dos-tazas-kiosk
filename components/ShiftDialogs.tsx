@@ -4,7 +4,7 @@ import { useState } from "react";
 import { AlertTriangle, CheckCircle2 } from "lucide-react";
 import { useOpenShift, useCloseShift } from "@/lib/hooks";
 import type { CountedBreakdown, ShiftSummary } from "@/lib/types";
-import { cn, formatMoney } from "@/lib/utils";
+import { cn, formatMoney, isZeroMoney } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
@@ -133,10 +133,11 @@ export function CloseShiftDialog({
 
   const countedTotal = denominationTotal(breakdown);
   const variance = countedTotal - shift.expected_cash;
-  // A numeric(10,2) column can round-trip through JS as e.g.
-  // 1234.0000000002 — strict equality would paint a genuinely balanced
-  // drawer red over a floating-point artifact, not a real variance.
-  const balanced = Math.abs(variance) < 0.005;
+  // Strict equality would paint a genuinely balanced drawer red over a
+  // numeric(10,2) round-trip artifact — and over the centimos the IVA split
+  // leaves in expected_cash, which no till can actually be short of.
+  // isZeroMoney compares on the displayed (whole-colón) value.
+  const balanced = isZeroMoney(variance);
 
   const handleCloseShift = async () => {
     if (!(await confirmDialog(t("cash.confirmClose")))) return;
@@ -209,7 +210,7 @@ export function CloseShiftDialog({
               balanced ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"
             )}
           >
-            {variance > 0 ? "+" : ""}
+            {!balanced && variance > 0 ? "+" : ""}
             {formatMoney(variance, "CRC")}
           </span>
         </div>

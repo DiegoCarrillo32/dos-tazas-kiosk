@@ -272,6 +272,7 @@ export type Database = {
       }
       menu_items: {
         Row: {
+          archived_at: string | null
           available_quantity: number | null
           category_id: string | null
           created_at: string
@@ -287,6 +288,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          archived_at?: string | null
           available_quantity?: number | null
           category_id?: string | null
           created_at?: string
@@ -302,6 +304,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          archived_at?: string | null
           available_quantity?: number | null
           category_id?: string | null
           created_at?: string
@@ -335,6 +338,7 @@ export type Database = {
       }
       modifier_options: {
         Row: {
+          archived_at: string | null
           created_at: string
           extra_price: number
           id: string
@@ -342,6 +346,7 @@ export type Database = {
           name: string
         }
         Insert: {
+          archived_at?: string | null
           created_at?: string
           extra_price?: number
           id?: string
@@ -349,6 +354,7 @@ export type Database = {
           name: string
         }
         Update: {
+          archived_at?: string | null
           created_at?: string
           extra_price?: number
           id?: string
@@ -367,6 +373,7 @@ export type Database = {
       }
       modifiers: {
         Row: {
+          archived_at: string | null
           created_at: string
           id: string
           is_multiple: boolean
@@ -375,6 +382,7 @@ export type Database = {
           name: string
         }
         Insert: {
+          archived_at?: string | null
           created_at?: string
           id?: string
           is_multiple?: boolean
@@ -383,6 +391,7 @@ export type Database = {
           name: string
         }
         Update: {
+          archived_at?: string | null
           created_at?: string
           id?: string
           is_multiple?: boolean
@@ -595,6 +604,8 @@ export type Database = {
           order_number: number | null
           payment_method: string | null
           payment_reference: string | null
+          refund_shift_id: string | null
+          refunded_at: string | null
           server_total_amount: number | null
           shift_id: string | null
           status: string
@@ -630,6 +641,8 @@ export type Database = {
           order_number?: number | null
           payment_method?: string | null
           payment_reference?: string | null
+          refund_shift_id?: string | null
+          refunded_at?: string | null
           server_total_amount?: number | null
           shift_id?: string | null
           status?: string
@@ -665,6 +678,8 @@ export type Database = {
           order_number?: number | null
           payment_method?: string | null
           payment_reference?: string | null
+          refund_shift_id?: string | null
+          refunded_at?: string | null
           server_total_amount?: number | null
           shift_id?: string | null
           status?: string
@@ -958,6 +973,22 @@ export type Database = {
       is_admin: { Args: never; Returns: boolean }
       is_admin_at: { Args: { p_location_id: string }; Returns: boolean }
       is_member_of: { Args: { p_location_id: string }; Returns: boolean }
+      delete_menu_item: {
+        Args: { p_item_id: string }
+        Returns: string
+      }
+      delete_modifier: {
+        Args: { p_modifier_id: string }
+        Returns: string
+      }
+      delete_modifier_option: {
+        Args: { p_option_id: string }
+        Returns: string
+      }
+      restore_menu_item: {
+        Args: { p_item_id: string }
+        Returns: undefined
+      }
       next_order_number: {
         Args: { p_at?: string; p_location_id: string }
         Returns: number

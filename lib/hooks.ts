@@ -39,6 +39,7 @@ import {
   createMenuItem,
   updateMenuItem,
   deleteMenuItem,
+  restoreMenuItem,
   createCategory,
   updateCategory,
   deleteCategory,
@@ -80,7 +81,8 @@ const SHORT_CACHE = 1000 * 30;       // 30 seconds – orders, analytics
 export const queryKeys = {
   categories: ["categories"] as const,
   menuItems: ["menuItems"] as const,
-  allMenuItems: ["allMenuItems"] as const,
+  allMenuItems: (includeArchived = false) =>
+    ["allMenuItems", includeArchived] as const,
   modifiers: ["modifiers"] as const,
   menuItemModifierMap: ["menuItemModifierMap"] as const,
   menuItemModifierLinks: (id: string) => ["menuItemModifierLinks", id] as const,
@@ -122,10 +124,10 @@ export function useMenuItems() {
   });
 }
 
-export function useAllMenuItems() {
+export function useAllMenuItems(includeArchived = false) {
   return useQuery({
-    queryKey: queryKeys.allMenuItems,
-    queryFn: fetchAllMenuItems,
+    queryKey: queryKeys.allMenuItems(includeArchived),
+    queryFn: () => fetchAllMenuItems(includeArchived),
     staleTime: MED_CACHE,
   });
 }
@@ -421,7 +423,7 @@ export function useCreateMenuItem() {
     mutationFn: createMenuItem,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.menuItems });
-      qc.invalidateQueries({ queryKey: queryKeys.allMenuItems });
+      qc.invalidateQueries({ queryKey: ["allMenuItems"] });
     },
   });
 }
@@ -433,7 +435,7 @@ export function useUpdateMenuItem() {
       updateMenuItem(id, updates),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.menuItems });
-      qc.invalidateQueries({ queryKey: queryKeys.allMenuItems });
+      qc.invalidateQueries({ queryKey: ["allMenuItems"] });
     },
   });
 }
@@ -444,7 +446,18 @@ export function useDeleteMenuItem() {
     mutationFn: deleteMenuItem,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.menuItems });
-      qc.invalidateQueries({ queryKey: queryKeys.allMenuItems });
+      qc.invalidateQueries({ queryKey: ["allMenuItems"] });
+    },
+  });
+}
+
+export function useRestoreMenuItem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: restoreMenuItem,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.menuItems });
+      qc.invalidateQueries({ queryKey: ["allMenuItems"] });
     },
   });
 }
@@ -467,7 +480,7 @@ export function useUpdateCategory() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.categories });
       qc.invalidateQueries({ queryKey: queryKeys.menuItems });
-      qc.invalidateQueries({ queryKey: queryKeys.allMenuItems });
+      qc.invalidateQueries({ queryKey: ["allMenuItems"] });
     },
   });
 }
@@ -479,7 +492,7 @@ export function useDeleteCategory() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.categories });
       qc.invalidateQueries({ queryKey: queryKeys.menuItems });
-      qc.invalidateQueries({ queryKey: queryKeys.allMenuItems });
+      qc.invalidateQueries({ queryKey: ["allMenuItems"] });
     },
   });
 }

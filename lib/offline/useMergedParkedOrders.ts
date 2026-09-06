@@ -71,6 +71,8 @@ function projectEntryToOrder(e: OutboxEntry): QueueOrder {
     client_charge: e.clientCharge ?? null,
     sync_discrepancy: null,
     sync_warnings: null,
+    refunded_at: null,
+    refund_shift_id: null,
     order_items,
     table: e.snapshot.tableName ? { name: e.snapshot.tableName } : null,
     __local: { entryId: e.id, offlineRef: e.offlineRef, status: e.status, attempts: e.attempts },

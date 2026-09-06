@@ -162,26 +162,40 @@ export async function fetchMenuItems(): Promise<MenuItem[]> {
     .select("*, category:categories(*)")
     .eq("location_id", locationId)
     .eq("is_active", true)
+    .is("archived_at", null)
     .order("name");
 
   if (error) throw error;
   return (data ?? []) as MenuItem[];
 }
 
-export async function fetchAllMenuItems(): Promise<MenuItem[]> {
+/**
+ * Every menu item for the admin list, active or not.
+ *
+ * Archived items are excluded by default: an archived product is one that
+ * was "deleted" but had sales history, so it survives only to keep old
+ * receipts and reports readable (see `delete_menu_item`, migration 00031).
+ * The admin page passes `includeArchived` for its Archived filter.
+ */
+export async function fetchAllMenuItems(
+  includeArchived = false
+): Promise<MenuItem[]> {
   const locationId = await getLocationId();
-  const { data, error } = await supabase()
+  let query = supabase()
     .from("menu_items")
     .select("*, category:categories(*)")
-    .eq("location_id", locationId)
-    .order("name");
+    .eq("location_id", locationId);
+
+  if (!includeArchived) query = query.is("archived_at", null);
+
+  const { data, error } = await query.order("name");
 
   if (error) throw error;
   return (data ?? []) as MenuItem[];
 }
 
 export async function createMenuItem(
-  item: Omit<MenuItem, "id" | "created_at" | "updated_at" | "category">
+  item: Omit<MenuItem, "id" | "created_at" | "updated_at" | "category" | "archived_at">
 ): Promise<MenuItem> {
   const { data, error } = await supabase()
     .from("menu_items")
@@ -195,7 +209,9 @@ export async function createMenuItem(
 
 export async function updateMenuItem(
   id: string,
-  updates: Partial<Omit<MenuItem, "id" | "created_at" | "updated_at" | "category">>
+  updates: Partial<
+    Omit<MenuItem, "id" | "created_at" | "updated_at" | "category" | "archived_at">
+  >
 ): Promise<MenuItem> {
   const { data, error } = await supabase()
     .from("menu_items")
@@ -208,8 +224,32 @@ export async function updateMenuItem(
   return data as MenuItem;
 }
 
-export async function deleteMenuItem(id: string): Promise<void> {
-  const { error } = await supabase().from("menu_items").delete().eq("id", id);
+/**
+ * Remove a menu item, and say which way it went.
+ *
+ * A plain `delete` could never work for a product that had been sold:
+ * `order_items.menu_item_id` is a NOT NULL foreign key with no ON DELETE
+ * rule (00001:119), so Postgres raised 23503 and — because the page
+ * passed no onError — the button silently did nothing. It cannot be
+ * relaxed to ON DELETE SET NULL either: order_items keeps no copy of the
+ * product name and reads it back through this FK for every receipt
+ * reprint (see `fetchCompletedOrders`).
+ *
+ * So `delete_menu_item` (00031) deletes an item nobody ever ordered and
+ * archives one that has history. It returns which branch ran so the UI
+ * can tell the truth instead of guessing.
+ */
+export async function deleteMenuItem(id: string): Promise<"deleted" | "archived"> {
+  const { data, error } = await supabase().rpc("delete_menu_item", {
+    p_item_id: id,
+  });
+  if (error) throw error;
+  return (data as "deleted" | "archived") ?? "archived";
+}
+
+/** Un-archive a menu item. Availability stays off — that's a shift decision. */
+export async function restoreMenuItem(id: string): Promise<void> {
+  const { error } = await supabase().rpc("restore_menu_item", { p_item_id: id });
   if (error) throw error;
 }
 
@@ -280,10 +320,16 @@ export async function fetchAllModifiers(): Promise<Modifier[]> {
     .from("modifiers")
     .select("*, options:modifier_options(*)")
     .eq("location_id", locationId)
+    .is("archived_at", null)
     .order("name");
 
   if (error) throw error;
-  return (data ?? []) as Modifier[];
+  // An archived option (one that has been sold) stays on its group so old
+  // receipts resolve, but must not be offered on new orders.
+  return ((data ?? []) as Modifier[]).map((mod) => ({
+    ...mod,
+    options: (mod.options ?? []).filter((opt) => opt.archived_at == null),
+  }));
 }
 
 export async function createModifier(mod: {
@@ -312,9 +358,18 @@ export async function updateModifier(
   if (error) throw error;
 }
 
-export async function deleteModifier(id: string): Promise<void> {
-  const { error } = await supabase().from("modifiers").delete().eq("id", id);
+/**
+ * Same story as `deleteMenuItem`: `order_item_modifiers.modifier_option_id`
+ * is a NOT NULL FK with no ON DELETE rule (00001:133), and modifier_options
+ * cascades from modifiers (00001:79) — so deleting a group whose options
+ * had ever been sold hit the same silent 23503.
+ */
+export async function deleteModifier(id: string): Promise<"deleted" | "archived"> {
+  const { data, error } = await supabase().rpc("delete_modifier", {
+    p_modifier_id: id,
+  });
   if (error) throw error;
+  return (data as "deleted" | "archived") ?? "archived";
 }
 
 // ─── Modifier Options ──────────────────────────────────────────────
@@ -345,12 +400,14 @@ export async function updateModifierOption(
   if (error) throw error;
 }
 
-export async function deleteModifierOption(id: string): Promise<void> {
-  const { error } = await supabase()
-    .from("modifier_options")
-    .delete()
-    .eq("id", id);
+export async function deleteModifierOption(
+  id: string
+): Promise<"deleted" | "archived"> {
+  const { data, error } = await supabase().rpc("delete_modifier_option", {
+    p_option_id: id,
+  });
   if (error) throw error;
+  return (data as "deleted" | "archived") ?? "archived";
 }
 
 // ─── Menu Item ↔ Modifier Links ────────────────────────────────────
@@ -670,6 +727,13 @@ export async function fetchTodayAnalytics(): Promise<{
   totalOrders: number;
   totalItemsSold: number;
   averageOrderValue: number;
+  /** The same four figures for yesterday, for the dashboard's delta chips. */
+  previous: {
+    netSales: number;
+    totalOrders: number;
+    totalItemsSold: number;
+    averageOrderValue: number;
+  };
 }> {
   const today = await currentBusinessDate();
   const summary = await fetchSalesSummary(today, today);
@@ -680,7 +744,14 @@ export async function fetchTodayAnalytics(): Promise<{
     tipAmount: Number(summary.tip_amount) || 0,
     totalOrders: Number(summary.order_count) || 0,
     totalItemsSold: Number(summary.items_sold) || 0,
-    averageOrderValue: Number(summary.average_ticket) || 0,
+    // Ex-tip, matching the Net Sales tile beside it on the dashboard.
+    averageOrderValue: Number(summary.average_ticket_net) || 0,
+    previous: {
+      netSales: Number(summary.previous_period.net_sales) || 0,
+      totalOrders: Number(summary.previous_period.order_count) || 0,
+      totalItemsSold: Number(summary.previous_period.items_sold) || 0,
+      averageOrderValue: Number(summary.previous_period.average_ticket_net) || 0,
+    },
   };
 }
 
@@ -742,10 +813,17 @@ async function getTimeZone(): Promise<string> {
  * Both statuses are returned so History shows reversals rather than
  * silently dropping them.
  */
+/**
+ * How many orders the history view will load at once. Exported so the page
+ * can tell the user when a range hit the cap instead of quietly showing a
+ * truncated list (and searching only within it).
+ */
+export const COMPLETED_ORDERS_LIMIT = 200;
+
 export async function fetchCompletedOrders(
   startDate?: string,
   endDate?: string,
-  limit = 200
+  limit = COMPLETED_ORDERS_LIMIT
 ): Promise<Order[]> {
   const locationId = await getLocationId();
   let query = supabase()

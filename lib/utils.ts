@@ -19,6 +19,25 @@ export function formatMoney(amount: number | string, currency = "CRC"): string {
 }
 
 /**
+ * Whether a money amount is zero *as the reader sees it*.
+ *
+ * Colones are displayed in whole units (formatMoney rounds), but the stored
+ * figures carry two decimals from the IVA split, and close_shift rounds only
+ * the counted side of the drawer (00014:381). So a shift that reconciled to
+ * the colón lands on a cash_variance like 0.37 — which printed as a red "₡0"
+ * on the Z-report and in the shift list. Compare on the displayed value
+ * instead of on strict equality.
+ */
+export function isZeroMoney(
+  amount: number | null | undefined,
+  currency = "CRC"
+): boolean {
+  if (amount == null) return false;
+  const n = Number(amount) || 0;
+  return currency === "CRC" ? Math.round(n) === 0 : Math.abs(n) < 0.005;
+}
+
+/**
  * Lowercase and strip diacritics for accent-insensitive search, e.g. so a
  * search for "cafe" matches "Café".
  */

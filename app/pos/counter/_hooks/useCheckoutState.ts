@@ -1,5 +1,5 @@
 import { useReducer } from "react";
-import type { DiscountType, PaymentMethod } from "@/lib/types";
+import type { DiscountType, PaymentMethod, ServiceType } from "@/lib/types";
 
 /**
  * `order` — the discount comes off the whole tab (the original behaviour).
@@ -19,6 +19,14 @@ export type CheckoutFormState = {
   discountReason: string;
   discountScope: DiscountScope;
   discountItems: Record<string, number>;
+  /**
+   * Seeded from the order when it's picked off the queue, so this is
+   * "what was parked" unless the cashier corrects it here — a customer
+   * who ordered to go and then sat down.
+   */
+  serviceType: ServiceType;
+  /** Don't charge the servicio on this one sale. */
+  waiveService: boolean;
   voidReason: string;
   needsInvoice: boolean;
   invoiceName: string;
@@ -36,6 +44,8 @@ const initialState: CheckoutFormState = {
   discountReason: "",
   discountScope: "order",
   discountItems: {},
+  serviceType: "takeaway",
+  waiveService: false,
   voidReason: "",
   needsInvoice: false,
   invoiceName: "",
@@ -54,7 +64,7 @@ type Action =
   // put the PREVIOUS customer's name, cédula and email in front of the
   // next one, one "needs invoice" tick away from being filed against the
   // wrong person. Every per-order field resets here.
-  | { type: "SELECT_ORDER" }
+  | { type: "SELECT_ORDER"; serviceType: ServiceType }
   | { type: "RESET_ALL" };
 
 function reducer(state: CheckoutFormState, action: Action): CheckoutFormState {
@@ -93,6 +103,11 @@ function reducer(state: CheckoutFormState, action: Action): CheckoutFormState {
         voidReason: "",
         discountValue: "",
         discountReason: "",
+        // A waiver is granted to one customer, not to the till. Carrying
+        // it forward would quietly stop charging the servicio for the
+        // rest of the shift.
+        serviceType: action.serviceType,
+        waiveService: false,
       };
     case "RESET_ALL":
       return initialState;
@@ -122,7 +137,7 @@ export function useCheckoutState() {
       dispatch({ type: "TOGGLE_DISCOUNT_ITEM", orderItemId, quantity }),
     setDiscountItemQty: (orderItemId: string, quantity: number) =>
       dispatch({ type: "SET_DISCOUNT_ITEM_QTY", orderItemId, quantity }),
-    selectOrder: () => dispatch({ type: "SELECT_ORDER" }),
+    selectOrder: (serviceType: ServiceType) => dispatch({ type: "SELECT_ORDER", serviceType }),
     resetAll: () => dispatch({ type: "RESET_ALL" }),
   };
 }

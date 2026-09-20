@@ -17,6 +17,8 @@ export function CheckoutSummary({
   taxDue,
   taxRatePct,
   tipAmount,
+  serviceChargeAmount,
+  serviceRatePct,
   currency,
 }: {
   order: QueueOrder;
@@ -30,6 +32,9 @@ export function CheckoutSummary({
   taxDue: number;
   taxRatePct: number;
   tipAmount: number;
+  /** The IVA-inclusive servicio; 0 when takeaway, waived, or disabled. */
+  serviceChargeAmount: number;
+  serviceRatePct: number;
   currency: string;
 }) {
   const t = useT();
@@ -49,7 +54,11 @@ export function CheckoutSummary({
                 : `#${order.id.slice(0, 8)}`}
           </h2>
           <p className="text-expresso/60 text-sm">
-            {order.table?.name ?? t("common.takeaway")} · {formatTime(order.created_at)}
+            {order.table?.name ??
+              (order.service_type === "table"
+                ? t("counter.tableService")
+                : t("common.takeaway"))}{" "}
+            · {formatTime(order.created_at)}
             {order.__payPending && (
               <span className="ml-2 text-amber-700 dark:text-amber-400 font-medium">
                 · {t("offline.statePending")}
@@ -112,6 +121,19 @@ export function CheckoutSummary({
               <span>-{formatMoney(discountAmount, currency)}</span>
             </div>
           </>
+        )}
+        {/* Above the subtotal, not below it: netDue and taxDue already
+            carry the servicio's net and IVA parts (it is folded server
+            side — 00034), so listing it here is what makes the column
+            add up: items - discount + servicio = subtotal + IVA. */}
+        {serviceChargeAmount > 0 && (
+          <div className="flex justify-between text-expresso/70">
+            <span>
+              {t("counter.serviceCharge")}{" "}
+              <span className="text-expresso/50">({serviceRatePct}%)</span>
+            </span>
+            <span>{formatMoney(serviceChargeAmount, currency)}</span>
+          </div>
         )}
         <div className="flex justify-between text-expresso/70">
           <span>{t("counter.subtotal")}</span>

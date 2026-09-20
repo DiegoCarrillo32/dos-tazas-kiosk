@@ -68,7 +68,7 @@ import {
   archiveLocation,
   restoreLocation,
 } from "./queries";
-import type { CartItem, CashMovementType, CountedBreakdown, DiscountType, PaymentMethod } from "./types";
+import type { CartItem, CashMovementType, CountedBreakdown, DiscountType, PaymentMethod, ServiceType } from "./types";
 
 // ─── Cache durations ───────────────────────────────────────────────
 
@@ -223,8 +223,11 @@ export function useOrdersRealtime(): boolean {
 export function useCreateOrder() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (params: { cartItems: CartItem[]; tableId?: string | null }) =>
-      createOrder(params.cartItems, params.tableId),
+    mutationFn: (params: {
+      cartItems: CartItem[];
+      tableId?: string | null;
+      serviceType?: ServiceType;
+    }) => createOrder(params.cartItems, params.tableId, params.serviceType),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.parkedOrders });
     },
@@ -258,6 +261,8 @@ export function useCompleteOrder() {
       discountValue?: number;
       discountReason?: string | null;
       discountItems?: DiscountItemRef[] | null;
+      waiveServiceCharge?: boolean;
+      serviceType?: ServiceType;
     }) => completeOrder(params),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.parkedOrders });

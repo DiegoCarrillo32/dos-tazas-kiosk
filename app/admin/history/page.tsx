@@ -172,7 +172,7 @@ export default function TransactionHistory() {
         >
             <div className="space-y-3 text-sm">
               <div className="flex justify-between"><span className="text-expresso/60">{t("history.date")}</span><span className="font-medium text-expresso">{formatDate(selectedOrder.created_at)}</span></div>
-              <div className="flex justify-between"><span className="text-expresso/60">{t("history.table")}</span><span className="text-expresso">{selectedOrder.table?.name ?? t("common.takeaway")}</span></div>
+              <div className="flex justify-between"><span className="text-expresso/60">{t("history.table")}</span><span className="text-expresso">{selectedOrder.table?.name ?? (selectedOrder.service_type === "table" ? t("counter.tableService") : t("common.takeaway"))}</span></div>
               <div className="flex justify-between">
                 <span className="text-expresso/60">{t("history.colStatus")}</span>
                 <span className={selectedOrder.status === "refunded" ? "text-red-600 dark:text-red-400 font-medium" : "text-expresso"}>
@@ -190,6 +190,14 @@ export default function TransactionHistory() {
                       </span>
                     )}
                   </span>
+                </div>
+              )}
+              {Number(selectedOrder.service_charge_amount) > 0 && (
+                <div className="flex justify-between gap-3">
+                  <span className="text-expresso/60">
+                    {t("counter.serviceCharge")} ({Math.round(Number(selectedOrder.service_charge_rate) * 1000) / 10}%)
+                  </span>
+                  <span className="text-expresso">{formatMoney(selectedOrder.service_charge_amount, "CRC")}</span>
                 </div>
               )}
               <div className="flex justify-between gap-3"><span className="text-expresso/60">{t("history.total")}</span><span className="font-bold text-expresso">{formatMoney(selectedOrder.total_amount, "CRC")}</span></div>

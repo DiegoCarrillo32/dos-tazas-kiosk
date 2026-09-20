@@ -156,7 +156,11 @@ export function OrderQueue({
                 </div>
                 <div className="flex justify-between text-xs text-expresso/60">
                   <span>
-                    {order.table?.name ?? t("common.takeaway")} · {itemCount} {itemLabel(itemCount)}
+                    {order.table?.name ??
+                      (order.service_type === "table"
+                        ? t("floor.tableUnassigned")
+                        : t("common.takeaway"))}{" "}
+                    · {itemCount} {itemLabel(itemCount)}
                   </span>
                   <span>{formatTime(order.created_at)}</span>
                 </div>

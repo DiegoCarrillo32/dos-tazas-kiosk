@@ -1,4 +1,4 @@
-import type { CartItem, MenuItem } from "./types";
+import type { CartItem, MenuItem, ServiceType } from "./types";
 
 /**
  * Draft-cart persistence for the Floor.
@@ -29,6 +29,7 @@ export const FLOOR_CART_MAX_AGE_MS = 8 * 60 * 60 * 1000;
 export type StoredFloorCart = {
   items: CartItem[];
   tableId: string | null;
+  serviceType: ServiceType;
   savedAt: number;
 };
 
@@ -64,7 +65,7 @@ export function parseStoredCart(raw: string | null, now = Date.now()): StoredFlo
   }
   if (!parsed || typeof parsed !== "object") return null;
 
-  const { items, tableId, savedAt } = parsed as Partial<StoredFloorCart>;
+  const { items, tableId, serviceType, savedAt } = parsed as Partial<StoredFloorCart>;
   if (!Array.isArray(items) || items.length === 0) return null;
   if (typeof savedAt !== "number" || !Number.isFinite(savedAt)) return null;
   if (now - savedAt > FLOOR_CART_MAX_AGE_MS) return null;
@@ -83,9 +84,16 @@ export function parseStoredCart(raw: string | null, now = Date.now()): StoredFlo
   );
   if (valid.length === 0) return null;
 
+  const storedTableId = typeof tableId === "string" ? tableId : null;
+
   return {
     items: valid,
-    tableId: typeof tableId === "string" ? tableId : null,
+    tableId: storedTableId,
+    // A draft saved before service type existed only knew about the
+    // table, so fall back to the inference this replaced. A table always
+    // means table service either way.
+    serviceType:
+      storedTableId !== null || serviceType === "table" ? "table" : "takeaway",
     savedAt,
   };
 }
@@ -99,14 +107,18 @@ export function loadFloorCart(now = Date.now()): StoredFloorCart | null {
   }
 }
 
-export function saveFloorCart(items: CartItem[], tableId: string | null): void {
+export function saveFloorCart(
+  items: CartItem[],
+  tableId: string | null,
+  serviceType: ServiceType
+): void {
   if (typeof window === "undefined") return;
   try {
     if (items.length === 0) {
       window.localStorage.removeItem(FLOOR_CART_KEY);
       return;
     }
-    const payload: StoredFloorCart = { items, tableId, savedAt: Date.now() };
+    const payload: StoredFloorCart = { items, tableId, serviceType, savedAt: Date.now() };
     window.localStorage.setItem(FLOOR_CART_KEY, JSON.stringify(payload));
   } catch {
     // Storage full or blocked (private mode). Persistence is a convenience,

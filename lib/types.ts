@@ -98,6 +98,15 @@ export type OrderStatus =
 export type PaymentMethod = "card" | "cash" | "sinpe";
 
 /**
+ * How an order is served. Until 00034 this was only inferred from
+ * `table_id` being null, which could not express a table order with no
+ * table assigned (bar seating) and quietly turned into "takeaway" when
+ * an admin deleted the table. `table` is what the servicio is charged
+ * on — see `orders.service_charge_rate`.
+ */
+export type ServiceType = "takeaway" | "table";
+
+/**
  * How a checkout discount was keyed in. The client sends the type and the
  * raw value ("percent", 10); `complete_order` derives the colón figure, so
  * a tampered client cannot dictate what comes off the till.
@@ -155,6 +164,8 @@ export type ShiftSummary = {
     net_sales: number;
     tax_amount: number;
     tip_amount: number;
+    /** IVA-inclusive gross servicio (00034) — inside net_sales/tax_amount above, reported here too because it's usually owed onward. */
+    service_charge: number;
     discount_amount: number;
     refund_total: number;
     by_payment_method: Record<string, number>;
@@ -206,6 +217,12 @@ export type SalesSummary = {
   tax_amount: number;
   /** Reported separately: a tip is owed to staff, not shop revenue. */
   tip_amount: number;
+  /**
+   * The IVA-inclusive servicio (00034). Unlike a tip, it IS taxable
+   * revenue and sits inside `net_sales`/`tax_amount`/`average_ticket_net`
+   * above — reported on its own line because it is usually owed onward.
+   */
+  service_charge: number;
   discount_amount: number;
   refund_total: number;
   items_sold: number;
@@ -273,10 +290,11 @@ export type SalesSummary = {
  */
 export type Order = Omit<
   Tables<"orders">,
-  "status" | "payment_method" | "client_charge" | "sync_warnings"
+  "status" | "payment_method" | "client_charge" | "sync_warnings" | "service_type"
 > & {
   status: OrderStatus;
   payment_method: PaymentMethod | null;
+  service_type: ServiceType;
   client_charge?: Record<string, unknown> | null;
   sync_warnings?: unknown[] | null;
   // Joined data

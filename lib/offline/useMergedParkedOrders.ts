@@ -68,6 +68,15 @@ function projectEntryToOrder(e: OutboxEntry): QueueOrder {
     occurred_at: e.occurredAtIso,
     synced_at: null,
     server_total_amount: null,
+    // A local order has not been priced by the server yet, so it carries
+    // no servicio — exactly like a parked server order (00034's
+    // parked-order invariant). The Counter derives the rate it quotes
+    // from live settings instead.
+    service_type: e.snapshot.serviceType ?? (e.tableId ? "table" : "takeaway"),
+    service_charge_rate: 0,
+    service_charge_amount: 0,
+    service_charge_tax: 0,
+    service_charge_waived: false,
     client_charge: e.clientCharge ?? null,
     sync_discrepancy: null,
     sync_warnings: null,

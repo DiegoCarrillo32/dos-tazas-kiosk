@@ -33,6 +33,7 @@ function makeEntry(overrides: Partial<OutboxEntry> = {}): OutboxEntry {
     snapshot: {
       offlineRef: "OFF-AAAA",
       tableName: null,
+      serviceType: "takeaway",
       itemCount: 1,
       lines: [{ name: "Latte", quantity: 1, modifiers: [] }],
       totalAmount: 1500,
@@ -56,6 +57,8 @@ const payment: OfflinePaymentPayload = {
   discount_type: null,
   discount_value: 0,
   discount_reason: null,
+  waive_service: false,
+  service_type: "takeaway",
 };
 
 const clientCharge: ClientCharge = {
@@ -63,6 +66,8 @@ const clientCharge: ClientCharge = {
   taxAmount: 173,
   discountAmount: 0,
   tipAmount: 0,
+  serviceCharge: 0,
+  serviceRate: 0,
   totalAmount: 1500,
   amountTendered: 2000,
   changeDue: 500,

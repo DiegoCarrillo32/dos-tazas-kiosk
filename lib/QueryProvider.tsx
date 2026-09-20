@@ -58,7 +58,7 @@ export default function QueryProvider({
         // key and crashes on the new fields it doesn't have — this is
         // exactly what happened to the old `analytics` key when it went
         // from the client-aggregated shape to `sales_summary`'s richer one.
-        buster: "2026-07-26-shift-cash-reconciliation",
+        buster: "2026-09-18-service-type-and-charge",
       }}
     >
       {children}

@@ -89,6 +89,9 @@ export function ZReport({
             <Row label={t("cash.netSales")} value={money(summary.sales.net_sales)} />
             <Row label="IVA" value={money(summary.sales.tax_amount)} />
             <Row label={t("analytics.tips")} value={money(summary.sales.tip_amount)} />
+            {summary.sales.service_charge > 0 && (
+              <Row label={t("counter.serviceCharge")} value={money(summary.sales.service_charge)} />
+            )}
             {summary.sales.refund_count > 0 && (
               <Row label={t("cash.refundCount")} value={`${summary.sales.refund_count} · ${money(summary.sales.refund_total)}`} />
             )}

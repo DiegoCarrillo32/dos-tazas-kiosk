@@ -1,4 +1,4 @@
-import type { CartItem, DiscountType, PaymentMethod } from "@/lib/types";
+import type { CartItem, DiscountType, PaymentMethod, ServiceType } from "@/lib/types";
 import type { ClientCharge } from "@/lib/pricing";
 
 /**
@@ -27,6 +27,14 @@ export type RpcItem = {
 /** Snake_case to match sync_offline_order/sync_offline_payment's p_payment jsonb. */
 export type OfflinePaymentPayload = {
   payment_method: PaymentMethod;
+  /**
+   * Don't charge the servicio on this sale. Carried here rather than as
+   * its own RPC argument because sync_offline_payment reads the whole
+   * payment out of one jsonb (00034 §6).
+   */
+  waive_service: boolean;
+  /** The type as corrected at the till, if the cashier changed it. */
+  service_type: ServiceType;
   payment_reference: string | null;
   tip_amount: number;
   amount_tendered: number | null;
@@ -42,6 +50,7 @@ export type OfflinePaymentPayload = {
 export type OfflineOrderSnapshot = {
   offlineRef: string;
   tableName: string | null;
+  serviceType: ServiceType;
   itemCount: number;
   lines: { name: string; quantity: number; modifiers: string[]; notes?: string }[];
   totalAmount: number;
@@ -84,6 +93,12 @@ export type OutboxEntry = {
 
   items?: RpcItem[];
   tableId?: string | null;
+  /**
+   * 'table' with a null tableId is a real combination (bar seating), so
+   * this cannot be re-derived from tableId at drain time — it goes to
+   * sync_offline_order as its own argument.
+   */
+  serviceType?: ServiceType;
   payment?: OfflinePaymentPayload;
   clientCharge?: ClientCharge;
   openingFloat?: number;
@@ -104,5 +119,6 @@ export type EnqueueCartInput = {
   cartItems: CartItem[];
   tableId: string | null;
   tableName: string | null;
+  serviceType: ServiceType;
   currency: string;
 };

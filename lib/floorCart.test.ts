@@ -52,6 +52,26 @@ describe("parseStoredCart", () => {
     expect(parseStoredCart(stored({ tableId: "mesa-2" }), NOW)?.tableId).toBe("mesa-2");
   });
 
+  // A draft saved before service type existed carries no `serviceType` at
+  // all — `stored()`'s default fixture already models exactly that.
+  it("infers takeaway for a legacy draft with no table and no serviceType", () => {
+    expect(parseStoredCart(stored(), NOW)?.serviceType).toBe("takeaway");
+  });
+
+  it("infers table for a legacy draft that has a table but no serviceType", () => {
+    expect(parseStoredCart(stored({ tableId: "mesa-2" }), NOW)?.serviceType).toBe("table");
+  });
+
+  it("keeps an explicit table serviceType even with no table assigned (bar seating)", () => {
+    expect(parseStoredCart(stored({ serviceType: "table" }), NOW)?.serviceType).toBe("table");
+  });
+
+  it("a table always means table service, even if serviceType says otherwise", () => {
+    expect(
+      parseStoredCart(stored({ tableId: "mesa-2", serviceType: "takeaway" }), NOW)?.serviceType
+    ).toBe("table");
+  });
+
   it("drops a cart older than one shift", () => {
     const old = stored({ savedAt: NOW - FLOOR_CART_MAX_AGE_MS - 1 });
     expect(parseStoredCart(old, NOW)).toBeNull();

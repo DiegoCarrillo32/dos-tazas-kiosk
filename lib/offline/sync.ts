@@ -184,6 +184,11 @@ async function runEntry(entry: OutboxEntry): Promise<
     offlineRef: entry.offlineRef,
     deviceId: entry.deviceId,
     tableId: entry.tableId ?? null,
+    // A correction made at the till wins over what the Floor parked;
+    // attachPayment keeps entry.serviceType in step, so these agree
+    // except on an entry queued before this field existed.
+    serviceType: entry.payment?.service_type ?? entry.serviceType
+      ?? (entry.tableId ? "table" : "takeaway"),
     clientAgeSeconds: clientAgeSeconds(entry),
     expectedShiftId: entry.expectedShiftId,
     payment: entry.kind === "create_and_pay" ? entry.payment ?? null : null,

@@ -156,6 +156,8 @@ export type Database = {
           phone: string | null
           prices_include_tax: boolean
           receipt_footer: string | null
+          table_service_enabled: boolean
+          table_service_rate: number
           tax_id: string | null
           tax_rate: number
           timezone: string
@@ -171,6 +173,8 @@ export type Database = {
           phone?: string | null
           prices_include_tax?: boolean
           receipt_footer?: string | null
+          table_service_enabled?: boolean
+          table_service_rate?: number
           tax_id?: string | null
           tax_rate?: number
           timezone?: string
@@ -186,6 +190,8 @@ export type Database = {
           phone?: string | null
           prices_include_tax?: boolean
           receipt_footer?: string | null
+          table_service_enabled?: boolean
+          table_service_rate?: number
           tax_id?: string | null
           tax_rate?: number
           timezone?: string
@@ -607,6 +613,11 @@ export type Database = {
           refund_shift_id: string | null
           refunded_at: string | null
           server_total_amount: number | null
+          service_charge_amount: number
+          service_charge_rate: number
+          service_charge_tax: number
+          service_charge_waived: boolean
+          service_type: string
           shift_id: string | null
           status: string
           subtotal: number
@@ -644,6 +655,11 @@ export type Database = {
           refund_shift_id?: string | null
           refunded_at?: string | null
           server_total_amount?: number | null
+          service_charge_amount?: number
+          service_charge_rate?: number
+          service_charge_tax?: number
+          service_charge_waived?: boolean
+          service_type?: string
           shift_id?: string | null
           status?: string
           subtotal?: number
@@ -681,6 +697,11 @@ export type Database = {
           refund_shift_id?: string | null
           refunded_at?: string | null
           server_total_amount?: number | null
+          service_charge_amount?: number
+          service_charge_rate?: number
+          service_charge_tax?: number
+          service_charge_waived?: boolean
+          service_type?: string
           shift_id?: string | null
           status?: string
           subtotal?: number
@@ -956,7 +977,9 @@ export type Database = {
           p_order_id: string
           p_payment_method: string
           p_payment_reference?: string
+          p_service_type?: string
           p_tip_amount?: number
+          p_waive_service?: boolean
         }
         Returns: undefined
       }
@@ -965,7 +988,7 @@ export type Database = {
         Returns: string
       }
       create_order: {
-        Args: { items: Json; p_table_id?: string }
+        Args: { items: Json; p_service_type?: string; p_table_id?: string }
         Returns: string
       }
       current_shift_id: { Args: never; Returns: string }
@@ -1013,6 +1036,9 @@ export type Database = {
           order_number: number
           payment_method: string
           payment_reference: string
+          service_charge_amount: number
+          service_charge_rate: number
+          service_type: string
           staff_name: string
           status: string
           subtotal: number
@@ -1064,6 +1090,7 @@ export type Database = {
           p_items: Json
           p_offline_ref?: string
           p_payment?: Json
+          p_service_type?: string
           p_table_id?: string
         }
         Returns: Json

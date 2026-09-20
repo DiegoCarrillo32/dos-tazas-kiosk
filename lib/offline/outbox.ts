@@ -100,6 +100,7 @@ function buildSnapshot(input: EnqueueCartInput): OfflineOrderSnapshot {
   return {
     offlineRef: "", // filled in by the caller once the id is known
     tableName: input.tableName,
+    serviceType: input.serviceType,
     itemCount: input.cartItems.reduce((s, i) => s + i.quantity, 0),
     lines,
     totalAmount,
@@ -170,6 +171,7 @@ export async function enqueuePark(
     expectedShiftId,
     items: cartItemsToRpcItems(input.cartItems),
     tableId: input.tableId,
+    serviceType: input.serviceType,
     snapshot,
   };
   await putOutboxEntry(entry);
@@ -198,6 +200,10 @@ export async function attachPayment(
       payment,
       clientCharge,
       expectedShiftId,
+      // The cashier may have corrected the service type at the till, and
+      // this entry still has to CREATE the order — so the correction has
+      // to reach the create, not just the payment.
+      serviceType: payment.service_type,
       snapshot: { ...entry.snapshot, totalAmount: clientCharge.totalAmount },
     };
   });
@@ -235,6 +241,7 @@ export async function enqueueOpenShift(openingFloat: number): Promise<OutboxEntr
     snapshot: {
       offlineRef: base.offlineRef,
       tableName: null,
+      serviceType: "takeaway",
       itemCount: 0,
       lines: [],
       totalAmount: 0,

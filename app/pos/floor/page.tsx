@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { Coffee, Plus, Minus, Trash2, Send, Loader2, X, ShoppingBag, Armchair, Search, Pencil, AlertTriangle } from "lucide-react";
-import type { MenuItem, ModifierOption, CartItem, SelectedModifier, Modifier, OrderItem } from "@/lib/types";
+import type { MenuItem, ModifierOption, CartItem, SelectedModifier, Modifier, OrderItem, ServiceType } from "@/lib/types";
 import {
   useCategories,
   useMenuItems,
@@ -273,23 +273,38 @@ export default function FloorView() {
     const saved = loadFloorCart();
     if (!saved) return null;
     const items = reconcileCart(saved.items, menuItems);
-    return items.length > 0 ? { items, tableId: saved.tableId } : null;
+    return items.length > 0
+      ? { items, tableId: saved.tableId, serviceType: saved.serviceType }
+      : null;
   }, [menuItems]);
 
   // `null`/`undefined` mean "the cashier hasn't touched this yet, so the
   // restored draft still speaks for it".
   const [cartOverride, setCartOverride] = useState<CartItem[] | null>(null);
   const [tableOverride, setTableOverride] = useState<string | null | undefined>(undefined);
+  const [serviceTypeOverride, setServiceTypeOverride] = useState<ServiceType | undefined>(undefined);
 
   const orderItems = cartOverride ?? restoredCart?.items ?? EMPTY_CART;
   const selectedTableId = tableOverride !== undefined ? tableOverride : restoredCart?.tableId ?? null;
+  // A table always means table service, so it wins over a stale override:
+  // the cashier cannot pick a table and still be on "para llevar".
+  const serviceType: ServiceType =
+    selectedTableId !== null
+      ? "table"
+      : serviceTypeOverride ?? restoredCart?.serviceType ?? "takeaway";
+
+  // The one place that sets both, so the two can never disagree.
+  const selectService = (next: ServiceType, tableId: string | null) => {
+    setServiceTypeOverride(next);
+    setTableOverride(tableId);
+  };
 
   useEffect(() => {
     // Nothing is written before the menu lands — otherwise this fires on
     // mount with an empty cart and deletes the very draft we're restoring.
     if (menuItems.length === 0) return;
-    saveFloorCart(orderItems, selectedTableId);
-  }, [menuItems, orderItems, selectedTableId]);
+    saveFloorCart(orderItems, selectedTableId, serviceType);
+  }, [menuItems, orderItems, selectedTableId, serviceType]);
 
   const occupiedTableIds = new Set(
     parkedOrders.map((o) => o.table_id).filter(Boolean) as string[]
@@ -299,7 +314,9 @@ export default function FloorView() {
     : null;
   const selectedTableName = selectedTableId
     ? tables.find((t) => t.id === selectedTableId)?.name ?? t("floor.table")
-    : t("common.takeaway");
+    : serviceType === "table"
+      ? t("floor.tableUnassigned")
+      : t("common.takeaway");
   const tabExistingTotal = openTab ? Number(openTab.total_amount) : 0;
 
   const [drawerItem, setDrawerItem] = useState<MenuItem | null>(null);
@@ -438,7 +455,13 @@ export default function FloorView() {
     setIsQueueing(true);
     try {
       const entry = await enqueuePark(
-        { cartItems: orderItems, tableId: selectedTableId, tableName: selectedTableName, currency },
+        {
+          cartItems: orderItems,
+          tableId: selectedTableId,
+          tableName: selectedTableId ? selectedTableName : null,
+          serviceType,
+          currency,
+        },
         shift?.shift_id ?? null
       );
       finishSend();
@@ -486,7 +509,7 @@ export default function FloorView() {
     }
 
     createOrderMut.mutate(
-      { cartItems: orderItems, tableId: selectedTableId },
+      { cartItems: orderItems, tableId: selectedTableId, serviceType },
       {
         onSuccess: async (orderId) => {
           finishSend();
@@ -584,9 +607,9 @@ export default function FloorView() {
           <div className="flex items-center gap-2 overflow-x-auto px-4 py-1.5 hide-scrollbar">
             <span className="text-xs font-semibold text-expresso/50 uppercase tracking-wider shrink-0 pr-1">{t("floor.table")}</span>
             <button
-              onClick={() => setTableOverride(null)}
+              onClick={() => selectService("takeaway", null)}
               className={`flex items-center gap-1.5 px-3.5 min-h-[44px] rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
-                selectedTableId === null
+                serviceType === "takeaway"
                   ? "bg-coffee-fruit text-white shadow-sm"
                   : "bg-warm-roast/10 text-expresso/70 hover:bg-warm-roast/20"
               }`}
@@ -594,13 +617,29 @@ export default function FloorView() {
               <ShoppingBag className="w-3.5 h-3.5" />
               {t("common.takeaway")}
             </button>
+            {/* Table service with no particular table — a stool at the bar,
+                a seat on the terrace. It still earns the servicio, which is
+                why it cannot just be "takeaway with no table". Kept in the
+                same strip rather than a second row: a phone has no vertical
+                space to spare here. */}
+            <button
+              onClick={() => selectService("table", null)}
+              className={`flex items-center gap-1.5 px-3.5 min-h-[44px] rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
+                serviceType === "table" && selectedTableId === null
+                  ? "bg-coffee-fruit text-white shadow-sm"
+                  : "bg-warm-roast/10 text-expresso/70 hover:bg-warm-roast/20"
+              }`}
+            >
+              <Armchair className="w-3.5 h-3.5" />
+              {t("floor.tableUnassigned")}
+            </button>
             {tables.map((tbl) => {
               const occupied = occupiedTableIds.has(tbl.id);
               const active = selectedTableId === tbl.id;
               return (
                 <button
                   key={tbl.id}
-                  onClick={() => setTableOverride(tbl.id)}
+                  onClick={() => selectService("table", tbl.id)}
                   className={`flex items-center gap-1.5 px-3.5 min-h-[44px] rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
                     active
                       ? "bg-coffee-fruit text-white shadow-sm"

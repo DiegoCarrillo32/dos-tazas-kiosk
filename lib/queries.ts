@@ -8,6 +8,7 @@ import type {
   CartItem,
   PaymentMethod,
   DiscountType,
+  ServiceType,
   LocationSettings,
   Table,
   UserProfile,
@@ -465,10 +466,15 @@ export function cartItemsToRpcItems(cartItems: CartItem[]): RpcItem[] {
 
 export async function createOrder(
   cartItems: CartItem[],
-  tableId?: string | null
+  tableId?: string | null,
+  serviceType?: ServiceType
 ): Promise<string> {
   const { data, error } = await supabase().rpc("create_order", {
     items: cartItemsToRpcItems(cartItems),
+    // A table always implies table service server-side, so this only
+    // carries the case a table id cannot express: table service with no
+    // table assigned.
+    p_service_type: serviceType ?? undefined,
     // The generated RPC arg types model a `default null` SQL parameter as
     // optional (`T | undefined`), not `T | null` — omitting the key here
     // has PostgREST send no value at all, which the SQL default resolves
@@ -541,6 +547,10 @@ export async function completeOrder(params: {
    * which is what every discount was before 00030.
    */
   discountItems?: DiscountItemRef[] | null;
+  /** Don't charge the servicio on this sale. */
+  waiveServiceCharge?: boolean;
+  /** Correct the service type at the till; omitted leaves it as parked. */
+  serviceType?: ServiceType;
 }): Promise<void> {
   // complete_order recomputes the total (discount, IVA re-split, tip) and
   // validates the cash tendered server-side before marking the order
@@ -566,6 +576,11 @@ export async function completeOrder(params: {
     // reads those lines' own stored prices and refuses any id that is not
     // part of this order.
     p_discount_items: params.discountItems?.length ? params.discountItems : undefined,
+    // Like the discount, the servicio goes over as intent — waive or
+    // don't, and which service was given — never as an amount. The
+    // server holds the rate.
+    p_waive_service: params.waiveServiceCharge ? true : undefined,
+    p_service_type: params.serviceType ?? undefined,
   });
   if (error) throw error;
 }
@@ -615,6 +630,11 @@ export async function syncOfflineOrder(params: {
   offlineRef: string | null;
   deviceId: string;
   tableId: string | null;
+  /**
+   * Sent separately from `tableId` because 'table' with no table is a
+   * real combination (bar seating) that the id alone cannot express.
+   */
+  serviceType: ServiceType;
   clientAgeSeconds: number;
   expectedShiftId: string | null;
   payment: SyncPaymentPayload | null;
@@ -638,6 +658,7 @@ export async function syncOfflineOrder(params: {
     p_offline_ref: params.offlineRef ?? undefined,
     p_device_id: params.deviceId,
     p_table_id: params.tableId ?? undefined,
+    p_service_type: params.serviceType,
     p_client_age_seconds: params.clientAgeSeconds,
     p_expected_shift_id: params.expectedShiftId ?? undefined,
     p_payment: params.payment,
@@ -681,6 +702,8 @@ export async function syncOfflinePayment(params: {
 
 export type SyncPaymentPayload = {
   payment_method: PaymentMethod;
+  waive_service: boolean;
+  service_type: ServiceType;
   payment_reference: string | null;
   tip_amount: number;
   amount_tendered: number | null;
@@ -915,6 +938,9 @@ type ExportRow = {
   customer_name: string | null;
   customer_id: string | null;
   customer_email: string | null;
+  service_type: string;
+  service_charge_rate: number;
+  service_charge_amount: number;
 };
 
 /**
@@ -958,6 +984,9 @@ export async function exportOrdersCSV(
     "Customer Name",
     "Customer ID",
     "Customer Email",
+    "Service Type",
+    "Service Charge Rate",
+    "Service Charge",
   ];
 
   const body = rows.map((r) =>
@@ -982,6 +1011,9 @@ export async function exportOrdersCSV(
       r.customer_name ?? "",
       r.customer_id ?? "",
       r.customer_email ?? "",
+      r.service_type,
+      r.service_charge_rate,
+      r.service_charge_amount,
     ]
       .map(csvCell)
       .join(",")

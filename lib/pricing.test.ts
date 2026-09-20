@@ -7,6 +7,7 @@ import {
   priceCheckout,
   round2,
   selectionToRpcItems,
+  serviceCharge,
 } from "./pricing";
 import type { CartItem, MenuItem, ModifierOption } from "./types";
 
@@ -252,6 +253,95 @@ describe("priceCheckout — discount + IVA re-split + tip (mirrors complete_orde
   it("keeps subtotal + tax + tip == total for a combined discount+tip case", () => {
     const math = priceCheckout({ gross: 3456.78, tax: 397.66, discountType: "amount", discountValue: 333.33, tip: 200 });
     expect(round2(math.subtotal + math.taxAmount + math.tipAmount)).toBe(math.totalAmount);
+  });
+});
+
+describe("serviceCharge — the servicio (mirrors _service_charge, 00034)", () => {
+  it("is zero at rate 0 (takeaway, disabled, or waived)", () => {
+    expect(serviceCharge(1200, 0, 0.13)).toEqual({ gross: 0, tax: 0, net: 0 });
+  });
+
+  it("is zero on a zero or negative base", () => {
+    expect(serviceCharge(0, 0.1, 0.13)).toEqual({ gross: 0, tax: 0, net: 0 });
+    expect(serviceCharge(-500, 0.1, 0.13)).toEqual({ gross: 0, tax: 0, net: 0 });
+  });
+
+  it("splits the IVA-inclusive gross the same way a menu price does", () => {
+    // 1080 * 10% = 108 gross; 108 - 108/1.13 = 12.42 tax (round2)
+    const svc = serviceCharge(1080, 0.1, 0.13);
+    expect(svc.gross).toBe(108);
+    expect(svc.tax).toBe(round2(108 - 108 / 1.13));
+    expect(svc.net).toBe(round2(svc.gross - svc.tax));
+  });
+});
+
+describe("priceCheckout — the servicio, folded into subtotal/tax (mirrors complete_order §5, 00034)", () => {
+  it("adds nothing when serviceRate is omitted — exact backward compatibility", () => {
+    const withRate = priceCheckout({
+      gross: 1200, tax: 138.05, discountType: null, discountValue: 0, tip: 0,
+    });
+    const withZero = priceCheckout({
+      gross: 1200, tax: 138.05, discountType: null, discountValue: 0, tip: 0, serviceRate: 0,
+    });
+    expect(withRate).toEqual(withZero);
+    expect(withRate.serviceChargeAmount).toBe(0);
+    expect(withRate.serviceChargeTax).toBe(0);
+  });
+
+  it("charges the servicio on the post-discount gross, tip excluded", () => {
+    // gross 1200, tax 138.05, 10% discount -> preTipTotal 1080, then 10% servicio
+    const math = priceCheckout({
+      gross: 1200, tax: 138.05, discountType: "percent", discountValue: 10, tip: 0,
+      serviceRate: 0.1, taxRate: 0.13,
+    });
+    expect(math.preTipTotal).toBe(1080); // unchanged — still pre-servicio, pre-tip
+    const svc = serviceCharge(1080, 0.1, 0.13);
+    expect(math.serviceChargeAmount).toBe(svc.gross);
+    expect(math.serviceChargeTax).toBe(svc.tax);
+    expect(math.totalBeforeTip).toBe(round2(1080 + svc.gross));
+  });
+
+  it("folds into subtotal/tax rather than adding a fourth term — total = subtotal + tax + tip", () => {
+    const math = priceCheckout({
+      gross: 3456.78, tax: 397.66, discountType: "amount", discountValue: 333.33, tip: 200,
+      serviceRate: 0.1, taxRate: 0.13,
+    });
+    expect(round2(math.subtotal + math.taxAmount + math.tipAmount)).toBe(math.totalAmount);
+  });
+
+  it("never lets the servicio ride on the tip", () => {
+    const noTip = priceCheckout({
+      gross: 1000, tax: 115, discountType: null, discountValue: 0, tip: 0,
+      serviceRate: 0.1, taxRate: 0.13,
+    });
+    const withTip = priceCheckout({
+      gross: 1000, tax: 115, discountType: null, discountValue: 0, tip: 500,
+      serviceRate: 0.1, taxRate: 0.13,
+    });
+    expect(withTip.serviceChargeAmount).toBe(noTip.serviceChargeAmount);
+  });
+
+  it("is zero for a takeaway order (rate 0)", () => {
+    const math = priceCheckout({
+      gross: 1200, tax: 138.05, discountType: null, discountValue: 0, tip: 0,
+      serviceRate: 0, taxRate: 0.13,
+    });
+    expect(math.serviceChargeAmount).toBe(0);
+    expect(math.totalAmount).toBe(1200);
+  });
+
+  it("produces the same total under prices_include_tax true or false, given the same IVA-inclusive gross", () => {
+    // Both modes feed priceCheckout an IVA-inclusive gross (00034's header
+    // note) — the servicio math has no branch on the setting.
+    const inclusive = priceCheckout({
+      gross: 1130, tax: 130, discountType: null, discountValue: 0, tip: 0,
+      serviceRate: 0.1, taxRate: 0.13,
+    });
+    const exclusive = priceCheckout({
+      gross: 1130, tax: 130, discountType: null, discountValue: 0, tip: 0,
+      serviceRate: 0.1, taxRate: 0.13,
+    });
+    expect(inclusive.totalAmount).toBe(exclusive.totalAmount);
   });
 });
 

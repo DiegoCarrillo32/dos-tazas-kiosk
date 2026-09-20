@@ -162,11 +162,17 @@ export default function AnalyticsPage() {
             <h3 className="text-sm font-bold text-expresso/70 uppercase tracking-wider mb-4">
               {t("analytics.reconciliation")}
             </h3>
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-4 text-sm">
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-4 text-sm">
               <MiniStat label={t("analytics.grossSales")} value={money(data.gross_sales)} />
               <MiniStat label={t("analytics.discounts")} value={"−" + money(data.discount_amount)} muted={data.discount_amount === 0} />
               <MiniStat label={t("analytics.iva")} value={"−" + money(data.tax_amount)} />
               <MiniStat label={t("analytics.tips")} value={"−" + money(data.tip_amount)} hint={t("analytics.tipsNote")} muted={data.tip_amount === 0} />
+              {/* Not subtracted — unlike a tip, the servicio IS taxable
+                  revenue and is already inside net_sales/tax_amount
+                  (00034). Shown for visibility, without a minus sign, so
+                  the Gross - IVA - Tips = Net arithmetic in this strip's
+                  header comment still closes. */}
+              <MiniStat label={t("counter.serviceCharge")} value={money(data.service_charge)} hint={t("analytics.serviceChargeNote")} muted={data.service_charge === 0} />
               <MiniStat label={t("analytics.netSales")} value={money(data.net_sales)} emphasis />
               <MiniStat label={t("analytics.refunds")} value={money(data.refund_total)} hint={t("analytics.refundsNote")} muted={data.refund_count === 0} />
               <MiniStat label={t("analytics.voids")} value={String(data.void_count)} muted={data.void_count === 0} />

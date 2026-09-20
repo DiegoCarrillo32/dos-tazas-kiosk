@@ -35,6 +35,7 @@ import { ShiftBanner } from "./_components/ShiftBanner";
 import { OrderQueue } from "./_components/OrderQueue";
 import { CheckoutSummary } from "./_components/CheckoutSummary";
 import { DiscountSection } from "./_components/DiscountSection";
+import { ServiceSection } from "./_components/ServiceSection";
 import { TipSection } from "./_components/TipSection";
 import { PaymentSection } from "./_components/PaymentSection";
 import { InvoiceSection } from "./_components/InvoiceSection";
@@ -100,9 +101,13 @@ export default function CounterView() {
   // counting tax on the checkout screen.
   const subtotal = Number(currentSelected?.subtotal ?? 0);
   const taxAmount = Number(currentSelected?.tax_amount ?? 0);
-  const taxRatePct = Math.round(
-    Number(currentSelected?.tax_rate ?? settings?.tax_rate ?? 0.13) * 100
-  );
+  // `||`, not `??`: a local order's projection carries tax_rate 0
+  // (lib/offline/useMergedParkedOrders.ts), which `??` would happily
+  // accept. That used to only mislabel the IVA line; now it would also
+  // split the servicio's IVA against a 0% rate and disagree with the
+  // server on every offline table sale.
+  const taxRate = Number(currentSelected?.tax_rate) || Number(settings?.tax_rate) || 0.13;
+  const taxRatePct = Math.round(taxRate * 100);
   const currency = settings?.currency ?? "CRC";
   const currencySymbol = currency === "CRC" ? "₡" : "$";
   const tipEnabled = settings?.tip_enabled ?? false;
@@ -129,6 +134,20 @@ export default function CounterView() {
       ? discountBase(orderLines, checkout.discountItems)
       : { gross: grossBeforeDiscount, tax: taxAmount, unitCount: 0, lineCount: 0 };
 
+  // The order's own snapshot is what the server will use, but a local
+  // order has none yet (and a type corrected here re-snapshots server
+  // side), so fall back to live settings in both cases.
+  const serviceEnabled = settings?.table_service_enabled ?? false;
+  const settingsServiceRate = Number(settings?.table_service_rate) || 0;
+  const snapshotServiceRate = Number(currentSelected?.service_charge_rate) || 0;
+  const serviceRate =
+    !serviceEnabled || checkout.waiveService || checkout.serviceType !== "table"
+      ? 0
+      : checkout.serviceType !== currentSelected?.service_type || snapshotServiceRate === 0
+        ? settingsServiceRate
+        : snapshotServiceRate;
+  const serviceRatePct = Math.round(serviceRate * 1000) / 10;
+
   const math = priceCheckout({
     gross: grossBeforeDiscount,
     tax: taxAmount,
@@ -137,12 +156,17 @@ export default function CounterView() {
     discountType: checkout.discountType,
     discountValue: discountInput,
     tip: tipAmount,
+    serviceRate,
+    taxRate,
   });
   const {
     discountAmount,
     subtotal: netDue,
     taxAmount: taxDue,
+    // Deliberately the PRE-servicio figure: the tip chips offer a
+    // percentage of the food, not of the food plus a service charge.
     preTipTotal,
+    serviceChargeAmount,
     totalAmount: totalDue,
     discountExceedsGross: discountExceedsTotal,
   } = math;
@@ -190,6 +214,10 @@ export default function CounterView() {
             : discountInput
           : 0,
       discount_reason: discountAmount > 0 ? checkout.discountReason.trim() : null,
+      // Without these the queued sale charges a servicio the cashier
+      // waived, or misses one they added by correcting the type.
+      waive_service: checkout.waiveService,
+      service_type: checkout.serviceType,
     };
   }
 
@@ -197,6 +225,7 @@ export default function CounterView() {
     return {
       offlineRef: "", // overwritten by enqueuePaymentForServerOrder with this entry's own ref
       tableName: order.table?.name ?? null,
+      serviceType: checkout.serviceType,
       itemCount: (order.order_items ?? []).reduce((s, i) => s + i.quantity, 0),
       lines: (order.order_items ?? []).map((i) => ({
         name: i.menu_item?.name ?? "Item",
@@ -292,6 +321,11 @@ export default function CounterView() {
             }
           : null,
       tip_amount: tipAmount,
+      service_type: checkout.serviceType,
+      service_charge_rate: serviceRate,
+      service_charge_amount: serviceChargeAmount,
+      service_charge_tax: math.serviceChargeTax,
+      service_charge_waived: checkout.waiveService && checkout.serviceType === "table",
       total_amount: totalDue,
       amount_tendered: checkout.paymentMethod === "cash" ? tenderedAmount : null,
       change_due: checkout.paymentMethod === "cash" ? changeDue : null,
@@ -343,6 +377,10 @@ export default function CounterView() {
           discountAmount > 0 && scope === "items"
             ? selectionToRpcItems(orderLines, checkout.discountItems)
             : null,
+        // Intent, not an amount — the server holds the rate, exactly as
+        // it holds the discount arithmetic.
+        waiveServiceCharge: checkout.waiveService,
+        serviceType: checkout.serviceType,
       },
       {
         onSuccess: () => {
@@ -436,7 +474,7 @@ export default function CounterView() {
           selectedOrderId={currentSelected?.id ?? null}
           onSelectOrder={(order) => {
             setSelectedOrder(order);
-            checkout.selectOrder();
+            checkout.selectOrder(order.service_type ?? "takeaway");
           }}
           currency={currency}
         />
@@ -462,6 +500,8 @@ export default function CounterView() {
                   taxDue={taxDue}
                   taxRatePct={taxRatePct}
                   tipAmount={tipAmount}
+                  serviceChargeAmount={serviceChargeAmount}
+                  serviceRatePct={serviceRatePct}
                   currency={currency}
                 />
 
@@ -490,6 +530,16 @@ export default function CounterView() {
                   onItemQtyChange={checkout.setDiscountItemQty}
                   onClear={checkout.clearDiscount}
                 />
+
+                {serviceEnabled && (
+                  <ServiceSection
+                    serviceType={checkout.serviceType}
+                    waived={checkout.waiveService}
+                    ratePct={Math.round(settingsServiceRate * 1000) / 10}
+                    onTypeChange={(v) => checkout.setField("serviceType", v)}
+                    onWaivedChange={(v) => checkout.setField("waiveService", v)}
+                  />
+                )}
 
                 {tipEnabled && (
                   <TipSection

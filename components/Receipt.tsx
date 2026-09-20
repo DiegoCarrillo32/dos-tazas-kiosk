@@ -37,9 +37,21 @@ export function Receipt({
   // coffee" and "₡1.500 off the whole tab" are different conversations to
   // have with a customer holding the paper.
   const discountedLines = discountScopeLabels(order, items);
+  const serviceCharge = Number(order.service_charge_amount ?? 0);
+  const serviceChargeTax = Number(order.service_charge_tax ?? 0);
+  const serviceRatePct = Math.round(Number(order.service_charge_rate ?? 0) * 1000) / 10;
+  // When prices are quoted ex-IVA, every OTHER figure on this receipt is
+  // ex-IVA too, but service_charge_amount is stored IVA-inclusive
+  // (00034) — print its net part here so this line matches the rest of
+  // the column instead of silently mixing tax treatments.
+  const serviceLineAmount = settings?.prices_include_tax === false
+    ? serviceCharge - serviceChargeTax
+    : serviceCharge;
   // The list price of the lines above: subtotal and tax are stored net of
-  // the discount, so adding it back recovers what the items came to.
-  const grossItems = Number(order.subtotal) + Number(order.tax_amount) + discount;
+  // the discount AND the servicio (both are folded in — 00034), so
+  // adding both back recovers what the items alone came to.
+  const grossItems =
+    Number(order.subtotal) + Number(order.tax_amount) + discount - serviceCharge;
 
   const businessName = settings?.business_legal_name?.trim() || "Dos Tazas";
   const dateStr = new Date(order.created_at).toLocaleString("es-CR", {
@@ -75,7 +87,13 @@ export function Receipt({
             </span>
             <span>{dateStr}</span>
           </div>
-          <div>{order.table?.name ? `${t("receipt.table")}: ${order.table.name}` : t("receipt.takeaway")}</div>
+          <div>
+            {order.table?.name
+              ? `${t("receipt.table")}: ${order.table.name}`
+              : order.service_type === "table"
+                ? t("counter.tableService")
+                : t("receipt.takeaway")}
+          </div>
 
           <div className="border-t border-dashed border-expresso/40 my-2" />
 
@@ -122,6 +140,12 @@ export function Receipt({
                   <div className="pl-4 text-[11px]">{discountedLines.join(", ")}</div>
                 )}
               </>
+            )}
+            {serviceCharge > 0 && (
+              <Row
+                label={`${t("receipt.service")} (${serviceRatePct}%)`}
+                value={money(serviceLineAmount)}
+              />
             )}
             <Row label={t("receipt.subtotal")} value={money(order.subtotal)} />
             <Row label={`IVA (${taxPct}%)`} value={money(order.tax_amount)} />

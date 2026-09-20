@@ -202,10 +202,18 @@ function BusinessSettingsForm({ settings }: { settings: LocationSettings | null 
     settings?.prices_include_tax ?? true
   );
   const [tipEnabled, setTipEnabled] = useState(settings?.tip_enabled ?? false);
+  const [tableServiceEnabled, setTableServiceEnabled] = useState(
+    settings?.table_service_enabled ?? false
+  );
+  // Same fraction<->percent idiom as the IVA rate above.
+  const [tableServiceRatePct, setTableServiceRatePct] = useState(
+    String(((settings?.table_service_rate ?? 0.1) * 100).toFixed(2)).replace(/\.00$/, "")
+  );
   const [receiptFooter, setReceiptFooter] = useState(settings?.receipt_footer ?? "");
 
   const handleSave = () => {
     const rate = Math.max(0, parseFloat(taxRatePct) || 0) / 100;
+    const tableServiceRate = Math.min(1, Math.max(0, parseFloat(tableServiceRatePct) || 0) / 100);
     updateMut.mutate(
       {
         business_legal_name: legalName.trim() || null,
@@ -216,6 +224,8 @@ function BusinessSettingsForm({ settings }: { settings: LocationSettings | null 
         tax_rate: rate,
         prices_include_tax: pricesIncludeTax,
         tip_enabled: tipEnabled,
+        table_service_enabled: tableServiceEnabled,
+        table_service_rate: tableServiceRate,
         receipt_footer: receiptFooter.trim() || null,
       },
       {
@@ -285,6 +295,32 @@ function BusinessSettingsForm({ settings }: { settings: LocationSettings | null 
             {t("settings.enableTipsDesc")}
           </span>
         </label>
+
+        <label className="flex items-start gap-3 cursor-pointer">
+          <Checkbox
+            checked={tableServiceEnabled}
+            onChange={(e) => setTableServiceEnabled(e.target.checked)}
+          />
+          <span className="text-sm text-expresso/80">
+            <span className="font-medium text-expresso">{t("settings.enableTableService")}</span>
+            <br />
+            {t("settings.enableTableServiceDesc")}
+          </span>
+        </label>
+
+        {tableServiceEnabled && (
+          <div>
+            <Label className="mb-1 block">{t("settings.tableServiceRate")}</Label>
+            <Input
+              type="number"
+              inputMode="decimal"
+              min={0}
+              max={100}
+              value={tableServiceRatePct}
+              onChange={(e) => setTableServiceRatePct(e.target.value)}
+            />
+          </div>
+        )}
 
         <div>
           <Label className="mb-1 block">{t("settings.receiptFooter")}</Label>

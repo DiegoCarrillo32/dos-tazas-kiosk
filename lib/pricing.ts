@@ -31,7 +31,7 @@ export const round2 = (n: number) => Math.round(n * 100) / 100;
  * trail rather than silently reinterpreting old offline sales. Bump it
  * whenever the rounding or formulas below change.
  */
-export const PRICING_VERSION = "2026-09-05-a";
+export const PRICING_VERSION = "2026-09-18-a";
 
 export type PricingContext = {
   /** `location_settings.tax_rate`, e.g. 0.13 for 13% IVA. */
@@ -120,8 +120,19 @@ export type CheckoutMath = {
   /** net of discount — order.tax_amount */
   taxAmount: number;
   tipAmount: number;
-  /** subtotal + taxAmount, before tip */
+  /**
+   * The post-discount gross BEFORE the servicio — what the items alone
+   * come to. This is the base the tip chips offer percentages of, so it
+   * deliberately excludes the service charge: tipping on top of a
+   * service charge charges for service twice.
+   */
   preTipTotal: number;
+  /** The IVA-inclusive servicio. 0 for takeaway, waived, or disabled. */
+  serviceChargeAmount: number;
+  /** The IVA component inside `serviceChargeAmount`. */
+  serviceChargeTax: number;
+  /** preTipTotal + serviceChargeAmount — everything but the tip. */
+  totalBeforeTip: number;
   /** subtotal + taxAmount + tip — what's actually due */
   totalAmount: number;
   /**
@@ -131,6 +142,29 @@ export type CheckoutMath = {
    */
   discountExceedsGross: boolean;
 };
+
+/**
+ * Mirrors `_service_charge` (00034) exactly.
+ *
+ * The servicio is quoted IVA-inclusive, like a menu price, so its tax is
+ * split back out of the gross rather than added on top. One formula
+ * covers both `prices_include_tax` settings — see 00034's header for
+ * why the gross reaching here is IVA-inclusive either way.
+ *
+ * `rate` arrives already zeroed by the caller when the order is
+ * takeaway, the servicio is waived, or the shop has it turned off.
+ */
+export function serviceCharge(
+  preTipGross: number,
+  rate: number,
+  taxRate: number
+): { gross: number; tax: number; net: number } {
+  const r = Math.max(0, rate || 0);
+  const gross = r > 0 && preTipGross > 0 ? round2(preTipGross * r) : 0;
+  if (gross <= 0) return { gross: 0, tax: 0, net: 0 };
+  const tax = round2(gross - gross / (1 + Math.max(0, taxRate || 0)));
+  return { gross, tax, net: round2(gross - tax) };
+}
 
 /**
  * Mirrors `complete_order`'s discount / IVA-re-split / tip arithmetic
@@ -155,6 +189,15 @@ export function priceCheckout(input: {
   tip: number;
   baseGross?: number;
   baseTax?: number;
+  /**
+   * `orders.service_charge_rate` — already 0 when the order is
+   * takeaway, the cashier waived the servicio, or the shop has it off.
+   * Kept as a rate rather than an amount for the same reason the
+   * discount is: the server derives the colones, never the client.
+   */
+  serviceRate?: number;
+  /** `orders.tax_rate` — the snapshot, not the live setting. */
+  taxRate?: number;
 }): CheckoutMath {
   const gross = Math.max(0, input.gross || 0);
   const tax = Math.max(0, input.tax || 0);
@@ -192,14 +235,26 @@ export function priceCheckout(input: {
   const netDue = round2(discountedGross - taxDue);
 
   const preTipTotal = discountedGross;
-  const totalAmount = round2(preTipTotal + tip);
+
+  // The servicio rides on the post-discount gross, so a comped coffee
+  // reduces it too. Folded into subtotal/tax rather than added as a
+  // fourth term, exactly as complete_order does it (00034), so
+  // total = subtotal + tax + tip still holds.
+  const svc = serviceCharge(preTipTotal, input.serviceRate ?? 0, input.taxRate ?? 0);
+  const subtotal = round2(netDue + svc.net);
+  const taxAmount = round2(taxDue + svc.tax);
+  const totalBeforeTip = round2(preTipTotal + svc.gross);
+  const totalAmount = round2(subtotal + taxAmount + tip);
 
   return {
     discountAmount: cappedDiscount,
-    subtotal: netDue,
-    taxAmount: taxDue,
+    subtotal,
+    taxAmount,
     tipAmount: tip,
     preTipTotal,
+    serviceChargeAmount: svc.gross,
+    serviceChargeTax: svc.tax,
+    totalBeforeTip,
     totalAmount,
     discountExceedsGross,
   };
@@ -281,6 +336,8 @@ export type ClientCharge = {
   taxAmount: number;
   discountAmount: number;
   tipAmount: number;
+  serviceCharge: number;
+  serviceRate: number;
   totalAmount: number;
   amountTendered: number | null;
   changeDue: number | null;
@@ -289,13 +346,16 @@ export type ClientCharge = {
 
 export function toClientCharge(
   math: CheckoutMath,
-  tendered: number | null
+  tendered: number | null,
+  serviceRate = 0
 ): ClientCharge {
   return {
     subtotal: math.subtotal,
     taxAmount: math.taxAmount,
     discountAmount: math.discountAmount,
     tipAmount: math.tipAmount,
+    serviceCharge: math.serviceChargeAmount,
+    serviceRate,
     totalAmount: math.totalAmount,
     amountTendered: tendered,
     changeDue: tendered != null ? changeDue(math.totalAmount, tendered) : null,
